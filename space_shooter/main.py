@@ -1149,6 +1149,7 @@ class Game:
         self.enemies.clear()
         self.active_bosses.clear()
         self.level = self.lv_idx + 1
+        self.score = 0   # each level starts with a fresh score
 
     def _spawn_enemy_arcade(self):
         lv = min(self.level, 3)
