@@ -187,6 +187,11 @@ class SoundManager:
                 'boss_die':     self._noise(sr, 0.60, decay=4, vol=0.70),
                 'level_complete': self._chord(sr, [261, 329, 392], vol=0.45),
                 'victory':      self._fanfare(sr),
+                # UI sounds
+                'ui_click':     self._ui_click(sr),
+                'ui_back':      self._ui_back(sr),
+                'ui_hover':     self._ui_hover(sr),
+                'wipe':         self._wipe_snd(sr),
             }
             self._play_ambient(sr)
             self.enabled = True
@@ -250,6 +255,36 @@ class SoundManager:
             out[start:end] += np.sin(2*np.pi*freq*t) * np.exp(-2*t)
         out = np.clip(out * vol * 32767, -32767, 32767)
         return self._to_sound(out)
+
+    def _ui_click(self, sr=22050, vol=0.28):
+        """Short two-tone click — positive button press."""
+        dur = 0.045
+        t = np.linspace(0, dur, int(sr*dur), False)
+        hi = np.sin(2*np.pi*1200*t) * np.exp(-80*t) * 0.5
+        lo = np.sin(2*np.pi*600*t)  * np.exp(-50*t) * 0.5
+        return self._to_sound((hi + lo) * vol * 32767)
+
+    def _ui_back(self, sr=22050, vol=0.22):
+        """Short descending sweep — back / cancel."""
+        dur = 0.07
+        t = np.linspace(0, dur, int(sr*dur), False)
+        freq = 700 - 350*(t/dur)
+        return self._to_sound(np.sin(2*np.pi*np.cumsum(freq)/sr) * np.exp(-35*t) * vol * 32767)
+
+    def _ui_hover(self, sr=22050, vol=0.08):
+        """Very subtle high tick — button hover."""
+        dur = 0.018
+        t = np.linspace(0, dur, int(sr*dur), False)
+        return self._to_sound(np.sin(2*np.pi*1500*t) * np.exp(-200*t) * vol * 32767)
+
+    def _wipe_snd(self, sr=22050, vol=0.48):
+        """Dramatic noise + descending sweep — progress wipe."""
+        dur = 0.6
+        t = np.linspace(0, dur, int(sr*dur), False)
+        noise = np.random.uniform(-1, 1, len(t)) * 0.45
+        freq  = 380 - 280*(t/dur)
+        sweep = np.sin(2*np.pi*np.cumsum(freq)/sr) * 0.55
+        return self._to_sound((noise + sweep) * np.exp(-3.5*t) * vol * 32767)
 
     def _play_ambient(self, sr=22050):
         dur = 5.0
@@ -932,6 +967,7 @@ class Game:
         self._del_hold         = 0    # frames DEL held on level-select screen
         self._del_wipe_confirm = 0    # countdown for "progress reset!" banner
         self._del_key_held     = False  # tracked via KEYDOWN/KEYUP events
+        self._hover_snd_last   = 0    # pygame.time.get_ticks() of last hover sound
         self._reset()
 
     def _reset(self):
@@ -1555,6 +1591,12 @@ class Game:
                     for nm, rc in self._btn_rects.items():
                         if rc.collidepoint(mx, my):
                             new_hover = nm; break
+                    # Play hover sound when entering a new button (rate-limited)
+                    if new_hover and new_hover != self._hover_btn:
+                        now = pygame.time.get_ticks()
+                        if now - self._hover_snd_last >= 80:
+                            self.sounds.play('ui_hover')
+                            self._hover_snd_last = now
                     self._hover_btn = new_hover
                     # Sync visual-selection state with hovered button
                     if self.state == 'menu':
@@ -1755,6 +1797,7 @@ class Game:
         self._del_hold         = 0
         self._del_key_held     = False
         self._del_wipe_confirm = 150  # show "Progress reset!" banner for 2.5 s
+        self.sounds.play('wipe')
         try:
             with open(self._save_path, 'w') as f:
                 json.dump({'max_unlocked': 0}, f)
@@ -1910,6 +1953,10 @@ class Game:
     # ── Mouse button dispatcher ───────────────────────────────────────────────
     def _handle_button_click(self, name: str):
         """Dispatch a mouse-click on a named button, guarded by current state."""
+        # back/cancel actions use a descending tone; positive actions use a click
+        _back_btns = {'ls_back', 'pause_1', 'go_menu', 'vict_menu'}
+        self.sounds.play('ui_back' if name in _back_btns else 'ui_click')
+
         if self.state == 'menu':
             if name == 'menu_0':
                 self.mode = 'arcade'; self._reset(); self.state = 'playing'
