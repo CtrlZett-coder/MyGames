@@ -28,50 +28,13 @@ jobs:
       - name: Build web version
         run: python -m pygbag --build space_shooter
 
-      - name: Download CDN files (with fallback — keep remote URL if download fails)
-        run: |
-          CDN="https://pygame-web.github.io/cdn/0.9.3"
-          DEST="space_shooter/build/web"
-
-          download_ok=true
-
-          curl -sL --fail --max-time 30 "$CDN/pythons.js" -o "$DEST/pythons.js" \
-            && echo "pythons.js OK ($(wc -c < $DEST/pythons.js) bytes)" \
-            || { echo "WARNING: pythons.js download failed — will use remote CDN URL"; rm -f "$DEST/pythons.js"; download_ok=false; }
-
-          curl -sL --fail --max-time 30 "$CDN/browserfs.min.js" -o "$DEST/browserfs.min.js" \
-            && echo "browserfs.min.js OK ($(wc -c < $DEST/browserfs.min.js) bytes)" \
-            || { echo "WARNING: browserfs.min.js download failed"; rm -f "$DEST/browserfs.min.js"; }
-
-          echo "download_ok=$download_ok" >> $GITHUB_ENV
-
-      - name: Patch index.html — loading screen + local CDN if available
+      - name: Patch index.html — add loading spinner only
         run: |
           python3 - <<'EOF'
-          import os, re
-
           with open("space_shooter/build/web/index.html", "r") as f:
               html = f.read()
 
-          # Only replace CDN URLs if we actually downloaded the files
-          dest = "space_shooter/build/web"
-          if os.path.exists(f"{dest}/pythons.js") and os.path.getsize(f"{dest}/pythons.js") > 1000:
-              html = html.replace(
-                  "https://pygame-web.github.io/cdn/0.9.3/pythons.js",
-                  "./pythons.js"
-              )
-              print("Patched: pythons.js -> local")
-          else:
-              print("Kept: pythons.js -> remote CDN")
-
-          if os.path.exists(f"{dest}/browserfs.min.js") and os.path.getsize(f"{dest}/browserfs.min.js") > 1000:
-              html = html.replace(
-                  "https://pygame-web.github.io/cdn/0.9.3//browserfs.min.js",
-                  "./browserfs.min.js"
-              )
-              print("Patched: browserfs.min.js -> local")
-
-          # Always add a visible loading overlay (works regardless of CDN)
+          # Keep ALL original CDN URLs — only inject a visible loading overlay
           loading_overlay = """
           <style>
           #py-loading {
@@ -95,10 +58,9 @@ jobs:
             <div class="py-spinner"></div>
             <h2>Space Shooter</h2>
             <p>Loading Python runtime...</p>
-            <p style="color:#666;font-size:0.85em">First load: ~30-60 seconds &nbsp;|&nbsp; Click canvas when ready</p>
+            <p style="color:#666;font-size:0.85em">First load: ~30-60 sec &nbsp;|&nbsp; Click canvas when ready</p>
           </div>
           <script>
-            // Hide overlay when the canvas gets content (pygame starts drawing)
             var _pyCheck = setInterval(function() {
               var c = document.getElementById('canvas');
               if (c && c.width > 2) {
@@ -107,18 +69,17 @@ jobs:
                 clearInterval(_pyCheck);
               }
             }, 300);
-            // Safety: remove after 3 minutes
             setTimeout(function() {
               var d = document.getElementById('py-loading');
               if (d) d.style.display = 'none';
-            }, 180000);
+            }, 300000);
           </script>
           """
           html = html.replace("<body>", "<body>" + loading_overlay, 1)
 
           with open("space_shooter/build/web/index.html", "w") as f:
               f.write(html)
-          print("index.html patched OK")
+          print("Done — CDN URLs untouched, spinner injected")
           EOF
 
       - name: Show deployed files
