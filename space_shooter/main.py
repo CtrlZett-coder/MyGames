@@ -925,6 +925,9 @@ class Game:
         self._pause_surf: pygame.Surface | None = None
         self._save_path = os.path.join(os.path.dirname(__file__), 'save.json')
         self._max_unlocked = self._load_save()
+        self._btn_rects: dict  = {}   # button_name → pygame.Rect
+        self._hover_btn: str   = ''   # currently hovered button key
+        self._cursor_is_hand   = False
         self._reset()
 
     def _reset(self):
@@ -1177,6 +1180,10 @@ class Game:
                     self.lv_wave_phase = 'normal'
 
         elif phase == 'normal':
+            # Stop spawning early when score target is already reached
+            _, _, score_tgt, _ = LEVELS_DATA[self.lv_idx]
+            if score_tgt > 0 and self.score >= score_tgt:
+                self.lv_spawn_left = 0
             # Spawn enemies
             if self.lv_spawn_left > 0:
                 self.lv_spawn_timer += 1
@@ -1395,7 +1402,24 @@ class Game:
         ctr(self.font_xl.render("VICTORY!", True, GOLD), SCREEN_HEIGHT//2 - 100)
         ctr(self.font_b.render("All 20 levels cleared!", True, WHITE), SCREEN_HEIGHT//2 - 20)
         ctr(self.font.render(f"Final Score: {self.score}", True, YELLOW), SCREEN_HEIGHT//2 + 60)
-        ctr(self.font.render("R — play again   ESC — main menu", True, CYAN), SCREEN_HEIGHT//2 + 120)
+        # Mouse-clickable buttons
+        btn_data = [('vict_restart', 'PLAY AGAIN', CYAN), ('vict_menu', 'MAIN MENU', GRAY)]
+        bw, bh = 200, 52; gap_b = 20
+        bx0 = SCREEN_WIDTH//2 - (bw * 2 + gap_b) // 2
+        by = SCREEN_HEIGHT//2 + 110
+        for i, (key, label, base_col) in enumerate(btn_data):
+            bx = bx0 + i * (bw + gap_b)
+            hovered = (self._hover_btn == key)
+            col = WHITE if hovered else base_col
+            bg  = (20, 60, 80) if hovered else DARK_GRAY
+            rect = pygame.Rect(bx, by, bw, bh)
+            self._btn_rects[key] = rect
+            pygame.draw.rect(self.screen, bg,  rect, border_radius=8)
+            pygame.draw.rect(self.screen, col, rect, 2, border_radius=8)
+            t = self.font.render(label, True, col)
+            self.screen.blit(t, t.get_rect(center=rect.center))
+        hint = self.font_s.render("R — play again   ESC — menu", True, (80, 80, 80))
+        ctr(hint, SCREEN_HEIGHT//2 + 185)
 
     def _draw_game_over(self):
         ov = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
@@ -1406,9 +1430,27 @@ class Game:
         ctr(self.font_b.render("GAME  OVER",           True, RED),    SCREEN_HEIGHT//2-80)
         ctr(self.font.render(f"Score: {self.score}",   True, WHITE),  SCREEN_HEIGHT//2-10)
         ctr(self.font.render(lv_txt,                   True, YELLOW), SCREEN_HEIGHT//2+35)
-        ctr(self.font.render("R — restart   ESC — main menu", True, CYAN), SCREEN_HEIGHT//2+100)
+        # Mouse-clickable buttons
+        btn_data = [('go_restart', 'RESTART', CYAN), ('go_menu', 'MAIN MENU', GRAY)]
+        bw, bh = 200, 52; gap_b = 20
+        bx0 = SCREEN_WIDTH//2 - (bw * 2 + gap_b) // 2
+        by = SCREEN_HEIGHT//2 + 90
+        for i, (key, label, base_col) in enumerate(btn_data):
+            bx = bx0 + i * (bw + gap_b)
+            hovered = (self._hover_btn == key)
+            col = WHITE if hovered else base_col
+            bg  = (20, 60, 80) if hovered else DARK_GRAY
+            rect = pygame.Rect(bx, by, bw, bh)
+            self._btn_rects[key] = rect
+            pygame.draw.rect(self.screen, bg,  rect, border_radius=8)
+            pygame.draw.rect(self.screen, col, rect, 2, border_radius=8)
+            t = self.font.render(label, True, col)
+            self.screen.blit(t, t.get_rect(center=rect.center))
+        hint = self.font_s.render("R — restart   ESC — menu", True, (80, 80, 80))
+        ctr(hint, SCREEN_HEIGHT//2 + 165)
 
     def _draw_menu(self):
+        self._btn_rects.clear()
         self.screen.fill(BLACK)
         for star in self.stars:
             star.update(); star.draw(self.screen)
@@ -1431,8 +1473,11 @@ class Game:
         ]
         for i, (name, desc) in enumerate(modes):
             bx = x0 + i*(box_w + gap)
+            btn_key = f'menu_{i}'
+            self._btn_rects[btn_key] = pygame.Rect(bx, y0, box_w, box_h)
             selected = (i == self._menu_sel)
-            box_col = CYAN if selected else GRAY
+            hovered  = (self._hover_btn == btn_key)
+            box_col  = CYAN if selected else (WHITE if hovered else GRAY)
             pygame.draw.rect(self.screen, DARK_GRAY, (bx, y0, box_w, box_h), border_radius=10)
             pygame.draw.rect(self.screen, box_col,   (bx, y0, box_w, box_h), 3, border_radius=10)
             lbl = self.font_b.render(name, True, (WHITE if selected else GRAY))
@@ -1445,7 +1490,7 @@ class Game:
             t = self.font_s.render(desc, True, col)
             self.screen.blit(t, t.get_rect(center=(bx+box_w//2, y0+box_h+22)))
 
-        hint = self.font_s.render("A / D or Arrow keys to select    SPACE or ENTER to start", True, GRAY)
+        hint = self.font_s.render("A/D — select    SPACE/ENTER — start    or click with mouse", True, GRAY)
         ctr(hint, SCREEN_HEIGHT - 40)
 
     # ── main loop ─────────────────────────────────────────────────────────────
@@ -1517,6 +1562,45 @@ class Game:
                             self._reset(); self.state = 'playing'
                         elif event.key == pygame.K_ESCAPE:
                             self._reset_to_menu()
+
+                # ── Mouse hover ───────────────────────────────────────────────
+                if event.type == pygame.MOUSEMOTION:
+                    mx, my = event.pos
+                    new_hover = ''
+                    for nm, rc in self._btn_rects.items():
+                        if rc.collidepoint(mx, my):
+                            new_hover = nm; break
+                    self._hover_btn = new_hover
+                    # Sync keyboard-selection state with hovered button
+                    if self.state == 'menu':
+                        for nm, rc in self._btn_rects.items():
+                            if nm.startswith('menu_') and rc.collidepoint(mx, my):
+                                self._menu_sel = int(nm[-1])
+                    elif self.state == 'level_select':
+                        for nm, rc in self._btn_rects.items():
+                            if (nm.startswith('ls_') and nm != 'ls_back'
+                                    and rc.collidepoint(mx, my)):
+                                i = int(nm[3:])
+                                if i <= self._max_unlocked:
+                                    self._ls_cursor = i
+                    elif self.state == 'paused':
+                        for nm, rc in self._btn_rects.items():
+                            if nm.startswith('pause_') and rc.collidepoint(mx, my):
+                                self._pause_sel = int(nm[-1])
+                    # Update OS cursor icon
+                    want_hand = bool(new_hover)
+                    if want_hand != self._cursor_is_hand:
+                        self._cursor_is_hand = want_hand
+                        pygame.mouse.set_cursor(
+                            pygame.SYSTEM_CURSOR_HAND if want_hand
+                            else pygame.SYSTEM_CURSOR_ARROW)
+
+                # ── Mouse click ───────────────────────────────────────────────
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    mx, my = event.pos
+                    for nm, rc in self._btn_rects.items():
+                        if rc.collidepoint(mx, my):
+                            self._handle_button_click(nm); break
 
             if self.state == 'menu':
                 self._draw_menu()
@@ -1685,28 +1769,45 @@ class Game:
 
         ctr(self.font_b.render("PAUSED", True, CYAN), SCREEN_HEIGHT//2 - 90)
 
+        self._btn_rects.clear()
         options = ["Resume", "Main Menu"]
         for i, label in enumerate(options):
-            col  = WHITE if i == self._pause_sel else GRAY
-            bg   = (30, 80, 100) if i == self._pause_sel else DARK_GRAY
+            btn_key  = f'pause_{i}'
+            hovered  = (self._hover_btn == btn_key)
+            selected = (i == self._pause_sel)
+            col  = WHITE if (selected or hovered) else GRAY
+            bg   = (30, 80, 100) if (selected or hovered) else DARK_GRAY
             bw, bh = 260, 54
             bx = SCREEN_WIDTH//2 - bw//2
             by = SCREEN_HEIGHT//2 - 10 + i * 70
-            pygame.draw.rect(self.screen, bg,   (bx, by, bw, bh), border_radius=8)
-            pygame.draw.rect(self.screen, col,  (bx, by, bw, bh), 2, border_radius=8)
+            rect = pygame.Rect(bx, by, bw, bh)
+            self._btn_rects[btn_key] = rect
+            pygame.draw.rect(self.screen, bg,  rect, border_radius=8)
+            pygame.draw.rect(self.screen, col, rect, 2, border_radius=8)
             t = self.font.render(label, True, col)
-            self.screen.blit(t, t.get_rect(center=(SCREEN_WIDTH//2, by + bh//2)))
+            self.screen.blit(t, t.get_rect(center=rect.center))
 
-        hint = self.font_s.render("↑↓ — select    ENTER / ESC — confirm", True, GRAY)
+        hint = self.font_s.render("↑↓ — select    ENTER/ESC — confirm    or click", True, GRAY)
         ctr(hint, SCREEN_HEIGHT//2 + 170)
 
     # ── Level Select ──────────────────────────────────────────────────────────
     def _draw_level_select(self):
+        self._btn_rects.clear()
         self.screen.fill(BLACK)
         for star in self.stars: star.update(); star.draw(self.screen)
 
         def ctr(surf, y): self.screen.blit(surf, surf.get_rect(center=(SCREEN_WIDTH//2, y)))
         ctr(self.font_b.render("SELECT LEVEL", True, CYAN), 50)
+
+        # Back button (top-left corner)
+        back_rect = pygame.Rect(15, 12, 110, 38)
+        self._btn_rects['ls_back'] = back_rect
+        bk_hov = (self._hover_btn == 'ls_back')
+        bk_col = WHITE if bk_hov else GRAY
+        pygame.draw.rect(self.screen, DARK_GRAY, back_rect, border_radius=6)
+        pygame.draw.rect(self.screen, bk_col,   back_rect, 2, border_radius=6)
+        bt = self.font_s.render("← BACK", True, bk_col)
+        self.screen.blit(bt, bt.get_rect(center=back_rect.center))
 
         cols, rows = 4, 5
         cw, ch = 186, 88
@@ -1725,9 +1826,14 @@ class Game:
 
             unlocked  = idx <= self._max_unlocked
             selected  = idx == self._ls_cursor
+            hovered   = (self._hover_btn == f'ls_{idx}') and unlocked
             ld = LEVELS_DATA[idx]
             score_tgt = ld[2]
             bosses    = ld[3]
+
+            # Store rect for mouse interaction
+            cell_rect = pygame.Rect(x, y, cw, ch)
+            self._btn_rects[f'ls_{idx}'] = cell_rect
 
             # Background colour
             if not unlocked:
@@ -1736,12 +1842,15 @@ class Game:
             elif selected:
                 bg = (15, 55, 80)
                 border = CYAN
+            elif hovered:
+                bg = (20, 45, 65)
+                border = (100, 160, 200)
             else:
                 bg = (30, 30, 45)
                 border = (90, 90, 120)
 
-            pygame.draw.rect(self.screen, bg,     (x, y, cw, ch), border_radius=6)
-            pygame.draw.rect(self.screen, border, (x, y, cw, ch), 2, border_radius=6)
+            pygame.draw.rect(self.screen, bg,     cell_rect, border_radius=6)
+            pygame.draw.rect(self.screen, border, cell_rect, 2, border_radius=6)
 
             if unlocked:
                 lbl = self.font.render(f"LEVEL {idx+1}", True, WHITE if not selected else CYAN)
@@ -1764,8 +1873,44 @@ class Game:
                 lo = self.font_s.render("LOCKED", True, (80, 80, 80))
                 self.screen.blit(lo, lo.get_rect(center=(x+cw//2, y+54)))
 
-        hint = self.font_s.render("Arrows — navigate    ENTER/SPACE — start    ESC — back", True, GRAY)
+        hint = self.font_s.render("Arrows — navigate    ENTER/SPACE or click — start    ESC/← BACK — back", True, GRAY)
         self.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT - 20)))
+
+    # ── Mouse button dispatcher ───────────────────────────────────────────────
+    def _handle_button_click(self, name: str):
+        """Dispatch a mouse-click on a named button, guarded by current state."""
+        if self.state == 'menu':
+            if name == 'menu_0':
+                self.mode = 'arcade'; self._reset(); self.state = 'playing'
+            elif name == 'menu_1':
+                self.mode = 'levels'; self._ls_cursor = 0; self.state = 'level_select'
+        elif self.state == 'level_select':
+            if name == 'ls_back':
+                self.state = 'menu'
+            elif name.startswith('ls_'):
+                idx = int(name[3:])
+                if idx <= self._max_unlocked:
+                    self._reset()
+                    self.lv_idx = idx
+                    self._start_level()
+                    self.state = 'playing'
+        elif self.state == 'paused':
+            if name == 'pause_0':
+                self._resume()
+            elif name == 'pause_1':
+                self._reset_to_menu()
+        elif self.state == 'game_over':
+            if name == 'go_restart':
+                if self.mode == 'levels': self.lv_idx = 0
+                self._reset(); self.state = 'playing'
+            elif name == 'go_menu':
+                self._reset_to_menu()
+        elif self.state == 'victory':
+            if name == 'vict_restart':
+                if self.mode == 'levels': self.lv_idx = 0
+                self._reset(); self.state = 'playing'
+            elif name == 'vict_menu':
+                self._reset_to_menu()
 
 
 if __name__ == "__main__":
