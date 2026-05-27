@@ -932,6 +932,136 @@ class Explosion:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+#  MERGED KEYS  (real keyboard + virtual touch overlay)
+# ══════════════════════════════════════════════════════════════════════════════
+class _MergedKeys:
+    """Wraps pygame key state and overlays on-screen touch-button presses."""
+    _MAP = {
+        pygame.K_UP: 'up',    pygame.K_w: 'up',
+        pygame.K_DOWN: 'down', pygame.K_s: 'down',
+        pygame.K_LEFT: 'left', pygame.K_a: 'left',
+        pygame.K_RIGHT: 'right', pygame.K_d: 'right',
+        pygame.K_SPACE: 'fire',
+    }
+    def __init__(self, kb, tp: set):
+        self._kb = kb; self._tp = tp
+    def __getitem__(self, k):
+        return bool(self._kb[k]) or (self._MAP.get(k) in self._tp)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  TOUCH CONTROLS  (on-screen virtual gamepad)
+# ══════════════════════════════════════════════════════════════════════════════
+class TouchControls:
+    BTN_S  = 70    # D-pad button size (px)
+    FIRE_R = 54    # fire-button radius (px)
+
+    def __init__(self):
+        s = self.BTN_S
+        cx, cy = 95, SCREEN_HEIGHT - 95   # D-pad centre
+        g = 8
+        self.dpad: dict = {
+            'up':    pygame.Rect(cx - s//2,  cy - s - g, s, s),
+            'down':  pygame.Rect(cx - s//2,  cy + g,     s, s),
+            'left':  pygame.Rect(cx - s - g, cy - s//2,  s, s),
+            'right': pygame.Rect(cx + g,     cy - s//2,  s, s),
+        }
+        self.fire_pos   = (SCREEN_WIDTH - 95, SCREEN_HEIGHT - 95)
+        # Pause pill — bottom centre, clear of D-pad and fire button
+        self.pause_rect = pygame.Rect(SCREEN_WIDTH//2 - 30, SCREEN_HEIGHT - 70, 60, 36)
+
+        self._fingers: dict = {}  # finger_id → button name
+        self.pressed:  set  = set()
+
+    # ── Internal helpers ──────────────────────────────────────────────────────
+    def _btn_at(self, px: int, py: int):
+        for name, rect in self.dpad.items():
+            if rect.collidepoint(px, py):
+                return name
+        fx, fy = self.fire_pos
+        if math.hypot(px - fx, py - fy) <= self.FIRE_R:
+            return 'fire'
+        if self.pause_rect.collidepoint(px, py):
+            return 'pause'
+        return None
+
+    def _sync(self):
+        self.pressed = {b for b in self._fingers.values()
+                        if b not in ('pause', None)}
+
+    # ── Public event API ──────────────────────────────────────────────────────
+    def touch_down(self, fid, px: int, py: int):
+        btn = self._btn_at(px, py)
+        if btn:
+            self._fingers[fid] = btn
+            self._sync()
+        return btn
+
+    def touch_up(self, fid):
+        self._fingers.pop(fid, None)
+        self._sync()
+
+    def touch_move(self, fid, px: int, py: int):
+        btn = self._btn_at(px, py)
+        if btn:
+            self._fingers[fid] = btn
+        else:
+            self._fingers.pop(fid, None)
+        self._sync()
+
+    def clear(self):
+        self._fingers.clear()
+        self.pressed.clear()
+
+    # ── Drawing ───────────────────────────────────────────────────────────────
+    @staticmethod
+    def _draw_dpad_btn(screen, rect: pygame.Rect, name: str, on: bool):
+        s = pygame.Surface(rect.size, pygame.SRCALPHA)
+        a_bg  = 195 if on else 75
+        a_brd = 230 if on else 130
+        pygame.draw.rect(s, ( 55,  80, 130, a_bg),  (0, 0, *rect.size), border_radius=14)
+        pygame.draw.rect(s, (140, 190, 255, a_brd), (0, 0, *rect.size), 2, border_radius=14)
+        w, h = rect.size
+        m = 19
+        a_arr = 235 if on else 170
+        col = (255, 255, 255, a_arr)
+        if   name == 'up':    pts = [(w//2,m),(m,h-m),(w-m,h-m)]
+        elif name == 'down':  pts = [(w//2,h-m),(m,m),(w-m,m)]
+        elif name == 'left':  pts = [(m,h//2),(w-m,m),(w-m,h-m)]
+        else:                 pts = [(w-m,h//2),(m,m),(m,h-m)]
+        pygame.draw.polygon(s, col, pts)
+        screen.blit(s, rect.topleft)
+
+    def draw(self, screen: pygame.Surface):
+        # D-pad
+        for name, rect in self.dpad.items():
+            self._draw_dpad_btn(screen, rect, name, name in self.pressed)
+
+        # Fire button (circle)
+        fx, fy  = self.fire_pos
+        fire_on = 'fire' in self.pressed
+        r = self.FIRE_R
+        sf = pygame.Surface((r*2, r*2), pygame.SRCALPHA)
+        pygame.draw.circle(sf, (130, 25, 25, 200 if fire_on else 80), (r,r), r)
+        pygame.draw.circle(sf, (255, 90, 90, 230 if fire_on else 140), (r,r), r, 3)
+        pygame.draw.circle(sf, (255, 50, 50, 185 if fire_on else 110), (r,r), r-14)
+        screen.blit(sf, (fx-r, fy-r))
+
+        # Pause pill (bottom centre)
+        pr   = self.pause_rect
+        p_on = any(v == 'pause' for v in self._fingers.values())
+        sp = pygame.Surface(pr.size, pygame.SRCALPHA)
+        pygame.draw.rect(sp, (55, 80, 130, 195 if p_on else 75),  (0,0,*pr.size), border_radius=10)
+        pygame.draw.rect(sp, (140,190,255, 200 if p_on else 110), (0,0,*pr.size), 2, border_radius=10)
+        bw, bh = 5, 18; by = (pr.h - bh)//2
+        bx1, bx2 = pr.w//2 - 8, pr.w//2 + 3
+        bar_a = 240 if p_on else 190
+        pygame.draw.rect(sp, (255,255,255,bar_a), (bx1,by,bw,bh), border_radius=2)
+        pygame.draw.rect(sp, (255,255,255,bar_a), (bx2,by,bw,bh), border_radius=2)
+        screen.blit(sp, pr.topleft)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 #  GAME
 # ══════════════════════════════════════════════════════════════════════════════
 class Game:
@@ -968,6 +1098,7 @@ class Game:
         self._del_wipe_confirm = 0    # countdown for "progress reset!" banner
         self._del_key_held     = False  # tracked via KEYDOWN/KEYUP events
         self._hover_snd_last   = 0    # pygame.time.get_ticks() of last hover sound
+        self._touch            = TouchControls()
         self._reset()
 
     def _reset(self):
@@ -1625,9 +1756,40 @@ class Game:
                 # ── Mouse click ───────────────────────────────────────────────
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     mx, my = event.pos
-                    for nm, rc in self._btn_rects.items():
-                        if rc.collidepoint(mx, my):
-                            self._handle_button_click(nm); break
+                    if self.state == 'playing':
+                        btn = self._touch.touch_down(-1, mx, my)
+                        if btn == 'pause':
+                            self._pause()
+                    else:
+                        for nm, rc in self._btn_rects.items():
+                            if rc.collidepoint(mx, my):
+                                self._handle_button_click(nm); break
+
+                if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                    if self.state == 'playing':
+                        self._touch.touch_up(-1)
+
+                # ── Real multi-touch (phone / tablet) ─────────────────────────
+                if event.type == pygame.FINGERDOWN:
+                    px = int(event.x * SCREEN_WIDTH)
+                    py = int(event.y * SCREEN_HEIGHT)
+                    if self.state == 'playing':
+                        btn = self._touch.touch_down(event.finger_id, px, py)
+                        if btn == 'pause':
+                            self._pause()
+                    else:
+                        for nm, rc in self._btn_rects.items():
+                            if rc.collidepoint(px, py):
+                                self._handle_button_click(nm); break
+
+                if event.type == pygame.FINGERUP:
+                    self._touch.touch_up(event.finger_id)
+
+                if event.type == pygame.FINGERMOTION:
+                    px = int(event.x * SCREEN_WIDTH)
+                    py = int(event.y * SCREEN_HEIGHT)
+                    if self.state == 'playing':
+                        self._touch.touch_move(event.finger_id, px, py)
 
                 # ── DEL released ──────────────────────────────────────────────
                 if event.type == pygame.KEYUP and event.key == pygame.K_DELETE:
@@ -1662,7 +1824,7 @@ class Game:
                 continue
 
             if self.state == 'playing':
-                keys = pygame.key.get_pressed()
+                keys = _MergedKeys(pygame.key.get_pressed(), self._touch.pressed)
                 self.player.update(keys)
                 if self.player.just_shot: self.sounds.play('shoot')
 
@@ -1758,6 +1920,10 @@ class Game:
             if self.state == 'game_over':
                 self._draw_game_over()
 
+            # ── Touch controls overlay (drawn on top of everything) ───────────
+            if self.state == 'playing':
+                self._touch.draw(self.screen)
+
             pygame.display.flip()
             self.clock.tick(FPS)
 
@@ -1765,6 +1931,7 @@ class Game:
         """Clear game state and return to main menu."""
         self.state = 'menu'
         self._pause_surf = None
+        self._touch.clear()
         self.effects.reset()
         self.active_bosses = []
         self.enemies = []
@@ -1809,6 +1976,7 @@ class Game:
         """Freeze game and enter pause state."""
         self.state = 'paused'
         self._pause_sel = 0
+        self._touch.clear()
         # Capture current game frame for the dimmed background
         self._pause_surf = self.game_surf.copy()
 
