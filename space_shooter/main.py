@@ -1075,7 +1075,7 @@ class Game:
     def __init__(self):
         pygame.init()
         pygame.display.set_caption("Space Shooter")
-        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SCALED)
         self.game_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         self.clock  = pygame.time.Clock()
         self.font   = pygame.font.Font(None, 36)
@@ -1711,9 +1711,9 @@ class Game:
     async def run(self):
         while True:
             for event in pygame.event.get():
-                if event.type == pygame.QUIT: pygame.quit(); sys.exit()
+                if event.type == pygame.QUIT: pygame.quit(); raise SystemExit
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_q: pygame.quit(); sys.exit()
+                    if event.key == pygame.K_q: pygame.quit(); raise SystemExit
 
                     # DEL hold — works from menu and level select
                     if event.key == pygame.K_DELETE and self.state in ('menu', 'level_select'):
@@ -1772,13 +1772,16 @@ class Game:
                         for nm, rc in self._btn_rects.items():
                             if nm.startswith('pause_') and rc.collidepoint(mx, my):
                                 self._pause_sel = int(nm[-1])
-                    # Update OS cursor icon
+                    # Update OS cursor icon (not supported in browser — ignore errors)
                     want_hand = bool(new_hover)
                     if want_hand != self._cursor_is_hand:
                         self._cursor_is_hand = want_hand
-                        pygame.mouse.set_cursor(
-                            pygame.SYSTEM_CURSOR_HAND if want_hand
-                            else pygame.SYSTEM_CURSOR_ARROW)
+                        try:
+                            pygame.mouse.set_cursor(
+                                pygame.SYSTEM_CURSOR_HAND if want_hand
+                                else pygame.SYSTEM_CURSOR_ARROW)
+                        except Exception:
+                            pass
 
                 # ── Mouse click ───────────────────────────────────────────────
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -2196,7 +2199,14 @@ class Game:
 
 
 async def main():
-    game = Game()
-    await game.run()
+    try:
+        game = Game()
+        await game.run()
+    except SystemExit:
+        pass
+    except Exception as e:
+        import traceback
+        print("GAME ERROR:", e)
+        traceback.print_exc()
 
 asyncio.run(main())
