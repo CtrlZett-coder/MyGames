@@ -2,6 +2,8 @@ import pygame
 import random
 import sys
 import math
+import json
+import os
 
 try:
     import numpy as np
@@ -917,7 +919,12 @@ class Game:
         self.effects = ScreenEffects()
         self.mode = 'arcade'   # 'arcade' or 'levels'
         self.state = 'menu'
-        self._menu_sel = 0     # 0=ARCADE 1=LEVELS
+        self._menu_sel  = 0    # 0=ARCADE 1=LEVELS
+        self._ls_cursor = 0    # level-select grid cursor (0-19)
+        self._pause_sel = 0    # 0=Resume  1=Main Menu
+        self._pause_surf: pygame.Surface | None = None
+        self._save_path = os.path.join(os.path.dirname(__file__), 'save.json')
+        self._max_unlocked = self._load_save()
         self._reset()
 
     def _reset(self):
@@ -1048,9 +1055,12 @@ class Game:
 
     def _level_complete(self):
         self.state = 'level_complete'
-        self.lv_complete_timer = 150
+        self.lv_complete_timer = 180
         self.sounds.play('level_complete')
         self.effects.reset()
+        # Unlock next level (save progress)
+        if self.lv_idx + 1 < 20:
+            self._save_unlocked(self.lv_idx + 1)
 
     # ── collisions ────────────────────────────────────────────────────────────
     def _collisions(self):
@@ -1385,16 +1395,18 @@ class Game:
         ctr(self.font_xl.render("VICTORY!", True, GOLD), SCREEN_HEIGHT//2 - 100)
         ctr(self.font_b.render("All 20 levels cleared!", True, WHITE), SCREEN_HEIGHT//2 - 20)
         ctr(self.font.render(f"Final Score: {self.score}", True, YELLOW), SCREEN_HEIGHT//2 + 60)
-        ctr(self.font.render("R — play again   Q — quit", True, CYAN), SCREEN_HEIGHT//2 + 120)
+        ctr(self.font.render("R — play again   ESC — main menu", True, CYAN), SCREEN_HEIGHT//2 + 120)
 
     def _draw_game_over(self):
         ov = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         ov.fill((0,0,0,165)); self.screen.blit(ov,(0,0))
         def ctr(surf,y): self.screen.blit(surf, surf.get_rect(center=(SCREEN_WIDTH//2,y)))
+        lv_txt = (f"Level: {self.lv_idx+1} / 20" if self.mode == 'levels'
+                  else f"Level: {self.level}")
         ctr(self.font_b.render("GAME  OVER",           True, RED),    SCREEN_HEIGHT//2-80)
         ctr(self.font.render(f"Score: {self.score}",   True, WHITE),  SCREEN_HEIGHT//2-10)
-        ctr(self.font.render(f"Level: {self.level}",   True, YELLOW), SCREEN_HEIGHT//2+35)
-        ctr(self.font.render("R — restart   Q — quit", True, CYAN),   SCREEN_HEIGHT//2+100)
+        ctr(self.font.render(lv_txt,                   True, YELLOW), SCREEN_HEIGHT//2+35)
+        ctr(self.font.render("R — restart   ESC — main menu", True, CYAN), SCREEN_HEIGHT//2+100)
 
     def _draw_menu(self):
         self.screen.fill(BLACK)
@@ -1436,8 +1448,6 @@ class Game:
         hint = self.font_s.render("A / D or Arrow keys to select    SPACE or ENTER to start", True, GRAY)
         ctr(hint, SCREEN_HEIGHT - 40)
 
-        pygame.display.flip()
-
     # ── main loop ─────────────────────────────────────────────────────────────
     def run(self):
         while True:
@@ -1445,23 +1455,82 @@ class Game:
                 if event.type == pygame.QUIT: pygame.quit(); sys.exit()
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_q: pygame.quit(); sys.exit()
+
+                    # ── Menu ──────────────────────────────────────────────────
                     if self.state == 'menu':
                         if event.key in (pygame.K_LEFT, pygame.K_a):
                             self._menu_sel = (self._menu_sel - 1) % 2
                         elif event.key in (pygame.K_RIGHT, pygame.K_d):
                             self._menu_sel = (self._menu_sel + 1) % 2
                         elif event.key in (pygame.K_SPACE, pygame.K_RETURN):
-                            self.mode = 'arcade' if self._menu_sel == 0 else 'levels'
-                            self._reset()
-                            self.state = 'playing'
+                            if self._menu_sel == 0:  # ARCADE
+                                self.mode = 'arcade'
+                                self._reset(); self.state = 'playing'
+                            else:                    # LEVELS → level select
+                                self.mode = 'levels'
+                                self._ls_cursor = 0
+                                self.state = 'level_select'
+
+                    # ── Level Select ──────────────────────────────────────────
+                    elif self.state == 'level_select':
+                        cols = 4
+                        if event.key in (pygame.K_LEFT,  pygame.K_a):
+                            self._ls_cursor = max(0, self._ls_cursor - 1)
+                        elif event.key in (pygame.K_RIGHT, pygame.K_d):
+                            self._ls_cursor = min(19, self._ls_cursor + 1)
+                        elif event.key in (pygame.K_UP,   pygame.K_w):
+                            self._ls_cursor = max(0, self._ls_cursor - cols)
+                        elif event.key in (pygame.K_DOWN,  pygame.K_s):
+                            self._ls_cursor = min(19, self._ls_cursor + cols)
+                        elif event.key in (pygame.K_SPACE, pygame.K_RETURN):
+                            if self._ls_cursor <= self._max_unlocked:
+                                self._reset()
+                                self.lv_idx = self._ls_cursor   # override after reset
+                                self._start_level()
+                                self.state = 'playing'
+                        elif event.key == pygame.K_ESCAPE:
+                            self.state = 'menu'
+
+                    # ── Playing → Pause ───────────────────────────────────────
+                    elif self.state == 'playing':
+                        if event.key == pygame.K_ESCAPE:
+                            self._pause()
+
+                    # ── Paused ────────────────────────────────────────────────
+                    elif self.state == 'paused':
+                        if event.key in (pygame.K_UP, pygame.K_w):
+                            self._pause_sel = (self._pause_sel - 1) % 2
+                        elif event.key in (pygame.K_DOWN, pygame.K_s):
+                            self._pause_sel = (self._pause_sel + 1) % 2
+                        elif event.key in (pygame.K_ESCAPE, pygame.K_RETURN, pygame.K_SPACE):
+                            if self._pause_sel == 0:
+                                self._resume()
+                            else:
+                                self._reset_to_menu()
+
+                    # ── Game Over / Victory ───────────────────────────────────
                     elif self.state in ('game_over', 'victory'):
                         if event.key == pygame.K_r:
-                            self.state = 'menu'
+                            # Restart SAME mode (no menu)
+                            if self.mode == 'levels':
+                                self.lv_idx = 0
+                            self._reset(); self.state = 'playing'
+                        elif event.key == pygame.K_ESCAPE:
                             self._reset_to_menu()
 
             if self.state == 'menu':
                 self._draw_menu()
-                self.clock.tick(FPS)
+                pygame.display.flip(); self.clock.tick(FPS)
+                continue
+
+            if self.state == 'level_select':
+                self._draw_level_select()
+                pygame.display.flip(); self.clock.tick(FPS)
+                continue
+
+            if self.state == 'paused':
+                self._draw_pause()
+                pygame.display.flip(); self.clock.tick(FPS)
                 continue
 
             if self.state == 'playing':
@@ -1565,14 +1634,138 @@ class Game:
             self.clock.tick(FPS)
 
     def _reset_to_menu(self):
-        """Clear game state for menu return."""
+        """Clear game state and return to main menu."""
         self.state = 'menu'
+        self._pause_surf = None
         self.effects.reset()
         self.active_bosses = []
         self.enemies = []
         self.powerups = []
         self.explosions = []
         self.stars = [Star() for _ in range(180)]
+
+    # ── Save / Load ───────────────────────────────────────────────────────────
+    def _load_save(self) -> int:
+        """Return max unlocked level index (0-based). 0 = only level 1 available."""
+        try:
+            with open(self._save_path) as f:
+                return int(json.load(f).get('max_unlocked', 0))
+        except Exception:
+            return 0
+
+    def _save_unlocked(self, idx: int):
+        """Persist highest unlocked level index."""
+        self._max_unlocked = max(self._max_unlocked, idx)
+        try:
+            with open(self._save_path, 'w') as f:
+                json.dump({'max_unlocked': self._max_unlocked}, f)
+        except Exception:
+            pass
+
+    # ── Pause ─────────────────────────────────────────────────────────────────
+    def _pause(self):
+        """Freeze game and enter pause state."""
+        self.state = 'paused'
+        self._pause_sel = 0
+        # Capture current game frame for the dimmed background
+        self._pause_surf = self.game_surf.copy()
+
+    def _resume(self):
+        self.state = 'playing'
+        self._pause_surf = None
+
+    def _draw_pause(self):
+        """Dim the frozen game frame and show pause menu."""
+        if self._pause_surf:
+            self.screen.blit(self._pause_surf, (0, 0))
+        ov = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        ov.fill((0, 0, 0, 160)); self.screen.blit(ov, (0, 0))
+
+        def ctr(surf, y): self.screen.blit(surf, surf.get_rect(center=(SCREEN_WIDTH//2, y)))
+
+        ctr(self.font_b.render("PAUSED", True, CYAN), SCREEN_HEIGHT//2 - 90)
+
+        options = ["Resume", "Main Menu"]
+        for i, label in enumerate(options):
+            col  = WHITE if i == self._pause_sel else GRAY
+            bg   = (30, 80, 100) if i == self._pause_sel else DARK_GRAY
+            bw, bh = 260, 54
+            bx = SCREEN_WIDTH//2 - bw//2
+            by = SCREEN_HEIGHT//2 - 10 + i * 70
+            pygame.draw.rect(self.screen, bg,   (bx, by, bw, bh), border_radius=8)
+            pygame.draw.rect(self.screen, col,  (bx, by, bw, bh), 2, border_radius=8)
+            t = self.font.render(label, True, col)
+            self.screen.blit(t, t.get_rect(center=(SCREEN_WIDTH//2, by + bh//2)))
+
+        hint = self.font_s.render("↑↓ — select    ENTER / ESC — confirm", True, GRAY)
+        ctr(hint, SCREEN_HEIGHT//2 + 170)
+
+    # ── Level Select ──────────────────────────────────────────────────────────
+    def _draw_level_select(self):
+        self.screen.fill(BLACK)
+        for star in self.stars: star.update(); star.draw(self.screen)
+
+        def ctr(surf, y): self.screen.blit(surf, surf.get_rect(center=(SCREEN_WIDTH//2, y)))
+        ctr(self.font_b.render("SELECT LEVEL", True, CYAN), 50)
+
+        cols, rows = 4, 5
+        cw, ch = 186, 88
+        gx = 8   # gap x
+        gy = 6   # gap y
+        grid_w = cols * cw + (cols-1) * gx
+        grid_h = rows * ch + (rows-1) * gy
+        ox = (SCREEN_WIDTH  - grid_w) // 2
+        oy = 95
+
+        for idx in range(20):
+            col_i = idx % cols
+            row_i = idx // cols
+            x = ox + col_i * (cw + gx)
+            y = oy + row_i * (ch + gy)
+
+            unlocked  = idx <= self._max_unlocked
+            selected  = idx == self._ls_cursor
+            ld = LEVELS_DATA[idx]
+            score_tgt = ld[2]
+            bosses    = ld[3]
+
+            # Background colour
+            if not unlocked:
+                bg = (25, 25, 25)
+                border = (70, 70, 70)
+            elif selected:
+                bg = (15, 55, 80)
+                border = CYAN
+            else:
+                bg = (30, 30, 45)
+                border = (90, 90, 120)
+
+            pygame.draw.rect(self.screen, bg,     (x, y, cw, ch), border_radius=6)
+            pygame.draw.rect(self.screen, border, (x, y, cw, ch), 2, border_radius=6)
+
+            if unlocked:
+                lbl = self.font.render(f"LEVEL {idx+1}", True, WHITE if not selected else CYAN)
+                self.screen.blit(lbl, lbl.get_rect(center=(x+cw//2, y+20)))
+                if score_tgt > 0:
+                    sc = self.font_s.render(f"{score_tgt:,} pts", True, YELLOW)
+                    self.screen.blit(sc, sc.get_rect(center=(x+cw//2, y+42)))
+                # Boss indicator
+                if bosses:
+                    n_mini  = bosses.count('mini')
+                    has_fin = 'FINAL' in bosses
+                    if has_fin:
+                        bi = self.font_s.render("★ FINAL BOSS", True, RED)
+                    else:
+                        bi = self.font_s.render("🟡 " + "×".join(["M"] * n_mini), True, GOLD)
+                    self.screen.blit(bi, bi.get_rect(center=(x+cw//2, y+62)))
+            else:
+                lk = self.font.render(f"{idx+1}", True, (70, 70, 70))
+                self.screen.blit(lk, lk.get_rect(center=(x+cw//2, y+28)))
+                lo = self.font_s.render("LOCKED", True, (80, 80, 80))
+                self.screen.blit(lo, lo.get_rect(center=(x+cw//2, y+54)))
+
+        hint = self.font_s.render("Arrows — navigate    ENTER/SPACE — start    ESC — back", True, GRAY)
+        self.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT - 20)))
 
 
 if __name__ == "__main__":
