@@ -1,3 +1,4 @@
+import asyncio
 import pygame
 import random
 import sys
@@ -1707,7 +1708,7 @@ class Game:
         ctr(hint, SCREEN_HEIGHT - 40)
 
     # ── main loop ─────────────────────────────────────────────────────────────
-    def run(self):
+    async def run(self):
         while True:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT: pygame.quit(); sys.exit()
@@ -1832,6 +1833,7 @@ class Game:
                         self._del_key_held = False
                 self._draw_menu()
                 pygame.display.flip(); self.clock.tick(FPS)
+                await asyncio.sleep(0)
                 continue
 
             if self.state == 'level_select':
@@ -1843,11 +1845,13 @@ class Game:
                         self._del_key_held = False   # prevent re-trigger
                 self._draw_level_select()
                 pygame.display.flip(); self.clock.tick(FPS)
+                await asyncio.sleep(0)
                 continue
 
             if self.state == 'paused':
                 self._draw_pause()
                 pygame.display.flip(); self.clock.tick(FPS)
+                await asyncio.sleep(0)
                 continue
 
             if self.state == 'playing':
@@ -1953,6 +1957,7 @@ class Game:
 
             pygame.display.flip()
             self.clock.tick(FPS)
+            await asyncio.sleep(0)
 
     def _reset_to_menu(self):
         """Clear game state and return to main menu."""
@@ -2190,5 +2195,8 @@ class Game:
                 self._reset_to_menu()
 
 
-if __name__ == "__main__":
-    Game().run()
+async def main():
+    game = Game()
+    await game.run()
+
+asyncio.run(main())
