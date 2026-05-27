@@ -931,6 +931,7 @@ class Game:
         self._cursor_is_hand   = False
         self._del_hold         = 0    # frames DEL held on level-select screen
         self._del_wipe_confirm = 0    # countdown for "progress reset!" banner
+        self._del_key_held     = False  # tracked via KEYDOWN/KEYUP events
         self._reset()
 
     def _reset(self):
@@ -1538,6 +1539,8 @@ class Game:
                                 self.state = 'playing'
                         elif event.key == pygame.K_ESCAPE:
                             self.state = 'menu'
+                        elif event.key == pygame.K_DELETE:
+                            self._del_key_held = True   # start hold timer
 
                     # ── Playing → Pause ───────────────────────────────────────
                     elif self.state == 'playing':
@@ -1605,20 +1608,23 @@ class Game:
                         if rc.collidepoint(mx, my):
                             self._handle_button_click(nm); break
 
+                # ── DEL released ──────────────────────────────────────────────
+                if event.type == pygame.KEYUP and event.key == pygame.K_DELETE:
+                    self._del_key_held = False
+                    self._del_hold = 0
+
             if self.state == 'menu':
                 self._draw_menu()
                 pygame.display.flip(); self.clock.tick(FPS)
                 continue
 
             if self.state == 'level_select':
-                # DEL hold-to-wipe detection
-                keys = pygame.key.get_pressed()
-                if keys[pygame.K_DELETE]:
+                # DEL hold-to-wipe detection (event-driven, reliable cross-platform)
+                if self._del_key_held:
                     self._del_hold += 1
                     if self._del_hold >= DEL_HOLD_FRAMES:
                         self._wipe_progress()
-                else:
-                    self._del_hold = 0
+                        self._del_key_held = False   # prevent re-trigger
                 self._draw_level_select()
                 pygame.display.flip(); self.clock.tick(FPS)
                 continue
@@ -1762,6 +1768,7 @@ class Game:
         self._max_unlocked     = 0
         self._ls_cursor        = 0
         self._del_hold         = 0
+        self._del_key_held     = False
         self._del_wipe_confirm = 150  # show "Progress reset!" banner for 2.5 s
         try:
             with open(self._save_path, 'w') as f:
