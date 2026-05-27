@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - claude/game-creation-huu9A   # also deploy from feature branch for testing
+      - claude/game-creation-huu9A   # deploy from feature branch for testing
 
 permissions:
   contents: write   # needed to push to gh-pages branch
@@ -26,12 +26,14 @@ jobs:
         run: pip install pygbag
 
       - name: Build web version
+        # pygbag puts output in <game_folder>/build/web/
         run: python -m pygbag --build space_shooter
 
-      # pygbag outputs to build/web/ inside the game folder
+      - name: Show build output (debug)
+        run: find space_shooter/build/web -type f | sort
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./build/web
-          destination_dir: .
+          publish_dir: ./space_shooter/build/web   # correct path
