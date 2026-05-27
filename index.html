@@ -5,7 +5,7 @@ Loading space_shooter from space_shooter.apk
     Pygbag Version : 0.9.3
     Template Version : 0.9.3
     Python  : 3.12
-    CDN URL : ./browserfs.min.js
+    CDN URL : https://pygame-web.github.io/cdn/0.9.3/
     Screen  : 1280x720
     Title   : space_shooter
     Folder  : space_shooter
@@ -153,7 +153,7 @@ config = {
     can_close : 0,
     archive : "space_shooter",
     gui_debug : 2,
-    cdn : "./browserfs.min.js",
+    cdn : "https://pygame-web.github.io/cdn/0.9.3/",
     autorun : 0,
     PYBUILD : "3.12",
     fb_ar   :  1.77,
@@ -278,13 +278,13 @@ function show_infobox() {
     <script>
 /*
         if (navigator.serviceWorker)
-            navigator.serviceWorker.register("./browserfs.min.jspygbag0.9.3.js")
+            navigator.serviceWorker.register("https://pygame-web.github.io/cdn/0.9.3/pygbag0.9.3.js")
         else
             console.warn("Service workers not supported")
 */
     </script>
 
-    <script src="./browserfs.min.js"></script>
+    <script src="https://pygame-web.github.io/cdn/0.9.3//browserfs.min.js"></script>
 
 </head>
 
@@ -296,32 +296,34 @@ function show_infobox() {
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
   z-index: 99999; color: #fff; font-family: sans-serif;
+  text-align: center; padding: 20px;
 }
-#py-loading h2 { font-size: 1.6em; margin: 0 0 12px; }
-#py-loading p  { font-size: 1em; color: #aaa; margin: 4px 0; }
-.spinner {
-  width: 48px; height: 48px; border: 5px solid #333;
+#py-loading h2 { font-size: 1.5em; margin: 0 0 10px; color: #0af; }
+#py-loading p  { font-size: 0.95em; color: #aaa; margin: 4px 0; }
+.py-spinner {
+  width: 52px; height: 52px; border: 5px solid #333;
   border-top-color: #0af; border-radius: 50%;
-  animation: spin 0.8s linear infinite; margin-bottom: 20px;
+  animation: py-spin 0.8s linear infinite; margin-bottom: 18px;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes py-spin { to { transform: rotate(360deg); } }
 </style>
 <div id="py-loading">
-  <div class="spinner"></div>
-  <h2>Loading Space Shooter...</h2>
-  <p>Downloading Python runtime (~20 MB)</p>
-  <p>Please wait, this can take 30–60 seconds</p>
+  <div class="py-spinner"></div>
+  <h2>Space Shooter</h2>
+  <p>Loading Python runtime...</p>
+  <p style="color:#666;font-size:0.85em">First load: ~30-60 seconds &nbsp;|&nbsp; Click canvas when ready</p>
 </div>
 <script>
-  // Hide overlay once pygame canvas starts drawing
-  var _pyLoadCheck = setInterval(function() {
+  // Hide overlay when the canvas gets content (pygame starts drawing)
+  var _pyCheck = setInterval(function() {
     var c = document.getElementById('canvas');
-    if (c && c.width > 1) {
-      document.getElementById('py-loading').style.display = 'none';
-      clearInterval(_pyLoadCheck);
+    if (c && c.width > 2) {
+      var d = document.getElementById('py-loading');
+      if (d) d.style.display = 'none';
+      clearInterval(_pyCheck);
     }
-  }, 500);
-  // Remove after 3 min max in case check fails
+  }, 300);
+  // Safety: remove after 3 minutes
   setTimeout(function() {
     var d = document.getElementById('py-loading');
     if (d) d.style.display = 'none';
@@ -393,7 +395,7 @@ frameborder="1"
                 mozallowfullscreen="true"
                 sandbox="allow-same-origin allow-top-navigation allow-scripts allow-pointer-lock"
                 allow="autoplay; fullscreen *; geolocation; microphone; camera; midi; monetization; xr-spatial-tracking; gamepad; gyroscope; accelerometer; xr; cross-origin-isolated"
-                src="./browserfs.min.jsempty.html"
+                src="https://pygame-web.github.io/cdn/0.9.3/empty.html"
                 scrolling="yes">
             </iframe>
         </div>
