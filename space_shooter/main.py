@@ -15,23 +15,150 @@ SCREEN_HEIGHT = 600
 FPS           = 60
 
 # ─── Colours ──────────────────────────────────────────────────────────────────
-BLACK     = (0,   0,   0)
-WHITE     = (255, 255, 255)
-RED       = (220, 50,  50)
-DARK_RED  = (140, 0,   0)
-YELLOW    = (255, 220, 0)
-CYAN      = (0,   200, 255)
-ORANGE    = (255, 140, 0)
-GREEN     = (50,  200, 50)
-GRAY      = (150, 150, 150)
-DARK_GRAY = (40,  40,  40)
-BLUE      = (50,  100, 255)
-PURPLE    = (160, 30,  220)
-GOLD      = (200, 160, 0)
+BLACK      = (0,   0,   0)
+WHITE      = (255, 255, 255)
+RED        = (220, 50,  50)
+DARK_RED   = (140, 0,   0)
+YELLOW     = (255, 220, 0)
+CYAN       = (0,   200, 255)
+ORANGE     = (255, 140, 0)
+GREEN      = (50,  200, 50)
+GRAY       = (150, 150, 150)
+DARK_GRAY  = (40,  40,  40)
+BLUE       = (50,  100, 255)
+PURPLE     = (160, 30,  220)
+GOLD       = (200, 160, 0)
+CRIMSON    = (139, 0,   0)
+DARK_CRIMSON = (80, 0,  0)
+
+# ─── Levels data ──────────────────────────────────────────────────────────────
+# Each entry: (enemy_weights_dict, enemy_count, score_target, end_boss_list)
+LEVELS_DATA = [
+    # 1
+    ({'fighter': 1},                       15, 500,   []),
+    # 2
+    ({'fighter': 1},                       20, 800,   []),
+    # 3
+    ({'fighter': 3, 'scout': 1},           25, 1200,  []),
+    # 4
+    ({'fighter': 2, 'scout': 1},           30, 1600,  []),
+    # 5  — boss-only wave
+    ({},                                    0, 0,     ['mini', 'mini', 'mini']),
+    # 6
+    ({'fighter': 4, 'scout': 2, 'heavy': 1}, 25, 2000, []),
+    # 7
+    ({'fighter': 3, 'scout': 2, 'heavy': 1}, 28, 2400, []),
+    # 8
+    ({'fighter': 3, 'scout': 2, 'heavy': 2}, 32, 2900, []),
+    # 9
+    ({'fighter': 3, 'scout': 2, 'heavy': 2}, 40, 3500, []),
+    # 10
+    ({'fighter': 3, 'scout': 2, 'heavy': 2}, 30, 4000, ['mini']),
+    # 11
+    ({'fighter': 3, 'scout': 2, 'heavy': 2}, 32, 4500, ['mini']),
+    # 12
+    ({'fighter': 2, 'scout': 2, 'heavy': 3}, 35, 5000, ['mini']),
+    # 13
+    ({'fighter': 2, 'scout': 2, 'heavy': 3}, 38, 5500, ['mini']),
+    # 14
+    ({'fighter': 2, 'scout': 2, 'heavy': 3}, 40, 6000, ['mini']),
+    # 15
+    ({'fighter': 2, 'scout': 2, 'heavy': 3}, 40, 7000, ['mini', 'mini']),
+    # 16
+    ({'fighter': 2, 'scout': 3, 'heavy': 3}, 42, 8000, ['mini', 'mini']),
+    # 17
+    ({'fighter': 2, 'scout': 3, 'heavy': 3}, 45, 9000, ['mini', 'mini']),
+    # 18
+    ({'fighter': 2, 'scout': 3, 'heavy': 4}, 50, 10000, ['mini', 'mini']),
+    # 19
+    ({'fighter': 2, 'scout': 3, 'heavy': 4}, 50, 12000, ['mini', 'mini', 'mini']),
+    # 20
+    ({'fighter': 2, 'scout': 3, 'heavy': 4}, 55, 14000, ['mini', 'mini', 'mini', 'FINAL']),
+]
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  SOUND MANAGER  — procedural audio via numpy, gracefully silent without it
+#  SCREEN EFFECTS
+# ══════════════════════════════════════════════════════════════════════════════
+class ScreenEffects:
+    def __init__(self):
+        self.shake = 0.0
+        self.shake_offset = (0, 0)
+        self.flash_alpha = 0.0
+        self.vignette_alpha = 0.0
+        self._rnd_flash_interval = 0
+        self._rnd_flash_timer = 0
+
+    def add_shake(self, intensity: float):
+        self.shake = max(self.shake, float(intensity))
+
+    def add_flash(self, alpha: float):
+        self.flash_alpha = min(255.0, self.flash_alpha + alpha)
+
+    def set_vignette(self, alpha: float):
+        self.vignette_alpha = float(alpha)
+
+    def set_random_flashes(self, interval: int):
+        self._rnd_flash_interval = interval
+        self._rnd_flash_timer = interval
+
+    def update(self):
+        # Decay shake
+        if self.shake > 0:
+            ox = random.uniform(-self.shake, self.shake)
+            oy = random.uniform(-self.shake, self.shake)
+            self.shake_offset = (int(ox), int(oy))
+            self.shake *= 0.82
+            if self.shake < 0.5:
+                self.shake = 0.0
+                self.shake_offset = (0, 0)
+        else:
+            self.shake_offset = (0, 0)
+
+        # Decay flash
+        if self.flash_alpha > 0:
+            self.flash_alpha = max(0.0, self.flash_alpha - 15.0)
+
+        # Random flashes
+        if self._rnd_flash_interval > 0:
+            self._rnd_flash_timer -= 1
+            if self._rnd_flash_timer <= 0:
+                self._rnd_flash_timer = self._rnd_flash_interval
+                self.add_flash(random.uniform(30, 80))
+
+    def draw_vignette(self, screen):
+        if self.vignette_alpha <= 0:
+            return
+        alpha = int(min(255, self.vignette_alpha))
+        thickness = 80
+        for i in range(thickness):
+            t = 1.0 - i / thickness
+            a = int(alpha * t * t)
+            if a <= 0:
+                continue
+            col = (180, 0, 0, a)
+            s = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            pygame.draw.rect(s, col, (i, i, SCREEN_WIDTH - i * 2, SCREEN_HEIGHT - i * 2), 2)
+            screen.blit(s, (0, 0))
+
+    def draw_flash(self, screen):
+        if self.flash_alpha <= 0:
+            return
+        s = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        s.fill((255, 0, 0, int(self.flash_alpha)))
+        screen.blit(s, (0, 0))
+
+    def reset(self):
+        self.shake = 0.0
+        self.shake_offset = (0, 0)
+        self.flash_alpha = 0.0
+        self.vignette_alpha = 0.0
+        self._rnd_flash_interval = 0
+        self._rnd_flash_timer = 0
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  SOUND MANAGER
 # ══════════════════════════════════════════════════════════════════════════════
 class SoundManager:
     def __init__(self):
@@ -47,14 +174,16 @@ class SoundManager:
             pygame.mixer.init()
             sr = 22050
             self._sounds = {
-                'shoot':       self._sine(sr, 820,  0.07, decay=35, vol=0.22),
-                'boom':        self._noise(sr, 0.30, decay=9,  vol=0.55),
-                'hit':         self._sine(sr, 200,  0.18, decay=12, vol=0.45),
-                'powerup':     self._rising(sr, 440, 880, 0.35, vol=0.40),
-                'shield_break':self._sine(sr, 300,  0.25, decay=8,  vol=0.50),
-                'boss_warning':self._sine(sr, 110,  0.60, decay=3,  vol=0.60),
-                'boss_enrage': self._enrage(sr),
-                'boss_die':    self._noise(sr, 0.60, decay=4, vol=0.70),
+                'shoot':        self._sine(sr, 820,  0.07, decay=35, vol=0.22),
+                'boom':         self._noise(sr, 0.30, decay=9,  vol=0.55),
+                'hit':          self._sine(sr, 200,  0.18, decay=12, vol=0.45),
+                'powerup':      self._rising(sr, 440, 880, 0.35, vol=0.40),
+                'shield_break': self._sine(sr, 300,  0.25, decay=8,  vol=0.50),
+                'boss_warning': self._sine(sr, 110,  0.60, decay=3,  vol=0.60),
+                'boss_enrage':  self._enrage(sr),
+                'boss_die':     self._noise(sr, 0.60, decay=4, vol=0.70),
+                'level_complete': self._chord(sr, [261, 329, 392], vol=0.45),
+                'victory':      self._fanfare(sr),
             }
             self._play_ambient(sr)
             self.enabled = True
@@ -72,7 +201,7 @@ class SoundManager:
 
     def _noise(self, sr, dur, decay=10.0, vol=0.4):
         n, t = int(sr*dur), np.linspace(0, dur, int(sr*dur), False)
-        return self._to_sound(np.random.uniform(-1,1,n) * np.exp(-decay*t) * vol * 32767)
+        return self._to_sound(np.random.uniform(-1, 1, n) * np.exp(-decay*t) * vol * 32767)
 
     def _rising(self, sr, f0, f1, dur, vol=0.35):
         n = int(sr * dur)
@@ -88,6 +217,37 @@ class SoundManager:
         rise = np.sin(2*np.pi*np.cumsum(freq)/sr) * 0.3
         return self._to_sound((rumble+rise) * np.exp(-t) * vol * 32767)
 
+    def _chord(self, sr, freqs, vol=0.40):
+        """Ascending 3-note chord played in sequence."""
+        dur_each = 0.25
+        total = dur_each * len(freqs)
+        n = int(sr * total)
+        out = np.zeros(n)
+        for i, freq in enumerate(freqs):
+            start = int(i * dur_each * sr)
+            end = start + int(dur_each * 1.5 * sr)
+            end = min(end, n)
+            t = np.linspace(0, dur_each * 1.5, end - start, False)
+            out[start:end] += np.sin(2*np.pi*freq*t) * np.exp(-3*t)
+        out = np.clip(out * vol * 32767, -32767, 32767)
+        return self._to_sound(out)
+
+    def _fanfare(self, sr=22050, vol=0.45):
+        """Triumphant 4-note fanfare."""
+        notes = [261, 329, 392, 523]
+        dur_each = 0.20
+        total = dur_each * len(notes) + 0.4
+        n = int(sr * total)
+        out = np.zeros(n)
+        for i, freq in enumerate(notes):
+            start = int(i * dur_each * sr)
+            end = start + int(0.6 * sr)
+            end = min(end, n)
+            t = np.linspace(0, 0.6, end - start, False)
+            out[start:end] += np.sin(2*np.pi*freq*t) * np.exp(-2*t)
+        out = np.clip(out * vol * 32767, -32767, 32767)
+        return self._to_sound(out)
+
     def _play_ambient(self, sr=22050):
         dur = 5.0
         n, t = int(sr*dur), np.linspace(0, dur, int(sr*dur), False)
@@ -95,10 +255,13 @@ class SoundManager:
               + np.sin(2*np.pi*110*t)*0.12 + np.sin(2*np.pi*165*t)*0.08)
         wave *= 0.7 + 0.3*np.sin(2*np.pi*0.4*t)
         fl = int(sr*0.5)
-        fade = np.ones(n); fade[:fl]=np.linspace(0,1,fl); fade[-fl:]=np.linspace(1,0,fl)
+        fade = np.ones(n)
+        fade[:fl] = np.linspace(0, 1, fl)
+        fade[-fl:] = np.linspace(1, 0, fl)
         wave = (wave*fade*32767*0.45).astype(np.int16)
-        snd = pygame.sndarray.make_sound(np.ascontiguousarray(np.column_stack([wave,wave])))
-        snd.set_volume(0.35); snd.play(-1)
+        snd = pygame.sndarray.make_sound(np.ascontiguousarray(np.column_stack([wave, wave])))
+        snd.set_volume(0.35)
+        snd.play(-1)
 
     def play(self, name: str):
         if self.enabled and name in self._sounds:
@@ -337,7 +500,7 @@ class Enemy:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  MINI-BOSS — Marauder (gold, 8 HP, fan shots, appears at level 3 / 6 / 9…)
+#  MINI-BOSS — Marauder
 # ══════════════════════════════════════════════════════════════════════════════
 class MiniBoss:
     def __init__(self):
@@ -353,7 +516,7 @@ class MiniBoss:
         self._target_x   = SCREEN_WIDTH * 0.68
         self.entering    = True
 
-    def update(self, time_scale=1.0):
+    def update(self, time_scale=1.0, effects=None):
         if self.x > self._target_x:
             self.x -= 3.5 * time_scale
         else:
@@ -366,7 +529,7 @@ class MiniBoss:
             self.shoot_timer -= time_scale
             if self.shoot_timer <= 0:
                 self.shoot_timer = 52
-                for ang in range(162, 203, 8):   # 6-bullet fan
+                for ang in range(162, 203, 8):
                     self.bullets.append(EnemyBullet(self.x-self.W//2, self.y, ang))
 
         for b in self.bullets: b.update()
@@ -374,38 +537,34 @@ class MiniBoss:
 
     def take_hit(self) -> bool: self.hp -= 1; return self.hp <= 0
 
+    def get_laser_rects(self):
+        return []
+
     def draw(self, surf):
         x, y = int(self.x), int(self.y)
-
-        # Wings (large swept)
         pygame.draw.polygon(surf, (150,120,0), [(x-36,y-10),(x-8,y-38),(x+22,y-10)])
         pygame.draw.polygon(surf, (150,120,0), [(x-36,y+10),(x-8,y+38),(x+22,y+10)])
-        # Body hull
         pygame.draw.ellipse(surf, GOLD,   (x-36,y-23,72,46))
         pygame.draw.ellipse(surf, YELLOW, (x-18,y-13,36,26))
-        # Gun ports (left side)
         for dy in (-16,-6,4,14):
             pygame.draw.rect  (surf, GRAY,   (x-46,y+dy-3,18,6))
             pygame.draw.circle(surf, ORANGE, (x-46,y+dy), 3)
-        # Spinning core
         pygame.draw.circle(surf, YELLOW, (x,y), 13)
         pygame.draw.circle(surf, WHITE,  (x,y), 7)
         for i in range(4):
             a = math.radians(self.move_timer*3 + i*90)
             pygame.draw.circle(surf, (255,200,0), (x+int(10*math.cos(a)), y+int(10*math.sin(a))), 3)
-        # HP bar (above ship)
         bw = 80; filled = max(0, int(bw*self.hp/self.max_hp))
         pygame.draw.rect(surf, DARK_GRAY, (x-40,y-42,bw,8))
         pygame.draw.rect(surf, YELLOW,    (x-40,y-42,filled,8))
         pygame.draw.rect(surf, GRAY,      (x-40,y-42,bw,8), 1)
-
         for b in self.bullets: b.draw(surf)
 
     def get_rect(self): return pygame.Rect(self.x-self.W//2, self.y-self.H//2, self.W, self.H)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  BIG BOSS — Dreadnought (dark red, 25 HP, 2 phases + laser, level 5/10/15…)
+#  BIG BOSS — Dreadnought (arcade mode only)
 # ══════════════════════════════════════════════════════════════════════════════
 class Boss:
     LASER_DURATION = 105
@@ -424,12 +583,11 @@ class Boss:
         self.move_timer  = 0.0
         self._target_x   = SCREEN_WIDTH * 0.72
         self.entering    = True
-        # laser
         self.laser_active= False
         self.laser_timer = 0.0
         self.laser_cd    = 0.0
 
-    def update(self, time_scale=1.0):
+    def update(self, time_scale=1.0, effects=None):
         if self.x > self._target_x:
             self.x -= 2.5 * time_scale
         else:
@@ -440,7 +598,6 @@ class Boss:
             self.y = SCREEN_HEIGHT//2 + math.sin(self.move_timer*spd)*amp
             self.y = max(60, min(SCREEN_HEIGHT-60, self.y))
 
-        # Phase transition check handled externally (so enrage flash fires once)
         if not self.entering:
             delay = 38 if self.phase == 2 else 58
             self.shoot_timer -= time_scale
@@ -450,7 +607,6 @@ class Boss:
                 for ang in angs:
                     self.bullets.append(EnemyBullet(self.x-self.W//2, self.y, ang))
 
-            # Laser (phase 2)
             if self.phase == 2:
                 if self.laser_active:
                     self.laser_timer -= time_scale
@@ -472,54 +628,243 @@ class Boss:
         x, y = int(self.x), int(self.y)
         return pygame.Rect(0, y-6, x-self.W//2, 12)
 
+    def get_laser_rects(self):
+        r = self.get_laser_rect()
+        return [r] if r else []
+
     def draw(self, surf):
         x, y = int(self.x), int(self.y)
-
-        # ── Laser beam ──
         lr = self.get_laser_rect()
         if lr:
-            # flicker only in first 20 frames (wind-up) and last 20 (fade)
             flickering = self.laser_timer > self.LASER_DURATION-20 or self.laser_timer < 20
             if not flickering or (int(self.laser_timer)//3)%2:
                 pygame.draw.rect(surf, (255,40,40),  lr)
                 pygame.draw.rect(surf, (255,160,160), pygame.Rect(lr.x,lr.y+4,lr.w,4))
                 pygame.draw.rect(surf, WHITE,         pygame.Rect(lr.x,lr.y+5,lr.w,2))
 
-        # ── Wing panels ──
         col_wing = (90,10,10) if self.phase==2 else (70,10,10)
         pygame.draw.polygon(surf, col_wing, [(x-52,y-28),(x-14,y-68),(x+32,y-22)])
         pygame.draw.polygon(surf, col_wing, [(x-52,y+28),(x-14,y+68),(x+32,y+22)])
 
-        # ── Hull ──
         hull_col = (100,15,15) if self.phase==2 else (72,12,12)
         pygame.draw.ellipse(surf, hull_col,    (x-57,y-38,114,78))
         pygame.draw.ellipse(surf, (155,28,28), (x-28,y-19,58,40))
 
-        # ── Gun barrels (5 ports) ──
         for dy in (-30,-15,0,15,30):
             pygame.draw.rect  (surf, GRAY,   (x-66,y+dy-4,24,8))
             pygame.draw.circle(surf, ORANGE, (x-64,y+dy), 4)
 
-        # ── Core ──
         core_col  = (255,40,40)   if self.phase==2 else ORANGE
         inner_col = (255,200,0)   if self.phase==2 else YELLOW
         pygame.draw.circle(surf, core_col,  (x,y), 22)
         pygame.draw.circle(surf, inner_col, (x,y), 12)
         pygame.draw.circle(surf, WHITE,     (x,y), 5)
 
-        # Phase-2 rotating energy ring
         if self.phase == 2:
             for i in range(8):
                 a = math.radians(self.move_timer*4 + i*45)
                 rx,ry = x+int(22*math.cos(a)), y+int(22*math.sin(a))
                 pygame.draw.circle(surf,(255,80,80),(rx,ry),3)
 
-        # ── HP bar ──
         bw = 110; filled = max(0, int(bw*self.hp/self.max_hp))
         bar_col = RED if self.phase==2 else ORANGE
         pygame.draw.rect(surf, DARK_GRAY, (x-55,y-58,bw,10))
         pygame.draw.rect(surf, bar_col,   (x-55,y-58,filled,10))
         pygame.draw.rect(surf, GRAY,      (x-55,y-58,bw,10), 1)
+
+        for b in self.bullets: b.draw(surf)
+
+    def get_rect(self): return pygame.Rect(self.x-self.W//2, self.y-self.H//2, self.W, self.H)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  FINAL BOSS — Crimson Overlord (levels mode level 20)
+# ══════════════════════════════════════════════════════════════════════════════
+class FinalBoss:
+    LASER_DURATION = 120
+    LASER_CD       = 200
+
+    def __init__(self):
+        self.x = float(SCREEN_WIDTH + 150)
+        self.y = float(SCREEN_HEIGHT // 2)
+        self.hp = 50; self.max_hp = 50
+        self.W, self.H = 150, 100
+        self.score_val = 15000; self.kill_credit = 0; self.drop_count = 6
+        self.active = True
+        self.bullets: list[EnemyBullet] = []
+        self.shoot_timer = 100
+        self.move_timer  = 0.0
+        self._target_x   = SCREEN_WIDTH * 0.73
+        self.entering    = True
+        # Laser state: list of [active, timer, cd, y_offset]
+        self._lasers = [
+            [False, 0.0, 0.0, -20],
+            [False, 0.0, 0.0,  20],
+            [False, 0.0, 0.0,   0],
+        ]
+
+    def _hp_ratio(self):
+        return self.hp / self.max_hp
+
+    @property
+    def phase(self):
+        r = self._hp_ratio()
+        if r > 0.66:
+            return 1
+        elif r > 0.33:
+            return 2
+        else:
+            return 3
+
+    def _update_phase(self):
+        pass  # phase is now a computed property
+
+    def update(self, time_scale=1.0, effects=None):
+        if self.x > self._target_x:
+            self.x -= 2.0 * time_scale
+        else:
+            self.entering = False
+            self.move_timer += time_scale
+            amp = 160
+            spd = 0.016 + (self.phase - 1) * 0.006
+            self.y = SCREEN_HEIGHT//2 + math.sin(self.move_timer*spd)*amp
+            self.y = max(70, min(SCREEN_HEIGHT-70, self.y))
+
+        if not self.entering:
+            # Shooting config per phase
+            if self.phase == 1:
+                shoot_delay = 51   # ~0.85s at 60fps
+                n_spread = 7
+                spread_range = (155, 206)
+            elif self.phase == 2:
+                shoot_delay = 40
+                n_spread = 9
+                spread_range = (152, 209)
+            else:
+                shoot_delay = 30
+                n_spread = 12
+                spread_range = (149, 212)
+
+            self.shoot_timer -= time_scale
+            if self.shoot_timer <= 0:
+                self.shoot_timer = shoot_delay
+                step = (spread_range[1] - spread_range[0]) // max(1, n_spread - 1)
+                for i in range(n_spread):
+                    ang = spread_range[0] + i * step
+                    self.bullets.append(EnemyBullet(self.x - self.W//2, self.y, ang))
+                # Phase 3: diagonal shots
+                if self.phase == 3:
+                    for ang in [135, 225, 145, 215]:
+                        self.bullets.append(EnemyBullet(self.x - self.W//2, self.y, ang))
+                # Shake on shot
+                if effects:
+                    shake_amount = {1: 5, 2: 10, 3: 16}[self.phase]
+                    effects.add_shake(shake_amount)
+
+            # Laser beams
+            active_lasers = 0 if self.phase == 1 else (2 if self.phase == 2 else 3)
+            for i, laser in enumerate(self._lasers):
+                if i >= active_lasers:
+                    laser[0] = False
+                    continue
+                if laser[0]:  # active
+                    laser[1] -= time_scale
+                    if laser[1] <= 0:
+                        laser[0] = False
+                        laser[2] = self.LASER_CD + i * 30
+                elif laser[2] > 0:
+                    laser[2] -= time_scale
+                else:
+                    laser[0] = True
+                    laser[1] = self.LASER_DURATION
+
+        for b in self.bullets: b.update()
+        self.bullets = [b for b in self.bullets if b.active]
+
+    def take_hit(self) -> bool:
+        self.hp -= 1
+        self._update_phase()
+        return self.hp <= 0
+
+    def get_laser_rects(self) -> list:
+        rects = []
+        for laser in self._lasers:
+            active, timer, _, y_off = laser
+            if active and timer > 0:
+                lx = int(self.x) - self.W//2
+                ly = int(self.y + y_off) - 6
+                rects.append(pygame.Rect(0, ly, lx, 12))
+        return rects
+
+    def draw(self, surf):
+        x, y = int(self.x), int(self.y)
+        mt = self.move_timer
+
+        # Draw laser beams
+        for laser in self._lasers:
+            if laser[0] and laser[1] > 0:
+                lx = x - self.W//2
+                ly = int(self.y + laser[3])
+                flickering = laser[1] > self.LASER_DURATION - 20 or laser[1] < 20
+                if not flickering or (int(laser[1])//3)%2:
+                    pygame.draw.rect(surf, (200, 0, 0),   (0, ly-6, lx, 12))
+                    pygame.draw.rect(surf, (255, 60, 60), (0, ly-3, lx, 6))
+                    pygame.draw.rect(surf, WHITE,          (0, ly-1, lx, 2))
+
+        # Giant wings
+        wing_col = DARK_CRIMSON
+        pygame.draw.polygon(surf, wing_col, [
+            (x-70, y-20), (x-20, y-80), (x+30, y-30)
+        ])
+        pygame.draw.polygon(surf, wing_col, [
+            (x-70, y+20), (x-20, y+80), (x+30, y+30)
+        ])
+        # Wing highlights
+        pygame.draw.polygon(surf, CRIMSON, [
+            (x-60, y-18), (x-18, y-70), (x+24, y-28)
+        ])
+        pygame.draw.polygon(surf, CRIMSON, [
+            (x-60, y+18), (x-18, y+70), (x+24, y+28)
+        ])
+
+        # Main body
+        pygame.draw.ellipse(surf, DARK_CRIMSON, (x-70, y-48, 140, 96))
+        pygame.draw.ellipse(surf, CRIMSON,      (x-40, y-28, 82, 58))
+
+        # 6 gun ports
+        for i, dy in enumerate([-36, -20, -6, 6, 20, 36]):
+            pygame.draw.rect  (surf, GRAY,        (x-82, y+dy-4, 20, 8))
+            pygame.draw.circle(surf, (180, 20, 20), (x-80, y+dy), 5)
+            pygame.draw.circle(surf, ORANGE,       (x-80, y+dy), 3)
+
+        # Pulsing core
+        pulse = abs(math.sin(mt * 0.08)) * 8
+        core_r = int(26 + pulse)
+        pygame.draw.circle(surf, (180, 0, 0),  (x, y), core_r)
+        pygame.draw.circle(surf, (255, 40, 40), (x, y), core_r - 8)
+        pygame.draw.circle(surf, (255, 160, 0), (x, y), core_r - 16)
+        pygame.draw.circle(surf, WHITE,          (x, y), 6)
+
+        # Orbiting dots (phase 2+)
+        if self.phase >= 2:
+            for i in range(6):
+                a = math.radians(mt * 4 + i * 60)
+                pygame.draw.circle(surf, (255, 60, 60),
+                    (x + int(32*math.cos(a)), y + int(32*math.sin(a))), 4)
+
+        # Double ring (phase 3)
+        if self.phase == 3:
+            for i in range(8):
+                a = math.radians(mt * 6 + i * 45)
+                pygame.draw.circle(surf, (255, 120, 0),
+                    (x + int(50*math.cos(a)), y + int(50*math.sin(a))), 3)
+
+        # HP bar
+        bw = 130; filled = max(0, int(bw * self.hp / self.max_hp))
+        bar_col = (255, 20, 20) if self.phase == 3 else ((200, 40, 40) if self.phase == 2 else CRIMSON)
+        pygame.draw.rect(surf, DARK_GRAY, (x-65, y-70, bw, 10))
+        pygame.draw.rect(surf, bar_col,   (x-65, y-70, filled, 10))
+        pygame.draw.rect(surf, GRAY,      (x-65, y-70, bw, 10), 1)
 
         for b in self.bullets: b.draw(surf)
 
@@ -552,7 +897,7 @@ class Explosion:
 #  GAME
 # ══════════════════════════════════════════════════════════════════════════════
 class Game:
-    WEIGHTS = {
+    ARCADE_WEIGHTS = {
         1: {'fighter':8,'scout':2,'heavy':0},
         2: {'fighter':6,'scout':3,'heavy':1},
         3: {'fighter':5,'scout':3,'heavy':2},
@@ -560,13 +905,19 @@ class Game:
 
     def __init__(self):
         pygame.init()
-        pygame.display.set_caption("🚀 Space Shooter")
+        pygame.display.set_caption("Space Shooter")
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self.game_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         self.clock  = pygame.time.Clock()
         self.font   = pygame.font.Font(None, 36)
         self.font_b = pygame.font.Font(None, 74)
         self.font_s = pygame.font.Font(None, 24)
+        self.font_xl = pygame.font.Font(None, 96)
         self.sounds = SoundManager()
+        self.effects = ScreenEffects()
+        self.mode = 'arcade'   # 'arcade' or 'levels'
+        self.state = 'menu'
+        self._menu_sel = 0     # 0=ARCADE 1=LEVELS
         self._reset()
 
     def _reset(self):
@@ -581,25 +932,58 @@ class Game:
         self.kills_level = 10
         self.spawn_timer = 0
         self.spawn_delay = 90
-        self.state       = 'playing'
-        # Boss state
-        self.miniboss:  MiniBoss | None = None
-        self.boss:      Boss     | None = None
-        self.bosses_spawned: set        = set()
-        self.boss_enraged               = False
-        self.warning_text               = ""
-        self.warning_timer              = 0
-        self.enrage_flash               = 0
+        self.active_bosses: list = []
+        self.bosses_spawned: set = set()
+        self.boss_enraged    = False
+        self.warning_text    = ""
+        self.warning_timer   = 0
+        self.enrage_flash    = 0
+        self.effects.reset()
 
-    # ── spawning ──────────────────────────────────────────────────────────────
-    def _spawn_enemy(self):
+        # Levels-mode state
+        self.lv_idx             = 0
+        self.lv_wave_phase      = 'intro'
+        self.lv_spawn_left      = 0
+        self.lv_boss_queue: list = []
+        self.lv_next_boss_timer = 0
+        self.lv_final_delay_timer = 0
+        self.lv_intro_timer     = 0
+        self.lv_complete_timer  = 0
+        self.lv_spawn_timer     = 0
+        self.lv_spawn_delay     = 70
+
+        if self.mode == 'levels':
+            self._start_level()
+        if self.state != 'menu':
+            self.state = 'playing'
+
+    def _start_level(self):
+        weights, count, score_tgt, bosses = LEVELS_DATA[self.lv_idx]
+        self.lv_spawn_left = count
+        self.lv_boss_queue = list(bosses)
+        self.lv_wave_phase = 'intro'
+        self.lv_intro_timer = 140
+        self.lv_spawn_timer = 0
+        self.lv_spawn_delay = max(30, 90 - self.lv_idx * 3)
+        self.enemies.clear()
+        self.active_bosses.clear()
+        self.level = self.lv_idx + 1
+
+    def _spawn_enemy_arcade(self):
         lv = min(self.level, 3)
-        w  = self.WEIGHTS[lv]
+        w  = self.ARCADE_WEIGHTS[lv]
         self.enemies.append(Enemy(random.choices(list(w.keys()), list(w.values()))[0]))
 
-    def _check_boss_spawn(self):
-        """Trigger boss at level 5/10/15… (big) or 3/6/9… (mini, not big-boss levels)."""
-        if self.boss or self.miniboss:
+    def _spawn_enemy_levels(self):
+        weights, _, _, _ = LEVELS_DATA[self.lv_idx]
+        if not weights:
+            return
+        kinds = list(weights.keys())
+        wts   = list(weights.values())
+        self.enemies.append(Enemy(random.choices(kinds, wts)[0]))
+
+    def _check_boss_spawn_arcade(self):
+        if self.active_bosses:
             return
         lv = self.level
         if lv in self.bosses_spawned:
@@ -607,42 +991,72 @@ class Game:
         if lv % 5 == 0:
             self.bosses_spawned.add(lv)
             self.enemies.clear()
-            self.boss          = Boss()
+            boss = Boss()
+            self.active_bosses.append(boss)
             self.boss_enraged  = False
-            self.warning_text  = "⚠  D R E A D N O U G H T  ⚠"
+            self.warning_text  = "DREADNOUGHT"
             self.warning_timer = 190
             self.sounds.play('boss_warning')
         elif lv % 3 == 0:
             self.bosses_spawned.add(lv)
-            self.miniboss      = MiniBoss()
-            self.warning_text  = "⚠  M A R A U D E R  ⚠"
+            mb = MiniBoss()
+            self.active_bosses.append(mb)
+            self.warning_text  = "MARAUDER"
             self.warning_timer = 130
             self.sounds.play('boss_warning')
 
+    def _get_boss_laser_rects(self, boss) -> list:
+        if isinstance(boss, FinalBoss):
+            return boss.get_laser_rects()
+        if isinstance(boss, Boss):
+            return boss.get_laser_rects()
+        return []  # MiniBoss has no laser
+
     def _boss_death(self, boss):
-        """Common cleanup when any boss is killed."""
-        count = 5 if isinstance(boss, Boss) else 3
+        """Handle any boss death."""
+        count = 5 if isinstance(boss, (Boss, FinalBoss)) else 3
         for _ in range(count):
-            ox = boss.x + random.randint(-55,55)
-            oy = boss.y + random.randint(-40,40)
+            ox = boss.x + random.randint(-55, 55)
+            oy = boss.y + random.randint(-40, 40)
             self.explosions.append(Explosion(ox, oy, big=True))
         self.sounds.play('boss_die')
         for _ in range(boss.drop_count):
             self.powerups.append(PowerUp(
-                boss.x + random.randint(-65,65),
-                boss.y + random.randint(-45,45)
+                boss.x + random.randint(-65, 65),
+                boss.y + random.randint(-45, 45)
             ))
-        self.kills += boss.kill_credit
-        if isinstance(boss, Boss):
-            self.boss = None; self.boss_enraged = False
-        else:
-            self.miniboss = None
+        if self.mode == 'arcade':
+            self.kills += boss.kill_credit
+        self.score += boss.score_val
+        self.active_bosses = [b for b in self.active_bosses if b is not boss]
+
+        # Levels mode: advance state machine
+        if self.mode == 'levels':
+            if isinstance(boss, FinalBoss):
+                self.state = 'victory'
+                self.sounds.play('victory')
+                self.effects.set_random_flashes(0)
+            elif isinstance(boss, MiniBoss):
+                if self.lv_boss_queue:
+                    self.lv_wave_phase = 'boss_wait'
+                    self.lv_next_boss_timer = 90
+                else:
+                    self._level_complete()
+        # Arcade mode: enrage flag
+        if self.mode == 'arcade' and isinstance(boss, Boss):
+            self.boss_enraged = False
+
+    def _level_complete(self):
+        self.state = 'level_complete'
+        self.lv_complete_timer = 150
+        self.sounds.play('level_complete')
+        self.effects.reset()
 
     # ── collisions ────────────────────────────────────────────────────────────
     def _collisions(self):
         p_rect = self.player.get_rect()
 
-        # ── Player bullets vs regular enemies ─────────────────────────────
+        # Player bullets vs regular enemies
         for bullet in self.player.bullets:
             if not bullet.active: continue
             br = bullet.get_rect()
@@ -659,42 +1073,32 @@ class Game:
                         self.explosions.append(Explosion(enemy.x, enemy.y))
                     break
 
-        # ── Player bullets vs mini-boss ────────────────────────────────────
-        if self.miniboss and self.miniboss.active:
+        # Player bullets vs active bosses
+        for boss in list(self.active_bosses):
+            if not boss.active: continue
+            old_phase = getattr(boss, 'phase', 1)
             for bullet in self.player.bullets:
                 if not bullet.active: continue
-                if bullet.get_rect().colliderect(self.miniboss.get_rect()):
+                if bullet.get_rect().colliderect(boss.get_rect()):
                     bullet.active = False
-                    if self.miniboss.take_hit():
-                        self.score += self.miniboss.score_val
-                        self._boss_death(self.miniboss)
+                    if boss.take_hit():
+                        self._boss_death(boss)
+                        break
                     else:
-                        self.explosions.append(Explosion(self.miniboss.x, self.miniboss.y))
-
-        # ── Player bullets vs big boss ─────────────────────────────────────
-        if self.boss and self.boss.active:
-            old_phase = self.boss.phase
-            for bullet in self.player.bullets:
-                if not bullet.active: continue
-                if bullet.get_rect().colliderect(self.boss.get_rect()):
-                    bullet.active = False
-                    if self.boss.take_hit():
-                        self.score += self.boss.score_val
-                        self._boss_death(self.boss)
-                    else:
-                        self.explosions.append(Explosion(self.boss.x, self.boss.y))
-            # Enrage transition (fires once)
-            if (self.boss and self.boss.active
-                    and self.boss.phase == 2 and old_phase == 1
-                    and not self.boss_enraged):
+                        self.explosions.append(Explosion(boss.x, boss.y))
+            # Enrage check for Dreadnought in arcade mode
+            if (self.mode == 'arcade' and isinstance(boss, Boss)
+                    and boss.active and boss.phase == 2
+                    and old_phase == 1 and not self.boss_enraged):
                 self.boss_enraged  = True
                 self.enrage_flash  = 35
                 self.sounds.play('boss_enrage')
 
-        # ── Enemy bullets vs player ────────────────────────────────────────
+        # Enemy bullets vs player
         all_shooters = list(self.enemies)
-        if self.miniboss and self.miniboss.active: all_shooters.append(self.miniboss)
-        if self.boss     and self.boss.active:     all_shooters.append(self.boss)
+        for boss in self.active_bosses:
+            if boss.active:
+                all_shooters.append(boss)
 
         for shooter in all_shooters:
             for eb in shooter.bullets:
@@ -707,18 +1111,19 @@ class Game:
                         self.sounds.play('hit')
                         self.explosions.append(Explosion(self.player.x, self.player.y))
 
-        # ── Boss laser vs player ───────────────────────────────────────────
-        if self.boss and self.boss.active:
-            lr = self.boss.get_laser_rect()
-            if lr and lr.colliderect(p_rect):
-                shielded = self.player.has_shield
-                if self.player.take_damage():
-                    if shielded: self.sounds.play('shield_break')
-                    else:
-                        self.sounds.play('hit')
-                        self.explosions.append(Explosion(self.player.x, self.player.y))
+        # Boss lasers vs player
+        for boss in self.active_bosses:
+            if not boss.active: continue
+            for lr in self._get_boss_laser_rects(boss):
+                if lr and lr.colliderect(p_rect):
+                    shielded = self.player.has_shield
+                    if self.player.take_damage():
+                        if shielded: self.sounds.play('shield_break')
+                        else:
+                            self.sounds.play('hit')
+                            self.explosions.append(Explosion(self.player.x, self.player.y))
 
-        # ── Enemy ram vs player ────────────────────────────────────────────
+        # Enemy ram vs player
         for enemy in self.enemies:
             if enemy.active and enemy.get_rect().colliderect(p_rect):
                 enemy.active = False
@@ -728,7 +1133,7 @@ class Game:
                     self.sounds.play('hit')
                     self.explosions.append(Explosion(self.player.x, self.player.y))
 
-        # ── Player picks up power-ups ──────────────────────────────────────
+        # Player picks up power-ups
         for pu in self.powerups:
             if pu.active and pu.get_rect().colliderect(p_rect):
                 pu.active = False
@@ -738,17 +1143,110 @@ class Game:
         if self.player.health <= 0:
             self.state = 'game_over'
 
-    # ── level progression ─────────────────────────────────────────────────────
-    def _check_level(self):
+    # ── Arcade level progression ──────────────────────────────────────────────
+    def _check_level_arcade(self):
         if self.kills >= self.kills_level * self.level:
             self.level       += 1
             self.spawn_delay  = max(28, 90 - self.level * 10)
-            self._check_boss_spawn()
+            self._check_boss_spawn_arcade()
+
+    # ── Levels mode state machine ─────────────────────────────────────────────
+    def _update_levels_mode(self):
+        ts = 0.45 if self.player.slow_active else 1.0
+
+        phase = self.lv_wave_phase
+
+        if phase == 'intro':
+            self.lv_intro_timer -= 1
+            if self.lv_intro_timer <= 0:
+                if LEVELS_DATA[self.lv_idx][1] == 0:
+                    # Boss-only wave — go straight to boss_wait
+                    self.lv_wave_phase = 'boss_wait'
+                    self.lv_next_boss_timer = 60
+                else:
+                    self.lv_wave_phase = 'normal'
+
+        elif phase == 'normal':
+            # Spawn enemies
+            if self.lv_spawn_left > 0:
+                self.lv_spawn_timer += 1
+                if self.lv_spawn_timer >= self.lv_spawn_delay:
+                    self._spawn_enemy_levels()
+                    self.lv_spawn_left -= 1
+                    self.lv_spawn_timer = 0
+            else:
+                # All spawned; wait for enemies to die
+                if not self.enemies and not self.active_bosses:
+                    if self.lv_boss_queue:
+                        self.lv_wave_phase = 'boss_wait'
+                        self.lv_next_boss_timer = 90
+                    else:
+                        self._level_complete()
+
+        elif phase == 'boss_wait':
+            self.lv_next_boss_timer -= 1
+            if self.lv_next_boss_timer <= 0:
+                if not self.lv_boss_queue:
+                    self._level_complete()
+                    return
+                next_boss = self.lv_boss_queue.pop(0)
+                if next_boss == 'FINAL':
+                    self.lv_wave_phase = 'final_delay'
+                    self.lv_final_delay_timer = 240
+                    self.effects.set_vignette(60)
+                    self.effects.set_random_flashes(60)
+                    self.sounds.play('boss_warning')
+                else:  # 'mini'
+                    mb = MiniBoss()
+                    self.active_bosses.append(mb)
+                    self.lv_wave_phase = 'boss'
+                    self.warning_text  = "MARAUDER"
+                    self.warning_timer = 130
+                    self.sounds.play('boss_warning')
+
+        elif phase == 'boss':
+            # Wait for all bosses to die
+            if not self.active_bosses:
+                if self.lv_boss_queue:
+                    self.lv_wave_phase = 'boss_wait'
+                    self.lv_next_boss_timer = 90
+                else:
+                    self._level_complete()
+
+        elif phase == 'final_delay':
+            self.lv_final_delay_timer -= 1
+            # Periodic shake
+            if int(self.lv_final_delay_timer) % 20 == 0:
+                self.effects.add_shake(3)
+            self.effects.set_vignette(60)
+            if self.lv_final_delay_timer <= 0:
+                fb = FinalBoss()
+                self.active_bosses.append(fb)
+                self.lv_wave_phase = 'final_boss'
+                self.warning_text  = "CRIMSON OVERLORD"
+                self.warning_timer = 200
+                self.sounds.play('boss_warning')
+                self.effects.set_random_flashes(45)
+
+        elif phase == 'final_boss':
+            # FinalBoss is in active_bosses; update vignette intensity
+            for boss in self.active_bosses:
+                if isinstance(boss, FinalBoss):
+                    hp_ratio = boss.hp / boss.max_hp
+                    vign = (1.0 - hp_ratio) * 220
+                    self.effects.set_vignette(vign)
+                    if boss.phase == 3:
+                        self.effects.set_random_flashes(22)
+                    break
 
     # ── HUD ───────────────────────────────────────────────────────────────────
     def _draw_hud(self):
-        self.screen.blit(self.font.render(f"Score: {self.score}", True, WHITE),  (10, 10))
-        self.screen.blit(self.font.render(f"Level: {self.level}", True, YELLOW), (10, 44))
+        if self.mode == 'arcade':
+            self.screen.blit(self.font.render(f"Score: {self.score}", True, WHITE),  (10, 10))
+            self.screen.blit(self.font.render(f"Level: {self.level}", True, YELLOW), (10, 44))
+        else:
+            self.screen.blit(self.font.render(f"Score: {self.score}", True, WHITE),  (10, 10))
+            self.screen.blit(self.font.render(f"LEVEL {self.level} / 20", True, YELLOW), (10, 44))
 
         # Lives
         self.screen.blit(self.font_s.render("Lives:", True, WHITE), (SCREEN_WIDTH-200, 12))
@@ -757,16 +1255,16 @@ class Game:
             cx = SCREEN_WIDTH-140+i*28; cy = 22
             pygame.draw.polygon(self.screen, col, [(cx-12,cy+6),(cx+14,cy),(cx-12,cy-6)])
 
-        # Centre top: kill bar or boss HP bar
-        if self.boss or self.miniboss:
+        # Centre top
+        if self.active_bosses:
             self._draw_boss_hpbar()
-        else:
+        elif self.mode == 'arcade':
             self._draw_kill_bar()
+        else:
+            self._draw_score_bar()
 
-        # Active power-ups
         self._draw_active_powerups()
 
-        # Controls hint (bottom)
         hint = self.font_s.render("WASD / Arrows — move    SPACE — shoot", True, GRAY)
         self.screen.blit(hint, (SCREEN_WIDTH//2-hint.get_width()//2, SCREEN_HEIGHT-26))
 
@@ -780,11 +1278,33 @@ class Game:
         pt = self.font_s.render(f"{self.kills}/{thresh}", True, WHITE)
         self.screen.blit(pt, pt.get_rect(center=(SCREEN_WIDTH//2, by+bh+10)))
 
+    def _draw_score_bar(self):
+        if self.lv_idx >= len(LEVELS_DATA):
+            return
+        _, _, score_tgt, _ = LEVELS_DATA[self.lv_idx]
+        if score_tgt == 0:
+            return
+        bx,by,bw,bh = SCREEN_WIDTH//2-90, 8, 180, 14
+        filled = min(bw, int(bw * self.score / score_tgt)) if score_tgt else bw
+        pygame.draw.rect(self.screen, DARK_GRAY, (bx,by,bw,bh))
+        pygame.draw.rect(self.screen, CYAN,      (bx,by,filled,bh))
+        pygame.draw.rect(self.screen, GRAY,      (bx,by,bw,bh), 1)
+        pt = self.font_s.render(f"{self.score}/{score_tgt}", True, WHITE)
+        self.screen.blit(pt, pt.get_rect(center=(SCREEN_WIDTH//2, by+bh+10)))
+
     def _draw_boss_hpbar(self):
-        boss    = self.boss or self.miniboss
-        is_big  = isinstance(boss, Boss)
-        name    = "DREADNOUGHT" if is_big else "MARAUDER"
-        col     = RED if (is_big and boss.phase==2) else (ORANGE if is_big else YELLOW)
+        boss = self.active_bosses[-1] if self.active_bosses else None
+        if not boss:
+            return
+        if isinstance(boss, FinalBoss):
+            name = "CRIMSON OVERLORD"
+            col = (255, 20, 20) if boss.phase == 3 else ((200, 40, 40) if boss.phase == 2 else CRIMSON)
+        elif isinstance(boss, Boss):
+            name = "DREADNOUGHT"
+            col = RED if boss.phase == 2 else ORANGE
+        else:
+            name = "MARAUDER"
+            col = YELLOW
 
         bw,bh   = 360, 16
         bx, by  = SCREEN_WIDTH//2 - bw//2, 8
@@ -794,12 +1314,9 @@ class Game:
         pygame.draw.rect(self.screen, col,       (bx,by,filled,bh), border_radius=3)
         pygame.draw.rect(self.screen, GRAY,      (bx,by,bw,bh), 1, border_radius=3)
 
-        label = self.font_s.render(f"{name}   {boss.hp} / {boss.max_hp}", True, WHITE)
+        phase_txt = f" — Phase {boss.phase}" if isinstance(boss, FinalBoss) else ""
+        label = self.font_s.render(f"{name}   {boss.hp} / {boss.max_hp}{phase_txt}", True, WHITE)
         self.screen.blit(label, label.get_rect(center=(SCREEN_WIDTH//2, by+bh+10)))
-
-        if is_big and boss.phase == 2:
-            ph2 = self.font_s.render("— PHASE 2 —", True, RED)
-            self.screen.blit(ph2, ph2.get_rect(center=(SCREEN_WIDTH//2, by+bh+26)))
 
     def _draw_active_powerups(self):
         items = []
@@ -823,7 +1340,7 @@ class Game:
         self.warning_timer -= 1
         if (self.warning_timer // 8) % 2 == 0:
             alpha = min(255, self.warning_timer * 4)
-            t     = self.font_b.render(self.warning_text, True, RED)
+            t     = self.font_b.render(f"  {self.warning_text}  ", True, RED)
             s     = pygame.Surface(t.get_size(), pygame.SRCALPHA)
             s.blit(t, (0,0)); s.set_alpha(alpha)
             self.screen.blit(s, s.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2-30)))
@@ -839,6 +1356,37 @@ class Game:
         s = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         s.fill((255,0,0,alpha)); self.screen.blit(s,(0,0))
 
+    def _draw_level_intro(self):
+        if self.lv_wave_phase != 'intro' or self.lv_intro_timer <= 0:
+            return
+        alpha = min(255, self.lv_intro_timer * 4)
+        t1 = self.font_xl.render(f"LEVEL  {self.level}", True, WHITE)
+        t2 = self.font.render(f"/ 20", True, YELLOW)
+        s1 = pygame.Surface(t1.get_size(), pygame.SRCALPHA)
+        s1.blit(t1, (0,0)); s1.set_alpha(alpha)
+        s2 = pygame.Surface(t2.get_size(), pygame.SRCALPHA)
+        s2.blit(t2, (0,0)); s2.set_alpha(alpha)
+        cy = SCREEN_HEIGHT//2
+        self.screen.blit(s1, s1.get_rect(center=(SCREEN_WIDTH//2, cy-20)))
+        self.screen.blit(s2, s2.get_rect(center=(SCREEN_WIDTH//2, cy+50)))
+
+    def _draw_level_complete(self):
+        ov = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        ov.fill((0,0,0,160)); self.screen.blit(ov,(0,0))
+        def ctr(surf, y): self.screen.blit(surf, surf.get_rect(center=(SCREEN_WIDTH//2, y)))
+        ctr(self.font_b.render("LEVEL COMPLETE!", True, GREEN), SCREEN_HEIGHT//2 - 60)
+        ctr(self.font.render(f"Score: {self.score}", True, WHITE), SCREEN_HEIGHT//2)
+        ctr(self.font_s.render("Preparing next level...", True, GRAY), SCREEN_HEIGHT//2 + 50)
+
+    def _draw_victory(self):
+        ov = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        ov.fill((0,0,0,180)); self.screen.blit(ov,(0,0))
+        def ctr(surf, y): self.screen.blit(surf, surf.get_rect(center=(SCREEN_WIDTH//2, y)))
+        ctr(self.font_xl.render("VICTORY!", True, GOLD), SCREEN_HEIGHT//2 - 100)
+        ctr(self.font_b.render("All 20 levels cleared!", True, WHITE), SCREEN_HEIGHT//2 - 20)
+        ctr(self.font.render(f"Final Score: {self.score}", True, YELLOW), SCREEN_HEIGHT//2 + 60)
+        ctr(self.font.render("R — play again   Q — quit", True, CYAN), SCREEN_HEIGHT//2 + 120)
+
     def _draw_game_over(self):
         ov = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         ov.fill((0,0,0,165)); self.screen.blit(ov,(0,0))
@@ -848,6 +1396,48 @@ class Game:
         ctr(self.font.render(f"Level: {self.level}",   True, YELLOW), SCREEN_HEIGHT//2+35)
         ctr(self.font.render("R — restart   Q — quit", True, CYAN),   SCREEN_HEIGHT//2+100)
 
+    def _draw_menu(self):
+        self.screen.fill(BLACK)
+        for star in self.stars:
+            star.update(); star.draw(self.screen)
+
+        def ctr(surf, y): self.screen.blit(surf, surf.get_rect(center=(SCREEN_WIDTH//2, y)))
+
+        title = self.font_xl.render("SPACE SHOOTER", True, CYAN)
+        ctr(title, 120)
+
+        # Two mode boxes
+        box_w, box_h = 220, 80
+        gap = 40
+        total = box_w * 2 + gap
+        x0 = SCREEN_WIDTH//2 - total//2
+        y0 = 260
+
+        modes = [
+            ('ARCADE', 'Endless waves, boss every level'),
+            ('LEVELS', '20 predefined levels + bosses'),
+        ]
+        for i, (name, desc) in enumerate(modes):
+            bx = x0 + i*(box_w + gap)
+            selected = (i == self._menu_sel)
+            box_col = CYAN if selected else GRAY
+            pygame.draw.rect(self.screen, DARK_GRAY, (bx, y0, box_w, box_h), border_radius=10)
+            pygame.draw.rect(self.screen, box_col,   (bx, y0, box_w, box_h), 3, border_radius=10)
+            lbl = self.font_b.render(name, True, (WHITE if selected else GRAY))
+            self.screen.blit(lbl, lbl.get_rect(center=(bx+box_w//2, y0+box_h//2)))
+
+        # Descriptions
+        for i, (name, desc) in enumerate(modes):
+            bx = x0 + i*(box_w + gap)
+            col = WHITE if i == self._menu_sel else GRAY
+            t = self.font_s.render(desc, True, col)
+            self.screen.blit(t, t.get_rect(center=(bx+box_w//2, y0+box_h+22)))
+
+        hint = self.font_s.render("A / D or Arrow keys to select    SPACE or ENTER to start", True, GRAY)
+        ctr(hint, SCREEN_HEIGHT - 40)
+
+        pygame.display.flip()
+
     # ── main loop ─────────────────────────────────────────────────────────────
     def run(self):
         while True:
@@ -855,7 +1445,24 @@ class Game:
                 if event.type == pygame.QUIT: pygame.quit(); sys.exit()
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_q: pygame.quit(); sys.exit()
-                    if event.key == pygame.K_r and self.state == 'game_over': self._reset()
+                    if self.state == 'menu':
+                        if event.key in (pygame.K_LEFT, pygame.K_a):
+                            self._menu_sel = (self._menu_sel - 1) % 2
+                        elif event.key in (pygame.K_RIGHT, pygame.K_d):
+                            self._menu_sel = (self._menu_sel + 1) % 2
+                        elif event.key in (pygame.K_SPACE, pygame.K_RETURN):
+                            self.mode = 'arcade' if self._menu_sel == 0 else 'levels'
+                            self._reset()
+                            self.state = 'playing'
+                    elif self.state in ('game_over', 'victory'):
+                        if event.key == pygame.K_r:
+                            self.state = 'menu'
+                            self._reset_to_menu()
+
+            if self.state == 'menu':
+                self._draw_menu()
+                self.clock.tick(FPS)
+                continue
 
             if self.state == 'playing':
                 keys = pygame.key.get_pressed()
@@ -864,23 +1471,34 @@ class Game:
 
                 ts = 0.45 if self.player.slow_active else 1.0
 
-                # Spawn regular enemies (pause during big-boss fight)
-                if not self.boss:
-                    self.spawn_timer += 1
-                    if self.spawn_timer >= self.spawn_delay:
-                        self._spawn_enemy(); self.spawn_timer = 0
+                if self.mode == 'arcade':
+                    # Spawn enemies (pause during big-boss fight)
+                    has_big_boss = any(isinstance(b, Boss) for b in self.active_bosses)
+                    if not has_big_boss:
+                        self.spawn_timer += 1
+                        if self.spawn_timer >= self.spawn_delay:
+                            self._spawn_enemy_arcade(); self.spawn_timer = 0
+                    for e in self.enemies: e.update(ts)
+                    self.enemies = [e for e in self.enemies if e.active]
+                    for boss in self.active_bosses:
+                        if boss.active: boss.update(ts)
+                    # Phase check for Dreadnought
+                    for boss in self.active_bosses:
+                        if (isinstance(boss, Boss) and boss.active
+                                and boss.phase == 2 and not self.boss_enraged):
+                            self.boss_enraged = True
+                            self.enrage_flash = 35
+                            self.sounds.play('boss_enrage')
+                    self.active_bosses = [b for b in self.active_bosses if b.active]
+                    self._check_level_arcade()
 
-                for e in self.enemies:    e.update(ts)
-                self.enemies = [e for e in self.enemies if e.active]
-
-                if self.miniboss and self.miniboss.active: self.miniboss.update(ts)
-                if self.boss     and self.boss.active:     self.boss.update(ts)
-                # Phase-2 check for boss (must happen AFTER boss.update so phase may change)
-                if (self.boss and self.boss.active
-                        and self.boss.phase == 2 and not self.boss_enraged):
-                    self.boss_enraged = True
-                    self.enrage_flash = 35
-                    self.sounds.play('boss_enrage')
+                else:  # levels mode
+                    self._update_levels_mode()
+                    for e in self.enemies: e.update(ts)
+                    self.enemies = [e for e in self.enemies if e.active]
+                    for boss in self.active_bosses:
+                        if boss.active: boss.update(ts, self.effects)
+                    self.active_bosses = [b for b in self.active_bosses if b.active]
 
                 for pu in self.powerups: pu.update()
                 self.powerups = [pu for pu in self.powerups if pu.active]
@@ -890,30 +1508,71 @@ class Game:
                 for ex in self.explosions: ex.update()
                 self.explosions = [ex for ex in self.explosions if ex.active]
 
-                self._check_level()
+                self.effects.update()
 
-            # ── Draw ──────────────────────────────────────────────────────────
+            elif self.state == 'level_complete':
+                self.lv_complete_timer -= 1
+                if self.lv_complete_timer <= 0:
+                    self.lv_idx += 1
+                    if self.lv_idx >= 20:
+                        self.state = 'victory'
+                        self.sounds.play('victory')
+                    else:
+                        self._start_level()
+                        self.state = 'playing'
+
+            # ── Draw world to game_surf (shaken) ──────────────────────────────
+            self.game_surf.fill(BLACK)
+            for star in self.stars:
+                star.update(); star.draw(self.game_surf)
+
+            if self.player.slow_active:
+                tint = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+                tint.fill((60,30,160,20)); self.game_surf.blit(tint,(0,0))
+
+            for e in self.enemies:  e.draw(self.game_surf)
+            for boss in self.active_bosses:
+                if boss.active: boss.draw(self.game_surf)
+            for pu in self.powerups:   pu.draw(self.game_surf, self.font_s)
+            for ex in self.explosions: ex.draw(self.game_surf)
+            self.player.draw(self.game_surf)
+
+            # ── Blit game_surf with shake offset ──────────────────────────────
             self.screen.fill(BLACK)
-            for star in self.stars: star.update(); star.draw(self.screen)
+            self.screen.blit(self.game_surf, self.effects.shake_offset)
 
-            if self.player.slow_active: self._draw_slow_tint()
+            # ── HUD and overlays drawn directly to screen (no shake) ──────────
+            if self.state in ('playing', 'level_complete', 'victory', 'game_over'):
+                self._draw_hud()
+                self._draw_warning()
+                self._draw_enrage_flash()
+                self.effects.draw_vignette(self.screen)
+                self.effects.draw_flash(self.screen)
 
-            for e  in self.enemies:  e.draw(self.screen)
-            if self.miniboss and self.miniboss.active: self.miniboss.draw(self.screen)
-            if self.boss     and self.boss.active:     self.boss.draw(self.screen)
+            if self.mode == 'levels' and self.state == 'playing':
+                self._draw_level_intro()
 
-            for pu in self.powerups:   pu.draw(self.screen, self.font_s)
-            for ex in self.explosions: ex.draw(self.screen)
-            self.player.draw(self.screen)
+            if self.state == 'level_complete':
+                self._draw_level_complete()
 
-            self._draw_hud()
-            self._draw_warning()
-            self._draw_enrage_flash()
+            if self.state == 'victory':
+                self._draw_victory()
 
-            if self.state == 'game_over': self._draw_game_over()
+            if self.state == 'game_over':
+                self._draw_game_over()
 
             pygame.display.flip()
             self.clock.tick(FPS)
+
+    def _reset_to_menu(self):
+        """Clear game state for menu return."""
+        self.state = 'menu'
+        self.effects.reset()
+        self.active_bosses = []
+        self.enemies = []
+        self.powerups = []
+        self.explosions = []
+        self.stars = [Star() for _ in range(180)]
 
 
 if __name__ == "__main__":
