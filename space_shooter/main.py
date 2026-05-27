@@ -12,9 +12,10 @@ except ImportError:
     _HAS_NUMPY = False
 
 # ─── Constants ────────────────────────────────────────────────────────────────
-SCREEN_WIDTH  = 900
-SCREEN_HEIGHT = 600
-FPS           = 60
+SCREEN_WIDTH    = 900
+SCREEN_HEIGHT   = 600
+FPS             = 60
+DEL_HOLD_FRAMES = 120   # frames (~2 s) to hold DEL to wipe save progress
 
 # ─── Colours ──────────────────────────────────────────────────────────────────
 BLACK      = (0,   0,   0)
@@ -928,6 +929,8 @@ class Game:
         self._btn_rects: dict  = {}   # button_name → pygame.Rect
         self._hover_btn: str   = ''   # currently hovered button key
         self._cursor_is_hand   = False
+        self._del_hold         = 0    # frames DEL held on level-select screen
+        self._del_wipe_confirm = 0    # countdown for "progress reset!" banner
         self._reset()
 
     def _reset(self):
@@ -1608,6 +1611,14 @@ class Game:
                 continue
 
             if self.state == 'level_select':
+                # DEL hold-to-wipe detection
+                keys = pygame.key.get_pressed()
+                if keys[pygame.K_DELETE]:
+                    self._del_hold += 1
+                    if self._del_hold >= DEL_HOLD_FRAMES:
+                        self._wipe_progress()
+                else:
+                    self._del_hold = 0
                 self._draw_level_select()
                 pygame.display.flip(); self.clock.tick(FPS)
                 continue
@@ -1746,6 +1757,18 @@ class Game:
         except Exception:
             pass
 
+    def _wipe_progress(self):
+        """Erase all saved progress — called when DEL is held long enough."""
+        self._max_unlocked     = 0
+        self._ls_cursor        = 0
+        self._del_hold         = 0
+        self._del_wipe_confirm = 150  # show "Progress reset!" banner for 2.5 s
+        try:
+            with open(self._save_path, 'w') as f:
+                json.dump({'max_unlocked': 0}, f)
+        except Exception:
+            pass
+
     # ── Pause ─────────────────────────────────────────────────────────────────
     def _pause(self):
         """Freeze game and enter pause state."""
@@ -1872,6 +1895,22 @@ class Game:
                 self.screen.blit(lk, lk.get_rect(center=(x+cw//2, y+28)))
                 lo = self.font_s.render("LOCKED", True, (80, 80, 80))
                 self.screen.blit(lo, lo.get_rect(center=(x+cw//2, y+54)))
+
+        # DEL hold-to-reset indicator
+        if self._del_hold > 0:
+            prog = min(1.0, self._del_hold / DEL_HOLD_FRAMES)
+            bar_w, bar_h = 280, 12
+            bx = SCREEN_WIDTH//2 - bar_w//2
+            by = SCREEN_HEIGHT - 52
+            pygame.draw.rect(self.screen, DARK_GRAY, (bx, by, bar_w, bar_h), border_radius=4)
+            pygame.draw.rect(self.screen, RED,       (bx, by, int(bar_w * prog), bar_h), border_radius=4)
+            pygame.draw.rect(self.screen, GRAY,      (bx, by, bar_w, bar_h), 1, border_radius=4)
+            del_txt = self.font_s.render("Удержи DEL — сброс прогресса…", True, RED)
+            self.screen.blit(del_txt, del_txt.get_rect(center=(SCREEN_WIDTH//2, by - 14)))
+        elif self._del_wipe_confirm > 0:
+            self._del_wipe_confirm -= 1
+            conf = self.font.render("Прогресс сброшен!", True, GREEN)
+            self.screen.blit(conf, conf.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT - 52)))
 
         hint = self.font_s.render("Arrows — navigate    ENTER/SPACE or click — start    ESC/← BACK — back", True, GRAY)
         self.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT - 20)))
