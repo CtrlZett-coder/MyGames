@@ -1098,6 +1098,7 @@ class Game:
         self._del_wipe_confirm = 0    # countdown for "progress reset!" banner
         self._del_key_held     = False  # tracked via KEYDOWN/KEYUP events
         self._hover_snd_last   = 0    # pygame.time.get_ticks() of last hover sound
+        self._touch_mode       = False # True = show on-screen gamepad (phone mode)
         self._touch            = TouchControls()
         self._reset()
 
@@ -1662,6 +1663,30 @@ class Game:
             t = self.font_s.render(desc, True, col)
             self.screen.blit(t, t.get_rect(center=(bx+box_w//2, y0+box_h+22)))
 
+        # Platform toggle (PC vs PHONE)
+        plat_label = self.font_s.render("Platform:", True, GRAY)
+        ctr(plat_label, 395)
+
+        p_btn_w, p_btn_h = 150, 44
+        p_gap = 24
+        p_total = p_btn_w * 2 + p_gap
+        px0 = SCREEN_WIDTH//2 - p_total//2
+        py  = 408
+        platforms = [('ctrl_pc', 'PC / Keyboard'), ('ctrl_phone', 'Phone / Touch')]
+        for i, (key, label) in enumerate(platforms):
+            bx = px0 + i * (p_btn_w + p_gap)
+            rect = pygame.Rect(bx, py, p_btn_w, p_btn_h)
+            self._btn_rects[key] = rect
+            active  = (self._touch_mode == (i == 1))
+            hovered = (self._hover_btn == key)
+            fill_col   = (20, 60, 20)   if active  else DARK_GRAY
+            border_col = GREEN          if active  else (WHITE if hovered else GRAY)
+            text_col   = GREEN          if active  else (WHITE if hovered else GRAY)
+            pygame.draw.rect(self.screen, fill_col,   rect, border_radius=8)
+            pygame.draw.rect(self.screen, border_col, rect, 2, border_radius=8)
+            lbl = self.font_s.render(label, True, text_col)
+            self.screen.blit(lbl, lbl.get_rect(center=rect.center))
+
         # DEL hold-to-reset indicator (same as level select screen)
         if self._del_hold > 0:
             prog = min(1.0, self._del_hold / DEL_HOLD_FRAMES)
@@ -1757,7 +1782,7 @@ class Game:
                 # ── Mouse click ───────────────────────────────────────────────
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     mx, my = event.pos
-                    if self.state == 'playing':
+                    if self.state == 'playing' and self._touch_mode:
                         btn = self._touch.touch_down(-1, mx, my)
                         if btn == 'pause':
                             self._pause()
@@ -1767,14 +1792,14 @@ class Game:
                                 self._handle_button_click(nm); break
 
                 if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-                    if self.state == 'playing':
+                    if self.state == 'playing' and self._touch_mode:
                         self._touch.touch_up(-1)
 
                 # ── Real multi-touch (phone / tablet) ─────────────────────────
                 if event.type == pygame.FINGERDOWN:
                     px = int(event.x * SCREEN_WIDTH)
                     py = int(event.y * SCREEN_HEIGHT)
-                    if self.state == 'playing':
+                    if self.state == 'playing' and self._touch_mode:
                         btn = self._touch.touch_down(event.finger_id, px, py)
                         if btn == 'pause':
                             self._pause()
@@ -1784,12 +1809,13 @@ class Game:
                                 self._handle_button_click(nm); break
 
                 if event.type == pygame.FINGERUP:
-                    self._touch.touch_up(event.finger_id)
+                    if self._touch_mode:
+                        self._touch.touch_up(event.finger_id)
 
                 if event.type == pygame.FINGERMOTION:
                     px = int(event.x * SCREEN_WIDTH)
                     py = int(event.y * SCREEN_HEIGHT)
-                    if self.state == 'playing':
+                    if self.state == 'playing' and self._touch_mode:
                         self._touch.touch_move(event.finger_id, px, py)
 
                 # ── DEL released ──────────────────────────────────────────────
@@ -1922,7 +1948,7 @@ class Game:
                 self._draw_game_over()
 
             # ── Touch controls overlay (drawn on top of everything) ───────────
-            if self.state == 'playing':
+            if self.state == 'playing' and self._touch_mode:
                 self._touch.draw(self.screen)
 
             pygame.display.flip()
@@ -2127,6 +2153,10 @@ class Game:
         self.sounds.play('ui_back' if name in _back_btns else 'ui_click')
 
         if self.state == 'menu':
+            if name == 'ctrl_pc':
+                self._touch_mode = False; return
+            elif name == 'ctrl_phone':
+                self._touch_mode = True; return
             if name == 'menu_0':
                 self.mode = 'arcade'; self._reset(); self.state = 'playing'
             elif name == 'menu_1':
