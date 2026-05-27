@@ -1422,7 +1422,7 @@ class Game:
             pygame.draw.rect(self.screen, col, rect, 2, border_radius=8)
             t = self.font.render(label, True, col)
             self.screen.blit(t, t.get_rect(center=rect.center))
-        hint = self.font_s.render("R — play again   ESC — menu", True, (80, 80, 80))
+        hint = self.font_s.render("ESC — main menu", True, (80, 80, 80))
         ctr(hint, SCREEN_HEIGHT//2 + 185)
 
     def _draw_game_over(self):
@@ -1450,7 +1450,7 @@ class Game:
             pygame.draw.rect(self.screen, col, rect, 2, border_radius=8)
             t = self.font.render(label, True, col)
             self.screen.blit(t, t.get_rect(center=rect.center))
-        hint = self.font_s.render("R — restart   ESC — menu", True, (80, 80, 80))
+        hint = self.font_s.render("ESC — main menu", True, (80, 80, 80))
         ctr(hint, SCREEN_HEIGHT//2 + 165)
 
     def _draw_menu(self):
@@ -1494,7 +1494,23 @@ class Game:
             t = self.font_s.render(desc, True, col)
             self.screen.blit(t, t.get_rect(center=(bx+box_w//2, y0+box_h+22)))
 
-        hint = self.font_s.render("A/D — select    SPACE/ENTER — start    or click with mouse", True, GRAY)
+        # DEL hold-to-reset indicator (same as level select screen)
+        if self._del_hold > 0:
+            prog = min(1.0, self._del_hold / DEL_HOLD_FRAMES)
+            bar_w, bar_h = 280, 12
+            bx = SCREEN_WIDTH//2 - bar_w//2
+            by = SCREEN_HEIGHT - 65
+            pygame.draw.rect(self.screen, DARK_GRAY, (bx, by, bar_w, bar_h), border_radius=4)
+            pygame.draw.rect(self.screen, RED,       (bx, by, int(bar_w * prog), bar_h), border_radius=4)
+            pygame.draw.rect(self.screen, GRAY,      (bx, by, bar_w, bar_h), 1, border_radius=4)
+            del_txt = self.font_s.render("Hold DEL to reset progress...", True, RED)
+            self.screen.blit(del_txt, del_txt.get_rect(center=(SCREEN_WIDTH//2, by - 14)))
+        elif self._del_wipe_confirm > 0:
+            self._del_wipe_confirm -= 1
+            conf = self.font.render("Progress reset!", True, GREEN)
+            self.screen.blit(conf, conf.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT - 68)))
+
+        hint = self.font_s.render("Click to choose mode    DEL — reset progress", True, GRAY)
         ctr(hint, SCREEN_HEIGHT - 40)
 
     # ── main loop ─────────────────────────────────────────────────────────────
@@ -1505,68 +1521,31 @@ class Game:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_q: pygame.quit(); sys.exit()
 
-                    # ── Menu ──────────────────────────────────────────────────
-                    if self.state == 'menu':
-                        if event.key in (pygame.K_LEFT, pygame.K_a):
-                            self._menu_sel = (self._menu_sel - 1) % 2
-                        elif event.key in (pygame.K_RIGHT, pygame.K_d):
-                            self._menu_sel = (self._menu_sel + 1) % 2
-                        elif event.key in (pygame.K_SPACE, pygame.K_RETURN):
-                            if self._menu_sel == 0:  # ARCADE
-                                self.mode = 'arcade'
-                                self._reset(); self.state = 'playing'
-                            else:                    # LEVELS → level select
-                                self.mode = 'levels'
-                                self._ls_cursor = 0
-                                self.state = 'level_select'
+                    # DEL hold — works from menu and level select
+                    if event.key == pygame.K_DELETE and self.state in ('menu', 'level_select'):
+                        self._del_key_held = True
 
-                    # ── Level Select ──────────────────────────────────────────
-                    elif self.state == 'level_select':
-                        cols = 4
-                        if event.key in (pygame.K_LEFT,  pygame.K_a):
-                            self._ls_cursor = max(0, self._ls_cursor - 1)
-                        elif event.key in (pygame.K_RIGHT, pygame.K_d):
-                            self._ls_cursor = min(19, self._ls_cursor + 1)
-                        elif event.key in (pygame.K_UP,   pygame.K_w):
-                            self._ls_cursor = max(0, self._ls_cursor - cols)
-                        elif event.key in (pygame.K_DOWN,  pygame.K_s):
-                            self._ls_cursor = min(19, self._ls_cursor + cols)
-                        elif event.key in (pygame.K_SPACE, pygame.K_RETURN):
-                            if self._ls_cursor <= self._max_unlocked:
-                                self._reset()
-                                self.lv_idx = self._ls_cursor   # override after reset
-                                self._start_level()
-                                self.state = 'playing'
-                        elif event.key == pygame.K_ESCAPE:
+                    # ── Menu — mouse/touch only; no keyboard buttons ───────────
+                    # (no keyboard handlers for menu buttons)
+
+                    # ── Level Select — only ESC to go back ────────────────────
+                    if self.state == 'level_select':
+                        if event.key == pygame.K_ESCAPE:
                             self.state = 'menu'
-                        elif event.key == pygame.K_DELETE:
-                            self._del_key_held = True   # start hold timer
 
                     # ── Playing → Pause ───────────────────────────────────────
                     elif self.state == 'playing':
                         if event.key == pygame.K_ESCAPE:
                             self._pause()
 
-                    # ── Paused ────────────────────────────────────────────────
+                    # ── Paused — ESC always resumes; buttons are mouse-only ───
                     elif self.state == 'paused':
-                        if event.key in (pygame.K_UP, pygame.K_w):
-                            self._pause_sel = (self._pause_sel - 1) % 2
-                        elif event.key in (pygame.K_DOWN, pygame.K_s):
-                            self._pause_sel = (self._pause_sel + 1) % 2
-                        elif event.key in (pygame.K_ESCAPE, pygame.K_RETURN, pygame.K_SPACE):
-                            if self._pause_sel == 0:
-                                self._resume()
-                            else:
-                                self._reset_to_menu()
+                        if event.key == pygame.K_ESCAPE:
+                            self._resume()
 
-                    # ── Game Over / Victory ───────────────────────────────────
+                    # ── Game Over / Victory — ESC to menu; buttons mouse-only ─
                     elif self.state in ('game_over', 'victory'):
-                        if event.key == pygame.K_r:
-                            # Restart SAME mode (no menu)
-                            if self.mode == 'levels':
-                                self.lv_idx = 0
-                            self._reset(); self.state = 'playing'
-                        elif event.key == pygame.K_ESCAPE:
+                        if event.key == pygame.K_ESCAPE:
                             self._reset_to_menu()
 
                 # ── Mouse hover ───────────────────────────────────────────────
@@ -1577,7 +1556,7 @@ class Game:
                         if rc.collidepoint(mx, my):
                             new_hover = nm; break
                     self._hover_btn = new_hover
-                    # Sync keyboard-selection state with hovered button
+                    # Sync visual-selection state with hovered button
                     if self.state == 'menu':
                         for nm, rc in self._btn_rects.items():
                             if nm.startswith('menu_') and rc.collidepoint(mx, my):
@@ -1614,6 +1593,12 @@ class Game:
                     self._del_hold = 0
 
             if self.state == 'menu':
+                # DEL hold-to-wipe detection
+                if self._del_key_held:
+                    self._del_hold += 1
+                    if self._del_hold >= DEL_HOLD_FRAMES:
+                        self._wipe_progress()
+                        self._del_key_held = False
                 self._draw_menu()
                 pygame.display.flip(); self.clock.tick(FPS)
                 continue
@@ -1817,7 +1802,7 @@ class Game:
             t = self.font.render(label, True, col)
             self.screen.blit(t, t.get_rect(center=rect.center))
 
-        hint = self.font_s.render("↑↓ — select    ENTER/ESC — confirm    or click", True, GRAY)
+        hint = self.font_s.render("ESC — resume", True, GRAY)
         ctr(hint, SCREEN_HEIGHT//2 + 170)
 
     # ── Level Select ──────────────────────────────────────────────────────────
@@ -1836,7 +1821,7 @@ class Game:
         bk_col = WHITE if bk_hov else GRAY
         pygame.draw.rect(self.screen, DARK_GRAY, back_rect, border_radius=6)
         pygame.draw.rect(self.screen, bk_col,   back_rect, 2, border_radius=6)
-        bt = self.font_s.render("← BACK", True, bk_col)
+        bt = self.font_s.render("< BACK", True, bk_col)
         self.screen.blit(bt, bt.get_rect(center=back_rect.center))
 
         cols, rows = 4, 5
@@ -1893,9 +1878,9 @@ class Game:
                     n_mini  = bosses.count('mini')
                     has_fin = 'FINAL' in bosses
                     if has_fin:
-                        bi = self.font_s.render("★ FINAL BOSS", True, RED)
+                        bi = self.font_s.render("* FINAL BOSS", True, RED)
                     else:
-                        bi = self.font_s.render("🟡 " + "×".join(["M"] * n_mini), True, GOLD)
+                        bi = self.font_s.render("M x" + str(n_mini), True, GOLD)
                     self.screen.blit(bi, bi.get_rect(center=(x+cw//2, y+62)))
             else:
                 lk = self.font.render(f"{idx+1}", True, (70, 70, 70))
@@ -1919,7 +1904,7 @@ class Game:
             conf = self.font.render("Прогресс сброшен!", True, GREEN)
             self.screen.blit(conf, conf.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT - 52)))
 
-        hint = self.font_s.render("Arrows — navigate    ENTER/SPACE or click — start    ESC/← BACK — back", True, GRAY)
+        hint = self.font_s.render("Click level to start    ESC / < BACK — go back", True, GRAY)
         self.screen.blit(hint, hint.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT - 20)))
 
     # ── Mouse button dispatcher ───────────────────────────────────────────────
