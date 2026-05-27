@@ -1,4 +1,4 @@
-<html lang="en-us"><script src="./pythons.js" type=module id="site" data-python="python3.12" data-LINES=42 data-COLUMNS=132 data-os="vtx,snd,gui" async defer>#<!--
+<html lang="en-us"><script src="https://pygame-web.github.io/cdn/0.9.3/pythons.js" type=module id="site" data-python="python3.12" data-LINES=42 data-COLUMNS=132 data-os="vtx,snd,gui" async defer>#<!--
 
 print("""
 Loading space_shooter from space_shooter.apk
@@ -311,10 +311,9 @@ function show_infobox() {
   <div class="py-spinner"></div>
   <h2>Space Shooter</h2>
   <p>Loading Python runtime...</p>
-  <p style="color:#666;font-size:0.85em">First load: ~30-60 seconds &nbsp;|&nbsp; Click canvas when ready</p>
+  <p style="color:#666;font-size:0.85em">First load: ~30-60 sec &nbsp;|&nbsp; Click canvas when ready</p>
 </div>
 <script>
-  // Hide overlay when the canvas gets content (pygame starts drawing)
   var _pyCheck = setInterval(function() {
     var c = document.getElementById('canvas');
     if (c && c.width > 2) {
@@ -323,11 +322,10 @@ function show_infobox() {
       clearInterval(_pyCheck);
     }
   }, 300);
-  // Safety: remove after 3 minutes
   setTimeout(function() {
     var d = document.getElementById('py-loading');
     if (d) d.style.display = 'none';
-  }, 180000);
+  }, 300000);
 </script>
 
 
