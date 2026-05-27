@@ -28,39 +28,50 @@ jobs:
       - name: Build web version
         run: python -m pygbag --build space_shooter
 
-      - name: Download CDN files for self-hosting
+      - name: Download CDN files (with fallback — keep remote URL if download fails)
         run: |
           CDN="https://pygame-web.github.io/cdn/0.9.3"
           DEST="space_shooter/build/web"
-          echo "Downloading CDN files..."
-          curl -sL "$CDN/pythons.js"       -o "$DEST/pythons.js"
-          curl -sL "$CDN/browserfs.min.js" -o "$DEST/browserfs.min.js"
-          echo "Done. File sizes:"
-          ls -lh "$DEST/pythons.js" "$DEST/browserfs.min.js"
 
-      - name: Patch index.html to use local CDN + add loading screen
+          download_ok=true
+
+          curl -sL --fail --max-time 30 "$CDN/pythons.js" -o "$DEST/pythons.js" \
+            && echo "pythons.js OK ($(wc -c < $DEST/pythons.js) bytes)" \
+            || { echo "WARNING: pythons.js download failed — will use remote CDN URL"; rm -f "$DEST/pythons.js"; download_ok=false; }
+
+          curl -sL --fail --max-time 30 "$CDN/browserfs.min.js" -o "$DEST/browserfs.min.js" \
+            && echo "browserfs.min.js OK ($(wc -c < $DEST/browserfs.min.js) bytes)" \
+            || { echo "WARNING: browserfs.min.js download failed"; rm -f "$DEST/browserfs.min.js"; }
+
+          echo "download_ok=$download_ok" >> $GITHUB_ENV
+
+      - name: Patch index.html — loading screen + local CDN if available
         run: |
           python3 - <<'EOF'
-          import re
+          import os, re
 
           with open("space_shooter/build/web/index.html", "r") as f:
               html = f.read()
 
-          # Replace remote CDN references with local files
-          html = html.replace(
-              "https://pygame-web.github.io/cdn/0.9.3/pythons.js",
-              "./pythons.js"
-          )
-          html = html.replace(
-              "https://pygame-web.github.io/cdn/0.9.3//browserfs.min.js",
-              "./browserfs.min.js"
-          )
-          html = html.replace(
-              "https://pygame-web.github.io/cdn/0.9.3/",
-              "./browserfs.min.js"  # fallback ref inside browserfs
-          )
+          # Only replace CDN URLs if we actually downloaded the files
+          dest = "space_shooter/build/web"
+          if os.path.exists(f"{dest}/pythons.js") and os.path.getsize(f"{dest}/pythons.js") > 1000:
+              html = html.replace(
+                  "https://pygame-web.github.io/cdn/0.9.3/pythons.js",
+                  "./pythons.js"
+              )
+              print("Patched: pythons.js -> local")
+          else:
+              print("Kept: pythons.js -> remote CDN")
 
-          # Add a visible loading overlay (shown before JS runs)
+          if os.path.exists(f"{dest}/browserfs.min.js") and os.path.getsize(f"{dest}/browserfs.min.js") > 1000:
+              html = html.replace(
+                  "https://pygame-web.github.io/cdn/0.9.3//browserfs.min.js",
+                  "./browserfs.min.js"
+              )
+              print("Patched: browserfs.min.js -> local")
+
+          # Always add a visible loading overlay (works regardless of CDN)
           loading_overlay = """
           <style>
           #py-loading {
@@ -69,47 +80,48 @@ jobs:
             display: flex; flex-direction: column;
             align-items: center; justify-content: center;
             z-index: 99999; color: #fff; font-family: sans-serif;
+            text-align: center; padding: 20px;
           }
-          #py-loading h2 { font-size: 1.6em; margin: 0 0 12px; }
-          #py-loading p  { font-size: 1em; color: #aaa; margin: 4px 0; }
-          .spinner {
-            width: 48px; height: 48px; border: 5px solid #333;
+          #py-loading h2 { font-size: 1.5em; margin: 0 0 10px; color: #0af; }
+          #py-loading p  { font-size: 0.95em; color: #aaa; margin: 4px 0; }
+          .py-spinner {
+            width: 52px; height: 52px; border: 5px solid #333;
             border-top-color: #0af; border-radius: 50%;
-            animation: spin 0.8s linear infinite; margin-bottom: 20px;
+            animation: py-spin 0.8s linear infinite; margin-bottom: 18px;
           }
-          @keyframes spin { to { transform: rotate(360deg); } }
+          @keyframes py-spin { to { transform: rotate(360deg); } }
           </style>
           <div id="py-loading">
-            <div class="spinner"></div>
-            <h2>Loading Space Shooter...</h2>
-            <p>Downloading Python runtime (~20 MB)</p>
-            <p>Please wait, this can take 30–60 seconds</p>
+            <div class="py-spinner"></div>
+            <h2>Space Shooter</h2>
+            <p>Loading Python runtime...</p>
+            <p style="color:#666;font-size:0.85em">First load: ~30-60 seconds &nbsp;|&nbsp; Click canvas when ready</p>
           </div>
           <script>
-            // Hide overlay once pygame canvas starts drawing
-            var _pyLoadCheck = setInterval(function() {
+            // Hide overlay when the canvas gets content (pygame starts drawing)
+            var _pyCheck = setInterval(function() {
               var c = document.getElementById('canvas');
-              if (c && c.width > 1) {
-                document.getElementById('py-loading').style.display = 'none';
-                clearInterval(_pyLoadCheck);
+              if (c && c.width > 2) {
+                var d = document.getElementById('py-loading');
+                if (d) d.style.display = 'none';
+                clearInterval(_pyCheck);
               }
-            }, 500);
-            // Remove after 3 min max in case check fails
+            }, 300);
+            // Safety: remove after 3 minutes
             setTimeout(function() {
               var d = document.getElementById('py-loading');
               if (d) d.style.display = 'none';
             }, 180000);
           </script>
           """
-          html = html.replace("<body>", "<body>" + loading_overlay)
+          html = html.replace("<body>", "<body>" + loading_overlay, 1)
 
           with open("space_shooter/build/web/index.html", "w") as f:
               f.write(html)
-
-          print("index.html patched successfully")
+          print("index.html patched OK")
           EOF
 
-      - name: Show build output
+      - name: Show deployed files
         run: find space_shooter/build/web -type f | sort
 
       - name: Deploy to GitHub Pages

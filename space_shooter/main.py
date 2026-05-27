@@ -39,15 +39,15 @@ DARK_CRIMSON = (80, 0,  0)
 # Each entry: (enemy_weights_dict, enemy_count, score_target, end_boss_list)
 LEVELS_DATA = [
     # 1
-    ({'fighter': 1},                       15, 500,   []),
+    ({'fighter': 1},                         15, 500,   []),
     # 2
-    ({'fighter': 1},                       20, 800,   []),
+    ({'fighter': 1},                         20, 800,   []),
     # 3
-    ({'fighter': 3, 'scout': 1},           25, 1200,  []),
+    ({'fighter': 3, 'scout': 1},             25, 1200,  []),
     # 4
-    ({'fighter': 2, 'scout': 1},           30, 1600,  []),
-    # 5  — boss-only wave
-    ({},                                    0, 0,     ['mini', 'mini', 'mini']),
+    ({'fighter': 2, 'scout': 1},             30, 1600,  []),
+    # 5  — boss-only wave (3 Marauders)
+    ({},                                      0, 0,     ['mini', 'mini', 'mini']),
     # 6
     ({'fighter': 4, 'scout': 2, 'heavy': 1}, 25, 2000, []),
     # 7
@@ -55,29 +55,29 @@ LEVELS_DATA = [
     # 8
     ({'fighter': 3, 'scout': 2, 'heavy': 2}, 32, 2900, []),
     # 9
-    ({'fighter': 3, 'scout': 2, 'heavy': 2}, 40, 3500, []),
-    # 10
-    ({'fighter': 3, 'scout': 2, 'heavy': 2}, 30, 4000, ['mini']),
+    ({'fighter': 3, 'scout': 2, 'heavy': 2}, 38, 3500, ['mini']),
+    # 10 — first Dreadnought
+    ({'fighter': 3, 'scout': 2, 'heavy': 2}, 30, 4000, ['dread']),
     # 11
-    ({'fighter': 3, 'scout': 2, 'heavy': 2}, 32, 4500, ['mini']),
+    ({'fighter': 3, 'scout': 2, 'heavy': 3}, 32, 4500, ['mini', 'dread']),
     # 12
-    ({'fighter': 2, 'scout': 2, 'heavy': 3}, 35, 5000, ['mini']),
+    ({'fighter': 2, 'scout': 3, 'heavy': 3}, 35, 5000, ['dread']),
     # 13
-    ({'fighter': 2, 'scout': 2, 'heavy': 3}, 38, 5500, ['mini']),
+    ({'fighter': 2, 'scout': 3, 'heavy': 3}, 38, 5500, ['mini', 'dread']),
     # 14
-    ({'fighter': 2, 'scout': 2, 'heavy': 3}, 40, 6000, ['mini']),
+    ({'fighter': 2, 'scout': 3, 'heavy': 3}, 40, 6000, ['dread', 'dread']),
     # 15
-    ({'fighter': 2, 'scout': 2, 'heavy': 3}, 40, 7000, ['mini', 'mini']),
+    ({'fighter': 2, 'scout': 3, 'heavy': 4}, 40, 7000, ['mini', 'dread', 'mini']),
     # 16
-    ({'fighter': 2, 'scout': 3, 'heavy': 3}, 42, 8000, ['mini', 'mini']),
+    ({'fighter': 2, 'scout': 3, 'heavy': 4}, 42, 8000, ['dread', 'mini', 'dread']),
     # 17
-    ({'fighter': 2, 'scout': 3, 'heavy': 3}, 45, 9000, ['mini', 'mini']),
+    ({'fighter': 1, 'scout': 3, 'heavy': 4}, 45, 9000, ['dread', 'dread', 'mini']),
     # 18
-    ({'fighter': 2, 'scout': 3, 'heavy': 4}, 50, 10000, ['mini', 'mini']),
+    ({'fighter': 1, 'scout': 3, 'heavy': 4}, 50, 10000, ['mini', 'dread', 'dread']),
     # 19
-    ({'fighter': 2, 'scout': 3, 'heavy': 4}, 50, 12000, ['mini', 'mini', 'mini']),
-    # 20
-    ({'fighter': 2, 'scout': 3, 'heavy': 4}, 55, 14000, ['mini', 'mini', 'mini', 'FINAL']),
+    ({'fighter': 1, 'scout': 3, 'heavy': 5}, 50, 12000, ['dread', 'mini', 'dread', 'mini']),
+    # 20 — boss-only: only the Final Boss
+    ({},                                      0, 0,     ['FINAL']),
 ]
 
 
@@ -721,13 +721,13 @@ class Boss:
 #  FINAL BOSS — Crimson Overlord (levels mode level 20)
 # ══════════════════════════════════════════════════════════════════════════════
 class FinalBoss:
-    LASER_DURATION = 120
-    LASER_CD       = 200
+    LASER_DURATION = 100
+    LASER_CD       = 220
 
     def __init__(self):
         self.x = float(SCREEN_WIDTH + 150)
         self.y = float(SCREEN_HEIGHT // 2)
-        self.hp = 50; self.max_hp = 50
+        self.hp = 40; self.max_hp = 40
         self.W, self.H = 150, 100
         self.score_val = 15000; self.kill_credit = 0; self.drop_count = 6
         self.active = True
@@ -736,11 +736,10 @@ class FinalBoss:
         self.move_timer  = 0.0
         self._target_x   = SCREEN_WIDTH * 0.73
         self.entering    = True
-        # Laser state: list of [active, timer, cd, y_offset]
+        # Two lasers max (was 3) — reduces per-frame work
         self._lasers = [
-            [False, 0.0, 0.0, -20],
-            [False, 0.0, 0.0,  20],
-            [False, 0.0, 0.0,   0],
+            [False, 0.0, 0.0, -22],
+            [False, 0.0, 0.0,  22],
         ]
 
     def _hp_ratio(self):
@@ -771,19 +770,19 @@ class FinalBoss:
             self.y = max(70, min(SCREEN_HEIGHT-70, self.y))
 
         if not self.entering:
-            # Shooting config per phase
+            # Shooting config per phase — kept lean to avoid bullet floods
             if self.phase == 1:
-                shoot_delay = 51   # ~0.85s at 60fps
-                n_spread = 7
-                spread_range = (155, 206)
+                shoot_delay = 65
+                n_spread = 5
+                spread_range = (157, 205)
             elif self.phase == 2:
-                shoot_delay = 40
-                n_spread = 9
-                spread_range = (152, 209)
+                shoot_delay = 50
+                n_spread = 7
+                spread_range = (153, 208)
             else:
-                shoot_delay = 30
-                n_spread = 12
-                spread_range = (149, 212)
+                shoot_delay = 38
+                n_spread = 9
+                spread_range = (150, 210)
 
             self.shoot_timer -= time_scale
             if self.shoot_timer <= 0:
@@ -792,26 +791,25 @@ class FinalBoss:
                 for i in range(n_spread):
                     ang = spread_range[0] + i * step
                     self.bullets.append(EnemyBullet(self.x - self.W//2, self.y, ang))
-                # Phase 3: diagonal shots
+                # Phase 3: two diagonal shots (was four)
                 if self.phase == 3:
-                    for ang in [135, 225, 145, 215]:
+                    for ang in [140, 220]:
                         self.bullets.append(EnemyBullet(self.x - self.W//2, self.y, ang))
-                # Shake on shot
                 if effects:
-                    shake_amount = {1: 5, 2: 10, 3: 16}[self.phase]
+                    shake_amount = {1: 4, 2: 8, 3: 13}[self.phase]
                     effects.add_shake(shake_amount)
 
-            # Laser beams
-            active_lasers = 0 if self.phase == 1 else (2 if self.phase == 2 else 3)
+            # Laser beams: 0 in phase 1, 1 in phase 2, 2 in phase 3
+            active_lasers = 0 if self.phase == 1 else (1 if self.phase == 2 else 2)
             for i, laser in enumerate(self._lasers):
                 if i >= active_lasers:
                     laser[0] = False
                     continue
-                if laser[0]:  # active
+                if laser[0]:
                     laser[1] -= time_scale
                     if laser[1] <= 0:
                         laser[0] = False
-                        laser[2] = self.LASER_CD + i * 30
+                        laser[2] = self.LASER_CD + i * 40
                 elif laser[2] > 0:
                     laser[2] -= time_scale
                 else:
@@ -885,17 +883,17 @@ class FinalBoss:
         pygame.draw.circle(surf, (255, 160, 0), (x, y), core_r - 16)
         pygame.draw.circle(surf, WHITE,          (x, y), 6)
 
-        # Orbiting dots (phase 2+)
+        # Orbiting dots (phase 2+) — 4 dots instead of 6 to save draw calls
         if self.phase >= 2:
-            for i in range(6):
-                a = math.radians(mt * 4 + i * 60)
+            for i in range(4):
+                a = math.radians(mt * 4 + i * 90)
                 pygame.draw.circle(surf, (255, 60, 60),
                     (x + int(32*math.cos(a)), y + int(32*math.sin(a))), 4)
 
-        # Double ring (phase 3)
+        # Outer ring (phase 3) — 6 dots instead of 8
         if self.phase == 3:
-            for i in range(8):
-                a = math.radians(mt * 6 + i * 45)
+            for i in range(6):
+                a = math.radians(mt * 5 + i * 60)
                 pygame.draw.circle(surf, (255, 120, 0),
                     (x + int(50*math.cos(a)), y + int(50*math.sin(a))), 3)
 
@@ -1387,6 +1385,13 @@ class Game:
                     self.lv_final_delay_timer = 240
                     self.effects.set_vignette(60)
                     self.effects.set_random_flashes(60)
+                    self.sounds.play('boss_warning')
+                elif next_boss == 'dread':
+                    dr = Boss()
+                    self.active_bosses.append(dr)
+                    self.lv_wave_phase = 'boss'
+                    self.warning_text  = "DREADNOUGHT"
+                    self.warning_timer = 190
                     self.sounds.play('boss_warning')
                 else:  # 'mini'
                     mb = MiniBoss()
