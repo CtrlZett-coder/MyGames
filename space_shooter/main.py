@@ -1075,7 +1075,7 @@ class Game:
     def __init__(self):
         pygame.init()
         pygame.display.set_caption("Space Shooter")
-        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SCALED)
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         self.game_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         self.clock  = pygame.time.Clock()
         self.font   = pygame.font.Font(None, 36)
@@ -2206,7 +2206,31 @@ async def main():
         pass
     except Exception as e:
         import traceback
-        print("GAME ERROR:", e)
-        traceback.print_exc()
+        tb = traceback.format_exc()
+        print("GAME ERROR:", tb)
+        # Show error on screen so it's visible on mobile too
+        try:
+            screen = pygame.display.get_surface()
+            if screen is None:
+                pygame.init()
+                screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+            screen.fill((0, 0, 30))
+            font = pygame.font.Font(None, 20)
+            lines = tb.strip().split('\n')
+            y = 10
+            for line in lines:
+                if line.strip() and y < SCREEN_HEIGHT - 20:
+                    surf = font.render(line[:95], True, (255, 80, 80))
+                    screen.blit(surf, (5, y))
+                    y += 20
+            pygame.display.flip()
+            await asyncio.sleep(0)
+            while True:
+                for ev in pygame.event.get():
+                    if ev.type == pygame.QUIT:
+                        return
+                await asyncio.sleep(0.5)
+        except Exception:
+            pass
 
 asyncio.run(main())
