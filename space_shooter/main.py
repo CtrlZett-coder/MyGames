@@ -168,7 +168,8 @@ class SoundManager:
     def __init__(self):
         self.enabled = False
         self._sounds: dict = {}
-        self._init()
+        # _init() is NOT called here — Game.run() calls it after the first
+        # rendered frame so the browser audio context is ready
 
     def _init(self):
         if not _HAS_NUMPY:
@@ -1709,6 +1710,14 @@ class Game:
 
     # ── main loop ─────────────────────────────────────────────────────────────
     async def run(self):
+        # Draw the first frame before touching audio —
+        # browser needs a rendered frame + the user's click gesture
+        # before the Web Audio context is allowed to start.
+        self._draw_menu()
+        pygame.display.flip()
+        await asyncio.sleep(0)          # ← browser renders frame here
+        self.sounds._init()             # ← audio context is now ready
+
         while True:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT: pygame.quit(); raise SystemExit
