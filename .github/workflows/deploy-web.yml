@@ -1,0 +1,92 @@
+name: Build & Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - claude/game-creation-huu9A
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pygbag
+        run: pip install pygbag
+
+      - name: Build web version
+        run: python -m pygbag --build space_shooter
+
+      - name: Patch index.html — add loading spinner only
+        run: |
+          python3 - <<'EOF'
+          with open("space_shooter/build/web/index.html", "r") as f:
+              html = f.read()
+
+          # Keep ALL original CDN URLs — only inject a visible loading overlay
+          loading_overlay = """
+          <style>
+          #py-loading {
+            position: fixed; inset: 0;
+            background: #111;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            z-index: 99999; color: #fff; font-family: sans-serif;
+            text-align: center; padding: 20px;
+          }
+          #py-loading h2 { font-size: 1.5em; margin: 0 0 10px; color: #0af; }
+          #py-loading p  { font-size: 0.95em; color: #aaa; margin: 4px 0; }
+          .py-spinner {
+            width: 52px; height: 52px; border: 5px solid #333;
+            border-top-color: #0af; border-radius: 50%;
+            animation: py-spin 0.8s linear infinite; margin-bottom: 18px;
+          }
+          @keyframes py-spin { to { transform: rotate(360deg); } }
+          </style>
+          <div id="py-loading">
+            <div class="py-spinner"></div>
+            <h2>Space Shooter</h2>
+            <p>Loading Python runtime...</p>
+            <p style="color:#666;font-size:0.85em">First load: ~30-60 sec &nbsp;|&nbsp; Click canvas when ready</p>
+          </div>
+          <script>
+            var _pyCheck = setInterval(function() {
+              var c = document.getElementById('canvas');
+              if (c && c.width > 2) {
+                var d = document.getElementById('py-loading');
+                if (d) d.style.display = 'none';
+                clearInterval(_pyCheck);
+              }
+            }, 300);
+            setTimeout(function() {
+              var d = document.getElementById('py-loading');
+              if (d) d.style.display = 'none';
+            }, 300000);
+          </script>
+          """
+          html = html.replace("<body>", "<body>" + loading_overlay, 1)
+
+          with open("space_shooter/build/web/index.html", "w") as f:
+              f.write(html)
+          print("Done — CDN URLs untouched, spinner injected")
+          EOF
+
+      - name: Show deployed files
+        run: find space_shooter/build/web -type f | sort
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./space_shooter/build/web

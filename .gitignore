@@ -1,0 +1,4 @@
+*.pyc
+__pycache__/
+.claude/worktrees/
+space_shooter/build/
