@@ -26,15 +26,21 @@ jobs:
         run: pip install pygbag
 
       - name: Build web version
-        run: python -m pygbag --build space_shooter
+        run: python -m pygbag --build --width 900 --height 600 space_shooter
 
-      - name: Patch index.html — add loading spinner only
+      - name: Patch index.html
         run: |
           python3 - <<'EOF'
           with open("space_shooter/build/web/index.html", "r") as f:
               html = f.read()
 
-          # Keep ALL original CDN URLs — only inject a visible loading overlay
+          # 1. Disable the debug terminal that splits the screen 50/50
+          html = html.replace("gui_debug : 2", "gui_debug : 0", 1)
+
+          # 2. Black background instead of powderblue so transparent canvas looks right
+          html = html.replace("background-color:powderblue", "background-color:#000000", 1)
+
+          # 3. Inject loading spinner overlay (keep ALL CDN URLs untouched)
           loading_overlay = """
           <style>
           #py-loading {
@@ -58,7 +64,7 @@ jobs:
             <div class="py-spinner"></div>
             <h2>Space Shooter</h2>
             <p>Loading Python runtime...</p>
-            <p style="color:#666;font-size:0.85em">First load: ~30-60 sec &nbsp;|&nbsp; Click canvas when ready</p>
+            <p style="color:#666;font-size:0.85em">First load may take 1-2 min &nbsp;|&nbsp; Tap screen when "Ready to start!" appears</p>
           </div>
           <script>
             var _pyCheck = setInterval(function() {
@@ -68,7 +74,7 @@ jobs:
                 if (d) d.style.display = 'none';
                 clearInterval(_pyCheck);
               }
-            }, 300);
+            }, 500);
             setTimeout(function() {
               var d = document.getElementById('py-loading');
               if (d) d.style.display = 'none';
@@ -79,7 +85,7 @@ jobs:
 
           with open("space_shooter/build/web/index.html", "w") as f:
               f.write(html)
-          print("Done — CDN URLs untouched, spinner injected")
+          print("gui_debug:0 + black bg + spinner injected, CDN URLs untouched")
           EOF
 
       - name: Show deployed files
