@@ -6,7 +6,7 @@ Loading space_shooter from space_shooter.apk
     Template Version : 0.9.3
     Python  : 3.12
     CDN URL : https://pygame-web.github.io/cdn/0.9.3/
-    Screen  : 1280x720
+    Screen  : 900x600
     Title   : space_shooter
     Folder  : space_shooter
     Authors : pgw
@@ -152,13 +152,13 @@ config = {
     ume_block : 1,
     can_close : 0,
     archive : "space_shooter",
-    gui_debug : 2,
+    gui_debug : 0,
     cdn : "https://pygame-web.github.io/cdn/0.9.3/",
     autorun : 0,
     PYBUILD : "3.12",
     fb_ar   :  1.77,
-    fb_width : "1280",
-    fb_height : "720"
+    fb_width : "900",
+    fb_height : "600"
 }
 
 function show_infobox() {
@@ -240,7 +240,7 @@ function show_infobox() {
             font-family: arial;
             margin: 0;
             padding: none;
-            background-color:powderblue;
+            background-color:#000000;
         }
 
         .topright{
@@ -311,7 +311,7 @@ function show_infobox() {
   <div class="py-spinner"></div>
   <h2>Space Shooter</h2>
   <p>Loading Python runtime...</p>
-  <p style="color:#666;font-size:0.85em">First load: ~30-60 sec &nbsp;|&nbsp; Click canvas when ready</p>
+  <p style="color:#666;font-size:0.85em">First load may take 1-2 min &nbsp;|&nbsp; Tap screen when "Ready to start!" appears</p>
 </div>
 <script>
   var _pyCheck = setInterval(function() {
@@ -321,7 +321,7 @@ function show_infobox() {
       if (d) d.style.display = 'none';
       clearInterval(_pyCheck);
     }
-  }, 300);
+  }, 500);
   setTimeout(function() {
     var d = document.getElementById('py-loading');
     if (d) d.style.display = 'none';
@@ -346,8 +346,8 @@ height="1px"
     </canvas>
 
     <canvas class="emscripten" id="canvas3d"
-width="1280px"
-height="720px"
+width="900px"
+height="600px"
     oncontextmenu="event.preventDefault()" tabindex=1 hidden>
     </canvas>
 
