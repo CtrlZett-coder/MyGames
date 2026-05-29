@@ -998,106 +998,130 @@ class _MergedKeys:
 #  TOUCH CONTROLS  (on-screen virtual gamepad)
 # ══════════════════════════════════════════════════════════════════════════════
 class TouchControls:
-    BTN_S  = 70    # D-pad button size (px)
-    FIRE_R = 54    # fire-button radius (px)
+    JOY_BASE_R = 80   # outer ring radius
+    JOY_NUB_R  = 28   # thumb nub radius
+    JOY_MAX_R  = 55   # max nub travel from base centre
+    JOY_DEAD   = 12   # dead-zone radius
+    FIRE_R     = 54   # fire button radius
+    _JOY_HALF  = SCREEN_WIDTH // 2  # left half = joystick zone
 
     def __init__(self):
-        s = self.BTN_S
-        cx, cy = 95, SCREEN_HEIGHT - 95   # D-pad centre
-        g = 8
-        self.dpad: dict = {
-            'up':    pygame.Rect(cx - s//2,  cy - s - g, s, s),
-            'down':  pygame.Rect(cx - s//2,  cy + g,     s, s),
-            'left':  pygame.Rect(cx - s - g, cy - s//2,  s, s),
-            'right': pygame.Rect(cx + g,     cy - s//2,  s, s),
-        }
         self.fire_pos   = (SCREEN_WIDTH - 95, SCREEN_HEIGHT - 95)
-        # Pause pill — bottom centre, clear of D-pad and fire button
         self.pause_rect = pygame.Rect(SCREEN_WIDTH//2 - 30, SCREEN_HEIGHT - 70, 60, 36)
+        self._joy_fid   = None   # finger id owning the joystick
+        self._joy_base  = None   # (cx, cy) — where the finger first touched
+        self._joy_nub   = None   # (nx, ny) — current nub position
+        self._fire_fid  = None
+        self._pause_fid = None
+        self.pressed: set = set()
 
-        self._fingers: dict = {}  # finger_id → button name
-        self.pressed:  set  = set()
-
-    # ── Internal helpers ──────────────────────────────────────────────────────
-    def _btn_at(self, px: int, py: int):
-        for name, rect in self.dpad.items():
-            if rect.collidepoint(px, py):
-                return name
-        fx, fy = self.fire_pos
-        if math.hypot(px - fx, py - fy) <= self.FIRE_R:
-            return 'fire'
-        if self.pause_rect.collidepoint(px, py):
-            return 'pause'
-        return None
+    # ── Direction mapping (8-way) ─────────────────────────────────────────────
+    def _joy_dirs(self) -> set:
+        if self._joy_base is None:
+            return set()
+        cx, cy = self._joy_base
+        nx, ny = self._joy_nub
+        dx, dy = nx - cx, ny - cy
+        if math.hypot(dx, dy) < self.JOY_DEAD:
+            return set()
+        a = math.degrees(math.atan2(dy, dx))   # right=0°, down=90°, up=−90°
+        if   -157.5 <= a < -112.5: return {'left',  'up'}
+        elif -112.5 <= a <  -67.5: return {'up'}
+        elif  -67.5 <= a <  -22.5: return {'right', 'up'}
+        elif  -22.5 <= a <   22.5: return {'right'}
+        elif   22.5 <= a <   67.5: return {'right', 'down'}
+        elif   67.5 <= a <  112.5: return {'down'}
+        elif  112.5 <= a <  157.5: return {'left',  'down'}
+        else:                       return {'left'}
 
     def _sync(self):
-        self.pressed = {b for b in self._fingers.values()
-                        if b not in ('pause', None)}
+        dirs = self._joy_dirs()
+        if self._fire_fid is not None:
+            dirs.add('fire')
+        self.pressed = dirs
 
     # ── Public event API ──────────────────────────────────────────────────────
     def touch_down(self, fid, px: int, py: int):
-        btn = self._btn_at(px, py)
-        if btn:
-            self._fingers[fid] = btn
+        if self.pause_rect.collidepoint(px, py):
+            self._pause_fid = fid; self._sync(); return 'pause'
+        fx, fy = self.fire_pos
+        if math.hypot(px - fx, py - fy) <= self.FIRE_R:
+            self._fire_fid = fid; self._sync(); return 'fire'
+        if px < self._JOY_HALF and self._joy_fid is None:
+            self._joy_fid  = fid
+            self._joy_base = (float(px), float(py))
+            self._joy_nub  = (float(px), float(py))
             self._sync()
-        return btn
+            return 'joy'
+        return None
 
     def touch_up(self, fid):
-        self._fingers.pop(fid, None)
+        if fid == self._joy_fid:
+            self._joy_fid = self._joy_base = self._joy_nub = None
+        if fid == self._fire_fid:   self._fire_fid  = None
+        if fid == self._pause_fid:  self._pause_fid = None
         self._sync()
 
     def touch_move(self, fid, px: int, py: int):
-        btn = self._btn_at(px, py)
-        if btn:
-            self._fingers[fid] = btn
-        else:
-            self._fingers.pop(fid, None)
-        self._sync()
+        if fid == self._joy_fid and self._joy_base:
+            cx, cy = self._joy_base
+            dx, dy = px - cx, py - cy
+            dist = math.hypot(dx, dy)
+            if dist > self.JOY_MAX_R:
+                sc = self.JOY_MAX_R / dist
+                dx, dy = dx * sc, dy * sc
+            self._joy_nub = (cx + dx, cy + dy)
+            self._sync()
+        elif fid == self._fire_fid:
+            fx, fy = self.fire_pos
+            if math.hypot(px - fx, py - fy) > self.FIRE_R + 10:
+                self._fire_fid = None; self._sync()
 
     def clear(self):
-        self._fingers.clear()
-        self.pressed.clear()
+        self._joy_fid = self._joy_base = self._joy_nub = None
+        self._fire_fid = self._pause_fid = None
+        self.pressed = set()
 
     # ── Drawing ───────────────────────────────────────────────────────────────
-    @staticmethod
-    def _draw_dpad_btn(screen, rect: pygame.Rect, name: str, on: bool):
-        s = pygame.Surface(rect.size, pygame.SRCALPHA)
-        a_bg  = 195 if on else 75
-        a_brd = 230 if on else 130
-        pygame.draw.rect(s, ( 55,  80, 130, a_bg),  (0, 0, *rect.size), border_radius=14)
-        pygame.draw.rect(s, (140, 190, 255, a_brd), (0, 0, *rect.size), 2, border_radius=14)
-        w, h = rect.size
-        m = 19
-        a_arr = 235 if on else 170
-        col = (255, 255, 255, a_arr)
-        if   name == 'up':    pts = [(w//2,m),(m,h-m),(w-m,h-m)]
-        elif name == 'down':  pts = [(w//2,h-m),(m,m),(w-m,m)]
-        elif name == 'left':  pts = [(m,h//2),(w-m,m),(w-m,h-m)]
-        else:                 pts = [(w-m,h//2),(m,m),(m,h-m)]
-        pygame.draw.polygon(s, col, pts)
-        screen.blit(s, rect.topleft)
-
     def draw(self, screen: pygame.Surface):
-        # D-pad
-        for name, rect in self.dpad.items():
-            self._draw_dpad_btn(screen, rect, name, name in self.pressed)
+        # Joystick base + nub (or ghost hint when idle)
+        if self._joy_base is not None:
+            cx, cy = int(self._joy_base[0]), int(self._joy_base[1])
+            r = self.JOY_BASE_R
+            bs = pygame.Surface((r*2+4, r*2+4), pygame.SRCALPHA)
+            pygame.draw.circle(bs, ( 55,  80, 130,  55), (r+2, r+2), r)
+            pygame.draw.circle(bs, (140, 190, 255, 110), (r+2, r+2), r, 3)
+            pygame.draw.circle(bs, (140, 190, 255,  35), (r+2, r+2), self.JOY_MAX_R, 2)
+            screen.blit(bs, (cx - r - 2, cy - r - 2))
+            nx, ny = int(self._joy_nub[0]), int(self._joy_nub[1])
+            nr = self.JOY_NUB_R
+            ns = pygame.Surface((nr*2+4, nr*2+4), pygame.SRCALPHA)
+            pygame.draw.circle(ns, ( 80, 130, 210, 210), (nr+2, nr+2), nr)
+            pygame.draw.circle(ns, (180, 220, 255, 230), (nr+2, nr+2), nr, 3)
+            screen.blit(ns, (nx - nr - 2, ny - nr - 2))
+        else:
+            cx, cy, r = 95, SCREEN_HEIGHT - 95, self.JOY_BASE_R
+            gs = pygame.Surface((r*2+4, r*2+4), pygame.SRCALPHA)
+            pygame.draw.circle(gs, ( 55,  80, 130,  22), (r+2, r+2), r)
+            pygame.draw.circle(gs, (140, 190, 255,  45), (r+2, r+2), r, 2)
+            screen.blit(gs, (cx - r - 2, cy - r - 2))
 
-        # Fire button (circle)
+        # Fire button
         fx, fy  = self.fire_pos
-        fire_on = 'fire' in self.pressed
+        fire_on = self._fire_fid is not None
         r = self.FIRE_R
         sf = pygame.Surface((r*2, r*2), pygame.SRCALPHA)
-        pygame.draw.circle(sf, (130, 25, 25, 200 if fire_on else 80), (r,r), r)
+        pygame.draw.circle(sf, (130, 25, 25, 200 if fire_on else 80),  (r,r), r)
         pygame.draw.circle(sf, (255, 90, 90, 230 if fire_on else 140), (r,r), r, 3)
         pygame.draw.circle(sf, (255, 50, 50, 185 if fire_on else 110), (r,r), r-14)
         screen.blit(sf, (fx-r, fy-r))
 
-        # Pause pill (bottom centre)
+        # Pause pill
         pr   = self.pause_rect
-        p_on = any(v == 'pause' for v in self._fingers.values())
+        p_on = self._pause_fid is not None
         sp = pygame.Surface(pr.size, pygame.SRCALPHA)
-        pygame.draw.rect(sp, (55, 80, 130, 195 if p_on else 75),  (0,0,*pr.size), border_radius=10)
-        pygame.draw.rect(sp, (140,190,255, 200 if p_on else 110), (0,0,*pr.size), 2, border_radius=10)
+        pygame.draw.rect(sp, ( 55,  80, 130, 195 if p_on else 75),  (0,0,*pr.size), border_radius=10)
+        pygame.draw.rect(sp, (140, 190, 255, 200 if p_on else 110), (0,0,*pr.size), 2, border_radius=10)
         bw, bh = 5, 18; by = (pr.h - bh)//2
         bx1, bx2 = pr.w//2 - 8, pr.w//2 + 3
         bar_a = 240 if p_on else 190
@@ -1801,9 +1825,13 @@ class Game:
                         if event.key == pygame.K_ESCAPE:
                             self._reset_to_menu()
 
-                # ── Mouse hover ───────────────────────────────────────────────
+                # ── Mouse hover / joystick drag ───────────────────────────────
                 if event.type == pygame.MOUSEMOTION:
                     mx, my = event.pos
+                    if (self.state == 'playing' and self._touch_mode
+                            and pygame.mouse.get_pressed()[0]):
+                        self._touch.touch_move(-1, mx, my)
+                        continue
                     new_hover = ''
                     for nm, rc in self._btn_rects.items():
                         if rc.collidepoint(mx, my):
