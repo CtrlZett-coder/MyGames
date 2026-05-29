@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Space Shooter — Скачать</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0a0a1a;color:#fff;font-family:sans-serif;min-height:100vh;
+       display:flex;align-items:center;justify-content:center;padding:20px}
+  .card{background:#111;border:1px solid #246;border-radius:16px;
+        padding:32px;max-width:440px;width:100%;text-align:center}
+  h1{color:#0af;font-size:2em;margin-bottom:6px}
+  p{color:#888;margin-bottom:24px;font-size:0.95em}
+  .btn{display:block;padding:16px 24px;border-radius:10px;
+       text-decoration:none;font-size:1.1em;font-weight:bold;
+       margin:12px 0;transition:opacity .2s}
+  .btn:hover{opacity:0.85}
+  .apk{background:#28a;color:#fff}
+  .html{background:#246;color:#0af;border:1px solid #0af}
+  .web{background:#204;color:#a4f;border:1px solid #a4f}
+  .note{font-size:0.78em;color:#555;margin-top:6px}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🚀 Space Shooter</h1>
+  <p>Выбери способ поиграть</p>
+
+  <a class="btn apk" href="SpaceShooter.apk" download>
+    📦 Скачать APK для Android
+  </a>
+  <div class="note">Установить: Настройки → Безопасность → Разрешить из неизвестных источников</div>
+
+  <a class="btn html" href="play.html">
+    🌐 Играть в браузере (HTML5)
+  </a>
+  <div class="note">Работает на iPhone, Android, ПК — мгновенно</div>
+
+  <a class="btn web" href="index.html">
+    🐍 Python-версия (pygbag)
+  </a>
+  <div class="note">Полная версия, первый запуск ~1-2 мин</div>
+</div>
+</body>
+</html>

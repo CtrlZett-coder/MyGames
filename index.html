@@ -316,7 +316,6 @@ function show_infobox() {
   <p id="py-load-err"></p>
 </div>
 <script>
-  // Mirror pygbag infobox text so user sees "Ready to start!" inside our overlay
   setInterval(function() {
     var box = document.getElementById('infobox');
     var st  = document.getElementById('py-load-status');
@@ -324,8 +323,6 @@ function show_infobox() {
     var t = (box.innerText || '').trim();
     if (t && t !== 'Loading, please wait ...') st.textContent = t;
   }, 300);
-
-  // Surface JS errors inside the overlay (visible on mobile without devtools)
   window.addEventListener('error', function(e) {
     var er = document.getElementById('py-load-err');
     if (er) { er.textContent = '⚠ ' + e.message; er.style.display = 'block'; }
@@ -336,8 +333,6 @@ function show_infobox() {
     var er = document.getElementById('py-load-err');
     if (er) { er.textContent = '⚠ ' + (e.reason || 'Promise error'); er.style.display = 'block'; }
   });
-
-  // Hide overlay once pygame canvas starts drawing
   var _ck = setInterval(function() {
     var c = document.getElementById('canvas');
     if (c && c.width > 2) {
@@ -345,15 +340,10 @@ function show_infobox() {
       clearInterval(_ck);
     }
   }, 500);
-  // 5-min failsafe
   setTimeout(function() {
     var d = document.getElementById('py-loading');
     if (d) d.style.display = 'none';
   }, 300000);
-
-  // Register service worker — caches Pyodide + game files locally.
-  // After the first load everything is in the browser cache, so
-  // subsequent page opens are near-instant.
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js', {scope: './'})
       .catch(function(e) { console.warn('SW register failed', e); });
