@@ -653,7 +653,6 @@ function joyDirs(){
 }
 function touchKeys(){const j=joyDirs();return{left:!!j.left,right:!!j.right,up:!!j.up,down:!!j.down,fire:fireFid!==null};}
 function touchDown(id,px,py){
-  if(px>pauseRect.x&&px<pauseRect.x+pauseRect.w&&py>pauseRect.y&&py<pauseRect.y+pauseRect.h){pauseFid=id;return'pause';}
   if(Math.hypot(px-firePos.x,py-firePos.y)<=FIRE_R){fireFid=id;return'fire';}
   if(px<GW/2&&joyFid===null){joyFid=id;joyBase={x:px,y:py};joyNub={x:px,y:py};return'joy';}
   return null;
@@ -691,14 +690,6 @@ function drawTouch(){
   ctx.strokeStyle=rgba(255,90,90,fon?0.9:0.55);ctx.lineWidth=3;ctx.stroke();
   ctx.beginPath();ctx.arc(firePos.x,firePos.y,FIRE_R-14,0,Math.PI*2);
   ctx.fillStyle=rgba(255,50,50,fon?0.72:0.43);ctx.fill();
-  const pr=pauseRect,pon=pauseFid!==null;
-  ctx.fillStyle=rgba(55,80,130,pon?0.76:0.29);
-  roundRect(pr.x,pr.y,pr.w,pr.h,10);ctx.fill();
-  ctx.strokeStyle=rgba(140,190,255,pon?0.78:0.43);ctx.lineWidth=2;
-  roundRect(pr.x,pr.y,pr.w,pr.h,10);ctx.stroke();
-  ctx.fillStyle=rgba(255,255,255,pon?0.94:0.75);
-  ctx.fillRect(pr.x+pr.w/2-8,pr.y+(pr.h-18)/2,5,18);
-  ctx.fillRect(pr.x+pr.w/2+3,pr.y+(pr.h-18)/2,5,18);
 }
 function roundRect(x,y,w,h,r){
   ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);
@@ -1008,6 +999,7 @@ function draw(){
   if(vigAlpha>0)drawVignette();
 
   if(gameState==='playing'){
+    btnRects={};
     drawHUD();
     if(touchMode)drawTouch();
     if(warnTimer>0)drawWarning();
@@ -1088,6 +1080,17 @@ function drawHUD(){
   ctx.textAlign='left';
   ctx.fillStyle='#555';ctx.font='12px sans-serif';ctx.textAlign='center';
   ctx.fillText('WASD/Arrows — move   Space — shoot',GW/2,GH-8);
+
+  // Pause button — always visible (works on PC and phone)
+  const pbx=GW/2-30,pby=GH-70,pbw=60,pbh=36;
+  btnRects['hud_pause']={x:pbx,y:pby,w:pbw,h:pbh};
+  ctx.fillStyle=rgba(55,80,130,0.32);
+  roundRect(pbx,pby,pbw,pbh,10);ctx.fill();
+  ctx.strokeStyle=rgba(140,190,255,0.50);ctx.lineWidth=2;
+  roundRect(pbx,pby,pbw,pbh,10);ctx.stroke();
+  ctx.fillStyle=rgba(255,255,255,0.80);
+  ctx.fillRect(pbx+pbw/2-8,pby+(pbh-18)/2,5,18);
+  ctx.fillRect(pbx+pbw/2+3,pby+(pbh-18)/2,5,18);
 }
 
 function drawBossHPBar(){
@@ -1278,8 +1281,9 @@ function canvasPos(cx,cy){
 canvas.addEventListener('mousedown',e=>{
   initAudio();
   const{x,y}=canvasPos(e.clientX,e.clientY);
-  if(gameState==='playing'&&touchMode){
-    const r=touchDown(-1,x,y);if(r==='pause'){gameState='paused';clearTouch();}
+  if(gameState==='playing'){
+    if(hitBtn(x,y)==='hud_pause'){gameState='paused';clearTouch();return;}
+    if(touchMode)touchDown(-1,x,y);
   }else{handleBtn(hitBtn(x,y));}
 });
 canvas.addEventListener('mouseup',()=>touchUp(-1));
@@ -1292,8 +1296,9 @@ canvas.addEventListener('touchstart',e=>{
   e.preventDefault();initAudio();
   for(const t of e.changedTouches){
     const{x,y}=canvasPos(t.clientX,t.clientY);
-    if(gameState==='playing'&&touchMode){
-      const r=touchDown(t.identifier,x,y);if(r==='pause'){gameState='paused';clearTouch();}
+    if(gameState==='playing'){
+      if(hitBtn(x,y)==='hud_pause'){gameState='paused';clearTouch();break;}
+      if(touchMode)touchDown(t.identifier,x,y);
     }else{handleBtn(hitBtn(x,y));}
   }
 },{passive:false});
@@ -1316,10 +1321,16 @@ window.addEventListener('keydown',e=>{
   }
 });
 
-// ── Game loop ─────────────────────────────────────────────────────────────────
+// ── Game loop (capped at 60 fps so speed is the same on 120 Hz screens) ───────
 initStars();
-function loop(){requestAnimationFrame(loop);update();draw();}
-loop();
+let _lastTs=0;
+function loop(ts){
+  requestAnimationFrame(loop);
+  if(ts-_lastTs<15.5)return;  // skip frame if less than ~1/64 s has passed
+  _lastTs=ts;
+  update();draw();
+}
+requestAnimationFrame(ts=>{_lastTs=ts;requestAnimationFrame(loop);});
 </script>
 </body>
 </html>
