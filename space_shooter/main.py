@@ -560,7 +560,7 @@ class MiniBoss:
         self.invuln_timer = self.INVULN_FRAMES
 
     def update(self, time_scale=1.0, effects=None):
-        if self.invuln_timer > 0:
+        if self.invuln_timer > 0 and not self.entering:
             self.invuln_timer = max(0, self.invuln_timer - time_scale)
         if self.x > self._target_x:
             self.x -= 3.5 * time_scale
@@ -646,7 +646,7 @@ class Boss:
         self.invuln_timer = self.INVULN_FRAMES
 
     def update(self, time_scale=1.0, effects=None):
-        if self.invuln_timer > 0:
+        if self.invuln_timer > 0 and not self.entering:
             self.invuln_timer = max(0, self.invuln_timer - time_scale)
         if self.x > self._target_x:
             self.x -= 2.5 * time_scale
@@ -752,14 +752,14 @@ class Boss:
 #  FINAL BOSS — Crimson Overlord (levels mode level 20)
 # ══════════════════════════════════════════════════════════════════════════════
 class FinalBoss:
-    LASER_DURATION = 100
-    LASER_CD       = 220
+    LASER_DURATION = 115
+    LASER_CD       = 170
     INVULN_FRAMES  = 240
 
     def __init__(self):
         self.x = float(SCREEN_WIDTH + 150)
         self.y = float(SCREEN_HEIGHT // 2)
-        self.hp = 40; self.max_hp = 40
+        self.hp = 65; self.max_hp = 65
         self.W, self.H = 150, 100
         self.score_val = 15000; self.kill_credit = 0; self.drop_count = 6
         self.active = True
@@ -792,32 +792,32 @@ class FinalBoss:
         pass  # phase is now a computed property
 
     def update(self, time_scale=1.0, effects=None):
-        if self.invuln_timer > 0:
+        if self.invuln_timer > 0 and not self.entering:
             self.invuln_timer = max(0, self.invuln_timer - time_scale)
         if self.x > self._target_x:
             self.x -= 2.0 * time_scale
         else:
             self.entering = False
             self.move_timer += time_scale
-            amp = 160
-            spd = 0.016 + (self.phase - 1) * 0.006
+            spd = 0.018 + (self.phase - 1) * 0.008
+            amp = 140 + self.phase * 20
             self.y = SCREEN_HEIGHT//2 + math.sin(self.move_timer*spd)*amp
             self.y = max(70, min(SCREEN_HEIGHT-70, self.y))
 
         if not self.entering:
             # Shooting config per phase — kept lean to avoid bullet floods
             if self.phase == 1:
-                shoot_delay = 65
-                n_spread = 5
+                shoot_delay = 55
+                n_spread = 7
                 spread_range = (157, 205)
             elif self.phase == 2:
-                shoot_delay = 50
-                n_spread = 7
-                spread_range = (153, 208)
+                shoot_delay = 42
+                n_spread = 10
+                spread_range = (152, 210)
             else:
-                shoot_delay = 38
-                n_spread = 9
-                spread_range = (150, 210)
+                shoot_delay = 30
+                n_spread = 13
+                spread_range = (148, 212)
 
             self.shoot_timer -= time_scale
             if self.shoot_timer <= 0:
@@ -828,7 +828,7 @@ class FinalBoss:
                     self.bullets.append(EnemyBullet(self.x - self.W//2, self.y, ang))
                 # Phase 3: two diagonal shots (was four)
                 if self.phase == 3:
-                    for ang in [140, 220]:
+                    for ang in [130, 180, 230]:
                         self.bullets.append(EnemyBullet(self.x - self.W//2, self.y, ang))
                 if effects:
                     shake_amount = {1: 4, 2: 8, 3: 13}[self.phase]
@@ -1166,6 +1166,9 @@ class Game:
         self._del_hold         = 0    # frames DEL held on level-select screen
         self._del_wipe_confirm = 0    # countdown for "progress reset!" banner
         self._del_key_held     = False  # tracked via KEYDOWN/KEYUP events
+        self._cheat_buf        = ''
+        self._cheat_msg        = ''
+        self._cheat_timer      = 0
         self._hover_snd_last   = 0    # pygame.time.get_ticks() of last hover sound
         self._touch_mode       = False # True = show on-screen gamepad (phone mode)
         self._touch            = TouchControls()
@@ -1611,6 +1614,16 @@ class Game:
             s.blit(t, (0,0)); s.set_alpha(alpha)
             self.screen.blit(s, s.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2-30)))
 
+    def _draw_cheat_msg(self):
+        if self._cheat_timer <= 0:
+            return
+        self._cheat_timer -= 1
+        alpha = min(255, self._cheat_timer * 8)
+        t = self.font_b.render(self._cheat_msg, True, (255, 224, 64))
+        s = pygame.Surface(t.get_size(), pygame.SRCALPHA)
+        s.blit(t, (0, 0)); s.set_alpha(alpha)
+        self.screen.blit(s, s.get_rect(center=(SCREEN_WIDTH // 2, 50)))
+
     def _draw_slow_tint(self):
         tint = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         tint.fill((60,30,160,20)); self.screen.blit(tint,(0,0))
@@ -1824,6 +1837,17 @@ class Game:
                     elif self.state in ('game_over', 'victory'):
                         if event.key == pygame.K_ESCAPE:
                             self._reset_to_menu()
+
+                    # ── Cheat code: lavelall ──────────────────────────────────
+                    ch = event.unicode
+                    if ch and len(ch) == 1:
+                        self._cheat_buf = (self._cheat_buf + ch)[-8:]
+                        if self._cheat_buf == 'lavelall':
+                            self._cheat_buf = ''
+                            self._max_unlocked = 19
+                            self._save_unlocked(19)
+                            self._cheat_msg   = '★ ALL LEVELS UNLOCKED ★'
+                            self._cheat_timer = 240
 
                 # ── Mouse hover / joystick drag ───────────────────────────────
                 if event.type == pygame.MOUSEMOTION:
@@ -2045,6 +2069,7 @@ class Game:
             if self.state == 'playing' and self._touch_mode:
                 self._touch.draw(self.screen)
 
+            self._draw_cheat_msg()
             pygame.display.flip()
             self.clock.tick(FPS)
             await asyncio.sleep(0)
