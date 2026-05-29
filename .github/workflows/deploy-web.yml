@@ -149,6 +149,25 @@ jobs:
           # Copy standalone HTML5 game too
           import shutil
           shutil.copy("space_shooter.html", "space_shooter/build/web/play.html")
+
+          # Copy favicon / icon files
+          import glob
+          for f in glob.glob("web-icons/*"):
+              shutil.copy(f, "space_shooter/build/web/")
+
+          # Inject favicon tags into pygbag index.html
+          with open("space_shooter/build/web/index.html", "r") as f:
+              idx = f.read()
+          favicon_tags = (
+              '<link rel="icon" type="image/x-icon" href="favicon.ico">\n'
+              '<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">\n'
+              '<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">\n'
+              '<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">\n'
+          )
+          idx = idx.replace("<head>", "<head>\n" + favicon_tags, 1)
+          with open("space_shooter/build/web/index.html", "w") as f:
+              f.write(idx)
+
           print("All web files patched OK")
           PYEOF
 
