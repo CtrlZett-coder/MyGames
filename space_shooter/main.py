@@ -1169,6 +1169,8 @@ class Game:
         self._cheat_buf        = ''
         self._cheat_msg        = ''
         self._cheat_timer      = 0
+        self._title_tap_count  = 0
+        self._title_tap_time   = 0
         self._hover_snd_last   = 0    # pygame.time.get_ticks() of last hover sound
         self._touch_mode       = False # True = show on-screen gamepad (phone mode)
         self._touch            = TouchControls()
@@ -1617,8 +1619,8 @@ class Game:
     def _draw_cheat_msg(self):
         if self._cheat_timer <= 0:
             return
-        self._cheat_timer -= 1
         alpha = min(255, self._cheat_timer * 8)
+        self._cheat_timer -= 1
         t = self.font_b.render(self._cheat_msg, True, (255, 224, 64))
         s = pygame.Surface(t.get_size(), pygame.SRCALPHA)
         s.blit(t, (0, 0)); s.set_alpha(alpha)
@@ -1721,6 +1723,7 @@ class Game:
 
         title = self.font_xl.render("SPACE SHOOTER", True, CYAN)
         ctr(title, 120)
+        self._btn_rects['menu_title'] = pygame.Rect(SCREEN_WIDTH//2 - 210, 80, 420, 80)
 
         # Two mode boxes
         box_w, box_h = 220, 80
@@ -2273,6 +2276,20 @@ class Game:
         self.sounds.play('ui_back' if name in _back_btns else 'ui_click')
 
         if self.state == 'menu':
+            if name == 'menu_title':
+                import time as _t
+                now = _t.time()
+                if now - self._title_tap_time > 3.0:
+                    self._title_tap_count = 0
+                self._title_tap_time = now
+                self._title_tap_count += 1
+                if self._title_tap_count >= 7:
+                    self._title_tap_count = 0
+                    self._max_unlocked = 19
+                    self._save_unlocked(19)
+                    self._cheat_msg   = '★ ALL LEVELS UNLOCKED ★'
+                    self._cheat_timer = 240
+                return
             if name == 'ctrl_pc':
                 self._touch_mode = False; return
             elif name == 'ctrl_phone':
