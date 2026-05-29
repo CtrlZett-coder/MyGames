@@ -28,65 +28,153 @@ jobs:
       - name: Build web version
         run: python -m pygbag --build --width 900 --height 600 space_shooter
 
-      - name: Patch index.html
+      - name: Patch index.html + create service worker
         run: |
-          python3 - <<'EOF'
+          python3 - <<'PYEOF'
+          import re, textwrap
+
           with open("space_shooter/build/web/index.html", "r") as f:
               html = f.read()
 
-          # 1. Disable the debug terminal that splits the screen 50/50
+          # 1. Disable debug terminal (it split the screen 50/50 with the game)
           html = html.replace("gui_debug : 2", "gui_debug : 0", 1)
 
-          # 2. Black background instead of powderblue so transparent canvas looks right
-          html = html.replace("background-color:powderblue", "background-color:#000000", 1)
+          # 2. Black background (powderblue showed through transparent canvas)
+          html = html.replace("background-color:powderblue", "background-color:#000", 1)
 
-          # 3. Inject loading spinner overlay (keep ALL CDN URLs untouched)
-          loading_overlay = """
+          # 3. Inject overlay with live status + error display + SW registration
+          overlay = """
           <style>
           #py-loading {
-            position: fixed; inset: 0;
-            background: #111;
+            position: fixed; inset: 0; background: #111;
             display: flex; flex-direction: column;
             align-items: center; justify-content: center;
             z-index: 99999; color: #fff; font-family: sans-serif;
-            text-align: center; padding: 20px;
+            text-align: center; padding: 24px; box-sizing: border-box;
           }
-          #py-loading h2 { font-size: 1.5em; margin: 0 0 10px; color: #0af; }
-          #py-loading p  { font-size: 0.95em; color: #aaa; margin: 4px 0; }
+          #py-loading h2 { font-size: 1.6em; margin: 0 0 6px; color: #0af; }
+          #py-load-status { font-size: 1em; color: #ccc; margin: 8px 0 4px; min-height: 1.4em; }
+          #py-load-detail { font-size: 0.82em; color: #555; margin: 0; }
+          #py-load-err    { font-size: 0.82em; color: #f55; margin: 8px 0 0; display:none; }
           .py-spinner {
-            width: 52px; height: 52px; border: 5px solid #333;
+            width: 56px; height: 56px; border: 5px solid #222;
             border-top-color: #0af; border-radius: 50%;
-            animation: py-spin 0.8s linear infinite; margin-bottom: 18px;
+            animation: py-spin 0.8s linear infinite; margin-bottom: 20px;
           }
           @keyframes py-spin { to { transform: rotate(360deg); } }
           </style>
           <div id="py-loading">
             <div class="py-spinner"></div>
             <h2>Space Shooter</h2>
-            <p>Loading Python runtime...</p>
-            <p style="color:#666;font-size:0.85em">First load may take 1-2 min &nbsp;|&nbsp; Tap screen when "Ready to start!" appears</p>
+            <p id="py-load-status">Loading Python runtime...</p>
+            <p id="py-load-detail">First load ~1-2 min &mdash; после этого мгновенно (кеш)</p>
+            <p id="py-load-err"></p>
           </div>
           <script>
-            var _pyCheck = setInterval(function() {
+            // Mirror pygbag infobox text so user sees "Ready to start!" inside our overlay
+            setInterval(function() {
+              var box = document.getElementById('infobox');
+              var st  = document.getElementById('py-load-status');
+              if (!box || !st) return;
+              var t = (box.innerText || '').trim();
+              if (t && t !== 'Loading, please wait ...') st.textContent = t;
+            }, 300);
+
+            // Surface JS errors inside the overlay (visible on mobile without devtools)
+            window.addEventListener('error', function(e) {
+              var er = document.getElementById('py-load-err');
+              if (er) { er.textContent = '⚠ ' + e.message; er.style.display = 'block'; }
+              var dt = document.getElementById('py-load-detail');
+              if (dt) dt.textContent = 'Обновите страницу / Refresh to retry';
+            }, true);
+            window.addEventListener('unhandledrejection', function(e) {
+              var er = document.getElementById('py-load-err');
+              if (er) { er.textContent = '⚠ ' + (e.reason || 'Promise error'); er.style.display = 'block'; }
+            });
+
+            // Hide overlay once pygame canvas starts drawing
+            var _ck = setInterval(function() {
               var c = document.getElementById('canvas');
               if (c && c.width > 2) {
-                var d = document.getElementById('py-loading');
-                if (d) d.style.display = 'none';
-                clearInterval(_pyCheck);
+                document.getElementById('py-loading').style.display = 'none';
+                clearInterval(_ck);
               }
             }, 500);
+            // 5-min failsafe
             setTimeout(function() {
               var d = document.getElementById('py-loading');
               if (d) d.style.display = 'none';
             }, 300000);
+
+            // Register service worker — caches Pyodide + game files locally.
+            // After the first load everything is in the browser cache, so
+            // subsequent page opens are near-instant.
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.register('./sw.js', {scope: './'})
+                .catch(function(e) { console.warn('SW register failed', e); });
+            }
           </script>
           """
-          html = html.replace("<body>", "<body>" + loading_overlay, 1)
+          html = html.replace("<body>", "<body>" + overlay, 1)
 
           with open("space_shooter/build/web/index.html", "w") as f:
               f.write(html)
-          print("gui_debug:0 + black bg + spinner injected, CDN URLs untouched")
-          EOF
+          print("index.html patched OK")
+
+          # ── Service Worker ────────────────────────────────────────────────────
+          # CDN files (Pyodide/pygame-web) never change → cache-first forever.
+          # Our own game files → network-first so updates deploy immediately,
+          # with cached fallback if offline.
+          sw = r"""
+          const CACHE = 'space-shooter-v4';
+
+          self.addEventListener('install', () => self.skipWaiting());
+
+          self.addEventListener('activate', e => {
+            // Delete stale caches from old SW versions
+            e.waitUntil(
+              caches.keys()
+                .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+                .then(() => clients.claim())
+            );
+          });
+
+          self.addEventListener('fetch', e => {
+            if (e.request.method !== 'GET') return;
+            const url = new URL(e.request.url);
+            if (!url.protocol.startsWith('http')) return;
+
+            const isCDN = url.hostname === 'pygame-web.github.io';
+
+            if (isCDN) {
+              // Cache-first: Pyodide/pygame-web files don't change; serve instantly from cache
+              e.respondWith(caches.open(CACHE).then(async cache => {
+                const hit = await cache.match(e.request);
+                if (hit) return hit;
+                const res = await fetch(e.request);
+                if (res.ok) cache.put(e.request, res.clone());
+                return res;
+              }));
+            } else {
+              // Network-first: our game files; fall back to cache when offline
+              e.respondWith(caches.open(CACHE).then(async cache => {
+                try {
+                  const res = await fetch(e.request);
+                  if (res.ok) cache.put(e.request, res.clone());
+                  return res;
+                } catch (_) {
+                  const hit = await cache.match(e.request);
+                  return hit || new Response('', {status: 503});
+                }
+              }));
+            }
+          });
+          """.strip()
+
+          with open("space_shooter/build/web/sw.js", "w") as f:
+              f.write(sw)
+          print("sw.js written OK")
+          PYEOF
 
       - name: Show deployed files
         run: find space_shooter/build/web -type f | sort
