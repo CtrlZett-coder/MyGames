@@ -379,7 +379,7 @@ class MiniBoss{
   }
   update(ts){
     ts=ts===undefined?1:ts;
-    if(this.invuln>0)this.invuln=Math.max(0,this.invuln-ts);
+    if(this.invuln>0&&!this.entering)this.invuln=Math.max(0,this.invuln-ts);
     if(this.x>this.targetX){this.x-=3.5*ts;}
     else{
       this.entering=false;
@@ -443,7 +443,7 @@ class Dreadnought{
   get phase(){return this.hp<=12?2:1;}
   update(ts){
     ts=ts===undefined?1:ts;
-    if(this.invuln>0)this.invuln=Math.max(0,this.invuln-ts);
+    if(this.invuln>0&&!this.entering)this.invuln=Math.max(0,this.invuln-ts);
     if(this.x>this.targetX){this.x-=2.5*ts;}
     else{
       this.entering=false;
@@ -528,35 +528,36 @@ class Dreadnought{
 class FinalBoss{
   constructor(){
     this.x=GW+150;this.y=GH/2;
-    this.hp=40;this.maxHp=40;this.W=150;this.H=100;
+    this.hp=65;this.maxHp=65;this.W=150;this.H=100;
     this.score=15000;this.dropCount=6;
     this.targetX=GW*0.73;this.moveTimer=0;this.entering=true;
     this.shootTimer=100;this.invuln=240;
-    this.LASER_DUR=100;this.LASER_CD=220;
+    this.LASER_DUR=115;this.LASER_CD=170;
     this._lasers=[{active:false,timer:0,cd:0,yOff:-22},{active:false,timer:0,cd:0,yOff:22}];
     this.bullets=[];this.dead=false;
   }
   get phase(){const r=this.hp/this.maxHp;return r>0.66?1:r>0.33?2:3;}
   update(ts){
     ts=ts===undefined?1:ts;
-    if(this.invuln>0)this.invuln=Math.max(0,this.invuln-ts);
+    if(this.invuln>0&&!this.entering)this.invuln=Math.max(0,this.invuln-ts);
     if(this.x>this.targetX){this.x-=2.0*ts;}
     else{
       this.entering=false;
       this.moveTimer+=ts;
-      const spd=0.016+(this.phase-1)*0.006;
-      this.y=clamp(GH/2+Math.sin(this.moveTimer*spd)*160,70,GH-70);
+      const spd=0.018+(this.phase-1)*0.008;
+      const amp=140+this.phase*20;
+      this.y=clamp(GH/2+Math.sin(this.moveTimer*spd)*amp,70,GH-70);
     }
     if(!this.entering){
-      const delays=[65,50,38];
-      const spreads=[[157,205,5],[153,208,7],[150,210,9]];
+      const delays=[55,42,30];
+      const spreads=[[157,205,7],[152,210,10],[148,212,13]];
       const[a0,a1,n]=spreads[this.phase-1];
       this.shootTimer-=ts;
       if(this.shootTimer<=0){
         this.shootTimer=delays[this.phase-1];
         const step=n>1?(a1-a0)/(n-1):0;
         for(let i=0;i<n;i++)this.bullets.push(new EnemyBullet(this.x-this.W/2,this.y,a0+i*step));
-        if(this.phase===3)for(const a of[140,220])this.bullets.push(new EnemyBullet(this.x-this.W/2,this.y,a));
+        if(this.phase===3)for(const a of[130,180,230])this.bullets.push(new EnemyBullet(this.x-this.W/2,this.y,a));
       }
       const activeLasers=this.phase===1?0:this.phase===2?1:2;
       for(let i=0;i<this._lasers.length;i++){
@@ -720,6 +721,7 @@ let lvIdx=0,maxUnlocked=loadProgress();
 let lvPhase='enemies',lvEnemiesLeft=0,lvBossQueue=[],lvNextBossTimer=0,lvFinalDelayTimer=0;
 let lvIntroTimer=0,lvCompleteTimer=0;
 let warnText='',warnTimer=0;
+let cheatBuf='',cheatMsg='',cheatTimer=0;
 let menuSel=0,lsCursor=0,btnRects={};
 let screenShake=0,flashAlpha=0,vigAlpha=0,enrageFlash=0,bossEnraged=false;
 const bossesSpawnedArcade=new Set();
@@ -943,6 +945,7 @@ function update(){
   if(flashAlpha>0)flashAlpha=Math.max(0,flashAlpha-15);
   if(enrageFlash>0)enrageFlash--;
   if(warnTimer>0)warnTimer--;
+  if(cheatTimer>0)cheatTimer--;
 
   const ts=player&&player.slowActive?0.45:1.0;
   const keys=mergeKeys(kbKeys(),touchKeys());
@@ -1012,6 +1015,7 @@ function draw(){
   else if(gameState==='game_over'){drawGameOver();}
   else if(gameState==='victory'){drawVictory();}
   else if(gameState==='level_complete'){drawLevelComplete();}
+  drawCheatMsg();
 }
 
 function drawVignette(){
@@ -1127,6 +1131,15 @@ function drawWarning(){
   ctx.shadowBlur=0;ctx.globalAlpha=1;
 }
 
+function drawCheatMsg(){
+  if(cheatTimer<=0)return;
+  const a=Math.min(1,cheatTimer/30)*Math.min(1,cheatTimer>30?1:cheatTimer/30);
+  ctx.save();ctx.globalAlpha=a;
+  ctx.font='bold 26px monospace';ctx.textAlign='center';
+  ctx.fillStyle='#000';ctx.fillText(cheatMsg,GW/2+2,52);
+  ctx.fillStyle='#ffe040';ctx.fillText(cheatMsg,GW/2,50);
+  ctx.restore();
+}
 function drawLevelIntro(){
   const a=Math.min(1,lvIntroTimer/40)*Math.min(1,lvIntroTimer>20?1:lvIntroTimer/20);
   ctx.globalAlpha=a;
@@ -1322,6 +1335,13 @@ window.addEventListener('keydown',e=>{
     else if(gameState==='paused'){gameState='playing';clearTouch();}
     else if(gameState==='level_select'){gameState='menu';}
     else if(gameState==='game_over'||gameState==='victory'){gameState='menu';}
+  }
+  if(e.key&&e.key.length===1){
+    cheatBuf=(cheatBuf+e.key).slice(-10);
+    if(cheatBuf.endsWith('levelall@/')){
+      cheatBuf='';maxUnlocked=19;saveProgress(19);
+      cheatMsg='★ ALL LEVELS UNLOCKED ★';cheatTimer=240;
+    }
   }
 });
 
