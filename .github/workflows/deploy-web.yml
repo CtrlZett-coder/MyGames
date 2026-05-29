@@ -17,6 +17,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # ── Python / pygbag web build ─────────────────────────────────────────
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -31,18 +32,12 @@ jobs:
       - name: Patch index.html + create service worker
         run: |
           python3 - <<'PYEOF'
-          import re, textwrap
-
           with open("space_shooter/build/web/index.html", "r") as f:
               html = f.read()
 
-          # 1. Disable debug terminal (it split the screen 50/50 with the game)
           html = html.replace("gui_debug : 2", "gui_debug : 0", 1)
-
-          # 2. Black background (powderblue showed through transparent canvas)
           html = html.replace("background-color:powderblue", "background-color:#000", 1)
 
-          # 3. Inject overlay with live status + error display + SW registration
           overlay = """
           <style>
           #py-loading {
@@ -71,7 +66,6 @@ jobs:
             <p id="py-load-err"></p>
           </div>
           <script>
-            // Mirror pygbag infobox text so user sees "Ready to start!" inside our overlay
             setInterval(function() {
               var box = document.getElementById('infobox');
               var st  = document.getElementById('py-load-status');
@@ -79,8 +73,6 @@ jobs:
               var t = (box.innerText || '').trim();
               if (t && t !== 'Loading, please wait ...') st.textContent = t;
             }, 300);
-
-            // Surface JS errors inside the overlay (visible on mobile without devtools)
             window.addEventListener('error', function(e) {
               var er = document.getElementById('py-load-err');
               if (er) { er.textContent = '⚠ ' + e.message; er.style.display = 'block'; }
@@ -91,8 +83,6 @@ jobs:
               var er = document.getElementById('py-load-err');
               if (er) { er.textContent = '⚠ ' + (e.reason || 'Promise error'); er.style.display = 'block'; }
             });
-
-            // Hide overlay once pygame canvas starts drawing
             var _ck = setInterval(function() {
               var c = document.getElementById('canvas');
               if (c && c.width > 2) {
@@ -100,15 +90,10 @@ jobs:
                 clearInterval(_ck);
               }
             }, 500);
-            // 5-min failsafe
             setTimeout(function() {
               var d = document.getElementById('py-loading');
               if (d) d.style.display = 'none';
             }, 300000);
-
-            // Register service worker — caches Pyodide + game files locally.
-            // After the first load everything is in the browser cache, so
-            // subsequent page opens are near-instant.
             if ('serviceWorker' in navigator) {
               navigator.serviceWorker.register('./sw.js', {scope: './'})
                 .catch(function(e) { console.warn('SW register failed', e); });
@@ -119,35 +104,23 @@ jobs:
 
           with open("space_shooter/build/web/index.html", "w") as f:
               f.write(html)
-          print("index.html patched OK")
 
-          # ── Service Worker ────────────────────────────────────────────────────
-          # CDN files (Pyodide/pygame-web) never change → cache-first forever.
-          # Our own game files → network-first so updates deploy immediately,
-          # with cached fallback if offline.
           sw = r"""
           const CACHE = 'space-shooter-v4';
-
           self.addEventListener('install', () => self.skipWaiting());
-
           self.addEventListener('activate', e => {
-            // Delete stale caches from old SW versions
             e.waitUntil(
               caches.keys()
                 .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
                 .then(() => clients.claim())
             );
           });
-
           self.addEventListener('fetch', e => {
             if (e.request.method !== 'GET') return;
             const url = new URL(e.request.url);
             if (!url.protocol.startsWith('http')) return;
-
             const isCDN = url.hostname === 'pygame-web.github.io';
-
             if (isCDN) {
-              // Cache-first: Pyodide/pygame-web files don't change; serve instantly from cache
               e.respondWith(caches.open(CACHE).then(async cache => {
                 const hit = await cache.match(e.request);
                 if (hit) return hit;
@@ -156,7 +129,6 @@ jobs:
                 return res;
               }));
             } else {
-              // Network-first: our game files; fall back to cache when offline
               e.respondWith(caches.open(CACHE).then(async cache => {
                 try {
                   const res = await fetch(e.request);
@@ -173,8 +145,90 @@ jobs:
 
           with open("space_shooter/build/web/sw.js", "w") as f:
               f.write(sw)
-          print("sw.js written OK")
+
+          # Copy standalone HTML5 game too
+          import shutil
+          shutil.copy("space_shooter.html", "space_shooter/build/web/play.html")
+          print("All web files patched OK")
           PYEOF
+
+      # ── Android APK build ────────────────────────────────────────────────
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '7.6.1'
+
+      - name: Build Android APK
+        run: |
+          cp space_shooter.html android/app/src/main/assets/game.html
+          cd android
+          gradle assembleDebug --no-daemon
+          echo "APK built successfully"
+
+      - name: Copy APK into web output
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk \
+             space_shooter/build/web/SpaceShooter.apk
+          echo "APK copied to web output"
+
+      # ── Download page ─────────────────────────────────────────────────────
+      - name: Create download page
+        run: |
+          cat > space_shooter/build/web/download.html << 'HTML'
+          <!DOCTYPE html>
+          <html lang="ru">
+          <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width,initial-scale=1">
+          <title>Space Shooter — Скачать</title>
+          <style>
+            *{margin:0;padding:0;box-sizing:border-box}
+            body{background:#0a0a1a;color:#fff;font-family:sans-serif;min-height:100vh;
+                 display:flex;align-items:center;justify-content:center;padding:20px}
+            .card{background:#111;border:1px solid #246;border-radius:16px;
+                  padding:32px;max-width:440px;width:100%;text-align:center}
+            h1{color:#0af;font-size:2em;margin-bottom:6px}
+            p{color:#888;margin-bottom:24px;font-size:0.95em}
+            .btn{display:block;padding:16px 24px;border-radius:10px;
+                 text-decoration:none;font-size:1.1em;font-weight:bold;
+                 margin:12px 0;transition:opacity .2s}
+            .btn:hover{opacity:0.85}
+            .apk{background:#28a;color:#fff}
+            .html{background:#246;color:#0af;border:1px solid #0af}
+            .web{background:#204;color:#a4f;border:1px solid #a4f}
+            .note{font-size:0.78em;color:#555;margin-top:6px}
+          </style>
+          </head>
+          <body>
+          <div class="card">
+            <h1>🚀 Space Shooter</h1>
+            <p>Выбери способ поиграть</p>
+
+            <a class="btn apk" href="SpaceShooter.apk" download>
+              📦 Скачать APK для Android
+            </a>
+            <div class="note">Установить: Настройки → Безопасность → Разрешить из неизвестных источников</div>
+
+            <a class="btn html" href="play.html">
+              🌐 Играть в браузере (HTML5)
+            </a>
+            <div class="note">Работает на iPhone, Android, ПК — мгновенно</div>
+
+            <a class="btn web" href="index.html">
+              🐍 Python-версия (pygbag)
+            </a>
+            <div class="note">Полная версия, первый запуск ~1-2 мин</div>
+          </div>
+          </body>
+          </html>
+          HTML
+          echo "Download page created"
 
       - name: Show deployed files
         run: find space_shooter/build/web -type f | sort
