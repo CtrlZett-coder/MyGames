@@ -1338,7 +1338,7 @@ window.addEventListener('keydown',e=>{
   }
   if(e.key&&e.key.length===1){
     cheatBuf=(cheatBuf+e.key).slice(-10);
-    if(cheatBuf.endsWith('levelall@/')){
+    if(cheatBuf.endsWith('lavelall')){
       cheatBuf='';maxUnlocked=19;saveProgress(19);
       cheatMsg='★ ALL LEVELS UNLOCKED ★';cheatTimer=240;
     }
