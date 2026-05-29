@@ -303,6 +303,11 @@ class SoundManager:
         snd.set_volume(0.35)
         snd.play(-1)
 
+    def set_master_volume(self, v: float):
+        v = max(0.0, min(1.0, v))
+        for snd in self._sounds.values():
+            snd.set_volume(v)
+
     def play(self, name: str):
         if self.enabled and name in self._sounds:
             self._sounds[name].play()
@@ -1166,6 +1171,8 @@ class Game:
         self._del_hold         = 0    # frames DEL held on level-select screen
         self._del_wipe_confirm = 0    # countdown for "progress reset!" banner
         self._del_key_held     = False  # tracked via KEYDOWN/KEYUP events
+        self._volume           = self._load_volume()
+        self.sounds.set_master_volume(self._volume)
         self._cheat_buf        = ''
         self._cheat_msg        = ''
         self._cheat_timer      = 0
@@ -1713,6 +1720,99 @@ class Game:
         hint = self.font_s.render("ESC — main menu", True, (80, 80, 80))
         ctr(hint, SCREEN_HEIGHT//2 + 165)
 
+    def _draw_settings(self):
+        self._btn_rects.clear()
+        self.screen.fill(BLACK)
+        for star in self.stars:
+            star.update(); star.draw(self.screen)
+
+        def ctr(surf, y): self.screen.blit(surf, surf.get_rect(center=(SCREEN_WIDTH//2, y)))
+
+        t = self.font_b.render("SETTINGS", True, CYAN)
+        ctr(t, 46)
+
+        # Back button
+        back_r = pygame.Rect(14, 8, 80, 32)
+        self._btn_rects['set_back'] = back_r
+        col = CYAN if self._hover_btn == 'set_back' else (80, 120, 160)
+        pygame.draw.rect(self.screen, (20, 40, 80), back_r, border_radius=6)
+        pygame.draw.rect(self.screen, col, back_r, 2, border_radius=6)
+        lbl = self.font_s.render('< BACK', True, col)
+        self.screen.blit(lbl, lbl.get_rect(center=back_r.center))
+
+        # ── Volume ────────────────────────────────────────────────────────────
+        vl = self.font_s.render('🔊  VOLUME', True, (170, 170, 170))
+        self.screen.blit(vl, (80, 82))
+
+        lvl = round(self._volume * 10)
+        seg_w, seg_h, seg_gap, segs = 34, 28, 5, 10
+        bar_w = segs * seg_w + (segs - 1) * seg_gap
+        btn_w = 36; btn_gap = 10
+        total_w = btn_w + btn_gap + bar_w + btn_gap + btn_w
+        bx0 = (SCREEN_WIDTH - total_w) // 2
+        bar_y = 102
+
+        minus_r = pygame.Rect(bx0, bar_y, btn_w, seg_h)
+        self._btn_rects['set_vol_down'] = minus_r
+        mc = CYAN if self._hover_btn == 'set_vol_down' else (80, 120, 160)
+        pygame.draw.rect(self.screen, (20, 36, 56), minus_r, border_radius=6)
+        pygame.draw.rect(self.screen, mc, minus_r, 2, border_radius=6)
+        mt = self.font_b.render('-', True, mc)
+        self.screen.blit(mt, mt.get_rect(center=(minus_r.centerx, minus_r.centery + 2)))
+
+        seg0 = bx0 + btn_w + btn_gap
+        for i in range(segs):
+            sx = seg0 + i * (seg_w + seg_gap)
+            on = i < lvl
+            pygame.draw.rect(self.screen, (0, 160, 200) if on else (20, 36, 56),
+                             (sx, bar_y, seg_w, seg_h), border_radius=4)
+            pygame.draw.rect(self.screen, (0, 120, 160) if on else (40, 60, 80),
+                             (sx, bar_y, seg_w, seg_h), 1, border_radius=4)
+
+        plus_r = pygame.Rect(seg0 + bar_w + btn_gap, bar_y, btn_w, seg_h)
+        self._btn_rects['set_vol_up'] = plus_r
+        pc = CYAN if self._hover_btn == 'set_vol_up' else (80, 120, 160)
+        pygame.draw.rect(self.screen, (20, 36, 56), plus_r, border_radius=6)
+        pygame.draw.rect(self.screen, pc, plus_r, 2, border_radius=6)
+        pt = self.font_b.render('+', True, pc)
+        self.screen.blit(pt, pt.get_rect(center=(plus_r.centerx, plus_r.centery + 2)))
+
+        pct = self.font_s.render(f'{round(self._volume * 100)}%', True, (100, 120, 140))
+        self.screen.blit(pct, (plus_r.right + 10, bar_y + 6))
+
+        # ── Divider ───────────────────────────────────────────────────────────
+        pygame.draw.line(self.screen, (30, 50, 80), (60, 152), (SCREEN_WIDTH - 60, 152))
+
+        ct = self.font_s.render('CONTROLS', True, (170, 170, 170))
+        ctr(ct, 176)
+
+        c1, c2 = SCREEN_WIDTH // 4, 3 * SCREEN_WIDTH // 4
+        lbl_pc   = self.font_s.render('PC / Keyboard', True, CYAN)
+        lbl_ph   = self.font_s.render('Phone / Touch',  True, CYAN)
+        self.screen.blit(lbl_pc, lbl_pc.get_rect(center=(c1, 200)))
+        self.screen.blit(lbl_ph, lbl_ph.get_rect(center=(c2, 200)))
+
+        pygame.draw.line(self.screen, (30, 50, 80), (SCREEN_WIDTH//2, 188), (SCREEN_WIDTH//2, 440))
+
+        pc_rows = [('Move',  '← → ↑ ↓   /   W A S D'),
+                   ('Fire',  'SPACE  /  Z  /  X'),
+                   ('Pause', 'ESC')]
+        ph_rows = [('Move',  'Joystick (left half)'),
+                   ('Fire',  'Button (bottom right)'),
+                   ('Pause', 'Button (top center)')]
+        for i, ((a1, k1), (a2, k2)) in enumerate(zip(pc_rows, ph_rows)):
+            y = 232 + i * 62
+            for cx, a, k in ((c1, a1, k1), (c2, a2, k2)):
+                al = self.font_s.render(a, True, (80, 100, 120))
+                kl = self.font_s.render(k, True, (180, 210, 230))
+                self.screen.blit(al, al.get_rect(center=(cx, y)))
+                self.screen.blit(kl, kl.get_rect(center=(cx, y + 22)))
+
+        pygame.draw.line(self.screen, (30, 50, 80), (60, 448), (SCREEN_WIDTH - 60, 448))
+        h1 = self.font_s.render('Unlock all levels — keyboard: type  lavelall', True, (60, 80, 100))
+        h2 = self.font_s.render('Unlock all levels — phone: tap title × 7',     True, (60, 80, 100))
+        ctr(h1, 470); ctr(h2, 494)
+
     def _draw_menu(self):
         self._btn_rects.clear()
         self.screen.fill(BLACK)
@@ -1724,6 +1824,14 @@ class Game:
         title = self.font_xl.render("SPACE SHOOTER", True, CYAN)
         ctr(title, 120)
         self._btn_rects['menu_title'] = pygame.Rect(SCREEN_WIDTH//2 - 210, 80, 420, 80)
+        # Settings button (top-right)
+        sr = pygame.Rect(SCREEN_WIDTH - 110, 9, 96, 28)
+        self._btn_rects['menu_settings'] = sr
+        col = CYAN if self._hover_btn == 'menu_settings' else (80, 120, 160)
+        pygame.draw.rect(self.screen, (20, 40, 80), sr, border_radius=6)
+        pygame.draw.rect(self.screen, col, sr, 2, border_radius=6)
+        lbl = self.font_s.render('⚙ SETTINGS', True, col)
+        self.screen.blit(lbl, lbl.get_rect(center=sr.center))
 
         # Two mode boxes
         box_w, box_h = 220, 80
@@ -1821,8 +1929,13 @@ class Game:
                     # ── Menu — mouse/touch only; no keyboard buttons ───────────
                     # (no keyboard handlers for menu buttons)
 
+                    # ── Settings — ESC to go back ─────────────────────────────
+                    if self.state == 'settings':
+                        if event.key == pygame.K_ESCAPE:
+                            self.state = 'menu'
+
                     # ── Level Select — only ESC to go back ────────────────────
-                    if self.state == 'level_select':
+                    elif self.state == 'level_select':
                         if event.key == pygame.K_ESCAPE:
                             self.state = 'menu'
 
@@ -1940,6 +2053,13 @@ class Game:
                 if event.type == pygame.KEYUP and event.key == pygame.K_DELETE:
                     self._del_key_held = False
                     self._del_hold = 0
+
+            if self.state == 'settings':
+                self._draw_settings()
+                self._draw_cheat_msg()
+                pygame.display.flip(); self.clock.tick(FPS)
+                await asyncio.sleep(0)
+                continue
 
             if self.state == 'menu':
                 # DEL hold-to-wipe detection
@@ -2098,12 +2218,39 @@ class Game:
         except Exception:
             return 0
 
+    def _load_volume(self) -> float:
+        try:
+            with open(self._save_path) as f:
+                return float(json.load(f).get('volume', 0.7))
+        except Exception:
+            return 0.7
+
+    def _save_volume(self):
+        try:
+            data = {}
+            try:
+                with open(self._save_path) as f:
+                    data = json.load(f)
+            except Exception:
+                pass
+            data['volume'] = round(self._volume, 2)
+            with open(self._save_path, 'w') as f:
+                json.dump(data, f)
+        except Exception:
+            pass
+
     def _save_unlocked(self, idx: int):
         """Persist highest unlocked level index."""
         self._max_unlocked = max(self._max_unlocked, idx)
         try:
+            with open(self._save_path) as f:
+                data = json.load(f)
+        except Exception:
+            data = {}
+        data['max_unlocked'] = self._max_unlocked
+        try:
             with open(self._save_path, 'w') as f:
-                json.dump({'max_unlocked': self._max_unlocked}, f)
+                json.dump(data, f)
         except Exception:
             pass
 
@@ -2275,7 +2422,22 @@ class Game:
         _back_btns = {'ls_back', 'pause_1', 'go_menu', 'vict_menu'}
         self.sounds.play('ui_back' if name in _back_btns else 'ui_click')
 
+        if self.state == 'settings':
+            if name == 'set_back':
+                self.state = 'menu'
+            elif name == 'set_vol_down':
+                self._volume = max(0.0, round(self._volume - 0.1, 2))
+                self.sounds.set_master_volume(self._volume)
+                self._save_volume()
+            elif name == 'set_vol_up':
+                self._volume = min(1.0, round(self._volume + 0.1, 2))
+                self.sounds.set_master_volume(self._volume)
+                self._save_volume()
+            return
+
         if self.state == 'menu':
+            if name == 'menu_settings':
+                self.state = 'settings'; return
             if name == 'menu_title':
                 import time as _t
                 now = _t.time()
