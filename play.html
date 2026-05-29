@@ -722,6 +722,7 @@ let lvPhase='enemies',lvEnemiesLeft=0,lvBossQueue=[],lvNextBossTimer=0,lvFinalDe
 let lvIntroTimer=0,lvCompleteTimer=0;
 let warnText='',warnTimer=0;
 let cheatBuf='',cheatMsg='',cheatTimer=0;
+let titleTapCount=0,titleTapTime=0;
 let menuSel=0,lsCursor=0,btnRects={};
 let screenShake=0,flashAlpha=0,vigAlpha=0,enrageFlash=0,bossEnraged=false;
 const bossesSpawnedArcade=new Set();
@@ -945,7 +946,6 @@ function update(){
   if(flashAlpha>0)flashAlpha=Math.max(0,flashAlpha-15);
   if(enrageFlash>0)enrageFlash--;
   if(warnTimer>0)warnTimer--;
-  if(cheatTimer>0)cheatTimer--;
 
   const ts=player&&player.slowActive?0.45:1.0;
   const keys=mergeKeys(kbKeys(),touchKeys());
@@ -1133,6 +1133,7 @@ function drawWarning(){
 
 function drawCheatMsg(){
   if(cheatTimer<=0)return;
+  cheatTimer--;
   const a=Math.min(1,cheatTimer/30)*Math.min(1,cheatTimer>30?1:cheatTimer/30);
   ctx.save();ctx.globalAlpha=a;
   ctx.font='bold 26px monospace';ctx.textAlign='center';
@@ -1170,6 +1171,7 @@ function drawMenu(){
   ctx.fillText('SHOOTER',GW/2,GH/2-20);
   ctx.shadowBlur=0;
   btnRects={};
+  btnRects['m_title']={x:GW/2-160,y:GH/2-145,w:320,h:135};
   const btns=[['ARCADE MODE','arcade'],['LEVELS MODE','levels'],['PHONE MODE','phone']];
   btns.forEach(([label,key],i)=>{
     const x=GW/2-120,y=GH/2+40+i*58,w=240,h=44;
@@ -1275,6 +1277,16 @@ function hitBtn(x,y){
 function handleBtn(key){
   if(!key)return;
   SND.uiClick();
+  if(key==='m_title'){
+    const now=Date.now();
+    if(now-titleTapTime>3000)titleTapCount=0;
+    titleTapTime=now;titleTapCount++;
+    if(titleTapCount>=7){
+      titleTapCount=0;maxUnlocked=19;saveProgress(19);
+      cheatMsg='★ ALL LEVELS UNLOCKED ★';cheatTimer=240;
+    }
+    return;
+  }
   if(key==='m_arcade'){menuSel=0;startGame('arcade');return;}
   if(key==='m_levels'){gameState='level_select';lsCursor=0;return;}
   if(key==='m_phone'){touchMode=!touchMode;return;}
