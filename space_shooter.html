@@ -42,8 +42,17 @@ function rectsOverlap(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h
 function range(a,b,s=1){const r=[];for(let i=a;i<b;i+=s)r.push(i);return r;}
 
 // ── Audio ──────────────────────────────────────────────────────────────────────
-let actx=null;
-function initAudio(){if(actx)return;try{actx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}
+let actx=null,masterGain=null;
+let masterVolume=parseFloat(localStorage.getItem('ss_vol')||'0.7');
+function saveMasterVolume(){try{localStorage.setItem('ss_vol',masterVolume.toFixed(2));}catch(e){}}
+function initAudio(){
+  if(actx)return;
+  try{
+    actx=new(window.AudioContext||window.webkitAudioContext)();
+    masterGain=actx.createGain();masterGain.gain.value=masterVolume;
+    masterGain.connect(actx.destination);
+  }catch(e){}
+}
 function playTone(freq,dur,type,vol){
   if(!actx)return;type=type||'sine';vol=vol||0.15;
   try{
@@ -51,7 +60,7 @@ function playTone(freq,dur,type,vol){
     o.type=type;o.frequency.value=freq;
     g.gain.setValueAtTime(vol,actx.currentTime);
     g.gain.exponentialRampToValueAtTime(0.001,actx.currentTime+dur);
-    o.connect(g);g.connect(actx.destination);o.start();o.stop(actx.currentTime+dur);
+    o.connect(g);g.connect(masterGain||actx.destination);o.start();o.stop(actx.currentTime+dur);
   }catch(e){}
 }
 function playNoise(dur,vol){
@@ -61,7 +70,7 @@ function playNoise(dur,vol){
     const d=buf.getChannelData(0);
     for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.exp(-8*i/d.length);
     const src=actx.createBufferSource(),g=actx.createGain();
-    g.gain.value=vol;src.buffer=buf;src.connect(g);g.connect(actx.destination);src.start();
+    g.gain.value=vol;src.buffer=buf;src.connect(g);g.connect(masterGain||actx.destination);src.start();
   }catch(e){}
 }
 const SND={
@@ -982,6 +991,7 @@ function draw(){
 
   if(gameState==='menu'){drawMenu();return;}
   if(gameState==='level_select'){drawLevelSelect();return;}
+  if(gameState==='settings'){drawSettings();return;}
 
   // Slow tint
   if(player&&player.slowActive){ctx.fillStyle=rgba(60,30,160,0.08);ctx.fillRect(0,0,GW,GH);}
@@ -1141,6 +1151,91 @@ function drawCheatMsg(){
   ctx.fillStyle='#ffe040';ctx.fillText(cheatMsg,GW/2,50);
   ctx.restore();
 }
+function drawSettings(){
+  ctx.font='bold 30px monospace';ctx.textAlign='center';
+  ctx.fillStyle='#00c8ff';ctx.shadowColor='#00c8ff';ctx.shadowBlur=10;
+  ctx.fillText('SETTINGS',GW/2,46);ctx.shadowBlur=0;
+  btnRects={};
+  // Back button
+  btnRects['set_back']={x:14,y:8,w:80,h:32};
+  ctx.fillStyle='#224466';roundRect(14,8,80,32,6);ctx.fill();
+  ctx.strokeStyle='#00c8ff';ctx.lineWidth=1.5;roundRect(14,8,80,32,6);ctx.stroke();
+  ctx.fillStyle='#00c8ff';ctx.font='14px sans-serif';ctx.textAlign='center';
+  ctx.fillText('< BACK',54,29);
+  // Volume
+  const lvl=Math.round(masterVolume*10);
+  const segW=34,segH=30,segGap=5,segs=10;
+  const totalBarW=segs*segW+(segs-1)*segGap;
+  const btnW=38,btnGap=10;
+  const totalW=btnW+btnGap+totalBarW+btnGap+btnW;
+  const bx0=(GW-totalW)/2;
+  ctx.fillStyle='#aaaaaa';ctx.font='bold 16px sans-serif';ctx.textAlign='left';
+  ctx.fillText('🔊  VOLUME',bx0,92);
+  // minus button
+  const minusX=bx0,barY=102;
+  btnRects['set_vol_down']={x:minusX,y:barY,w:btnW,h:segH};
+  ctx.fillStyle='#1a2a3a';roundRect(minusX,barY,btnW,segH,6);ctx.fill();
+  ctx.strokeStyle='#446688';ctx.lineWidth=1.5;roundRect(minusX,barY,btnW,segH,6);ctx.stroke();
+  ctx.fillStyle='#aac8e0';ctx.font='bold 22px sans-serif';ctx.textAlign='center';
+  ctx.fillText('-',minusX+btnW/2,barY+segH-5);
+  // segments
+  const seg0=bx0+btnW+btnGap;
+  for(let i=0;i<segs;i++){
+    const sx=seg0+i*(segW+segGap);
+    ctx.fillStyle=i<lvl?'#00c8ff':'#1a2a3a';
+    roundRect(sx,barY,segW,segH,4);ctx.fill();
+    ctx.strokeStyle=i<lvl?'#0090b8':'#2a3a4a';ctx.lineWidth=1;
+    roundRect(sx,barY,segW,segH,4);ctx.stroke();
+  }
+  // plus button
+  const plusX=seg0+totalBarW+btnGap;
+  btnRects['set_vol_up']={x:plusX,y:barY,w:btnW,h:segH};
+  ctx.fillStyle='#1a2a3a';roundRect(plusX,barY,btnW,segH,6);ctx.fill();
+  ctx.strokeStyle='#446688';ctx.lineWidth=1.5;roundRect(plusX,barY,btnW,segH,6);ctx.stroke();
+  ctx.fillStyle='#aac8e0';ctx.font='bold 22px sans-serif';ctx.textAlign='center';
+  ctx.fillText('+',plusX+btnW/2,barY+segH-5);
+  // percent label
+  ctx.fillStyle='#667788';ctx.font='14px monospace';ctx.textAlign='left';
+  ctx.fillText(Math.round(masterVolume*100)+'%',plusX+btnW+10,barY+segH-5);
+  // divider
+  ctx.strokeStyle='#1e3050';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(60,155);ctx.lineTo(GW-60,155);ctx.stroke();
+  // CONTROLS heading
+  ctx.fillStyle='#aaaaaa';ctx.font='bold 17px sans-serif';ctx.textAlign='center';
+  ctx.fillText('CONTROLS',GW/2,180);
+  // Columns
+  const c1=GW/4,c2=3*GW/4,cy=200;
+  ctx.fillStyle='#00c8ff';ctx.font='bold 15px sans-serif';
+  ctx.textAlign='center';ctx.fillText('PC / Keyboard',c1,cy);
+  ctx.fillText('Phone / Touch',c2,cy);
+  // Vertical divider
+  ctx.strokeStyle='#1e3050';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(GW/2,190);ctx.lineTo(GW/2,445);ctx.stroke();
+  // PC controls
+  const pc=[['Move','← → ↑ ↓   or   W A S D'],['Fire','SPACE  /  Z  /  X'],['Pause','ESC']];
+  pc.forEach(([a,k],i)=>{
+    const y=cy+36+i*58;
+    ctx.fillStyle='#556677';ctx.font='13px sans-serif';ctx.textAlign='center';
+    ctx.fillText(a,c1,y);
+    ctx.fillStyle='#cce0f0';ctx.font='bold 13px monospace';
+    ctx.fillText(k,c1,y+18);
+  });
+  // Phone controls
+  const ph=[['Move','Joystick (left half of screen)'],['Fire','Fire button (bottom right)'],['Pause','Pause button (top center)']];
+  ph.forEach(([a,k],i)=>{
+    const y=cy+36+i*58;
+    ctx.fillStyle='#556677';ctx.font='13px sans-serif';ctx.textAlign='center';
+    ctx.fillText(a,c2,y);
+    ctx.fillStyle='#cce0f0';ctx.font='bold 13px sans-serif';
+    ctx.fillText(k,c2,y+18);
+  });
+  // Cheat hint divider
+  ctx.strokeStyle='#1e3050';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(60,452);ctx.lineTo(GW-60,452);ctx.stroke();
+  ctx.fillStyle='#445566';ctx.font='13px monospace';ctx.textAlign='center';
+  ctx.fillText('Unlock all levels — keyboard: type  lavelall',GW/2,477);
+  ctx.fillText('Unlock all levels — phone: tap title × 7',GW/2,497);
+}
 function drawLevelIntro(){
   const a=Math.min(1,lvIntroTimer/40)*Math.min(1,lvIntroTimer>20?1:lvIntroTimer/20);
   ctx.globalAlpha=a;
@@ -1172,6 +1267,11 @@ function drawMenu(){
   ctx.shadowBlur=0;
   btnRects={};
   btnRects['m_title']={x:GW/2-160,y:GH/2-145,w:320,h:135};
+  btnRects['m_settings']={x:GW-106,y:9,w:92,h:28};
+  ctx.fillStyle=rgba(20,40,80,0.8);roundRect(GW-106,9,92,28,6);ctx.fill();
+  ctx.strokeStyle='#224466';ctx.lineWidth=1.5;roundRect(GW-106,9,92,28,6);ctx.stroke();
+  ctx.fillStyle='#88ccff';ctx.font='14px sans-serif';ctx.textAlign='center';
+  ctx.fillText('⚙ SETTINGS',GW-60,27);
   const btns=[['ARCADE MODE','arcade'],['LEVELS MODE','levels'],['PHONE MODE','phone']];
   btns.forEach(([label,key],i)=>{
     const x=GW/2-120,y=GH/2+40+i*58,w=240,h=44;
@@ -1277,6 +1377,18 @@ function hitBtn(x,y){
 function handleBtn(key){
   if(!key)return;
   SND.uiClick();
+  if(key==='m_settings'){gameState='settings';return;}
+  if(key==='set_back'){gameState='menu';return;}
+  if(key==='set_vol_down'){
+    masterVolume=Math.max(0,+(masterVolume-0.1).toFixed(2));
+    if(masterGain)masterGain.gain.value=masterVolume;
+    saveMasterVolume();SND.uiClick();return;
+  }
+  if(key==='set_vol_up'){
+    masterVolume=Math.min(1,+(masterVolume+0.1).toFixed(2));
+    if(masterGain)masterGain.gain.value=masterVolume;
+    saveMasterVolume();SND.uiClick();return;
+  }
   if(key==='m_title'){
     const now=Date.now();
     if(now-titleTapTime>3000)titleTapCount=0;
@@ -1346,6 +1458,7 @@ window.addEventListener('keydown',e=>{
     if(gameState==='playing'){gameState='paused';}
     else if(gameState==='paused'){gameState='playing';clearTouch();}
     else if(gameState==='level_select'){gameState='menu';}
+    else if(gameState==='settings'){gameState='menu';}
     else if(gameState==='game_over'||gameState==='victory'){gameState='menu';}
   }
   if(e.key&&e.key.length===1){
