@@ -986,17 +986,26 @@ class Explosion:
 # ══════════════════════════════════════════════════════════════════════════════
 class _MergedKeys:
     """Wraps pygame key state and overlays on-screen touch-button presses."""
-    _MAP = {
+    _STANDARD = {
         pygame.K_UP: 'up',    pygame.K_w: 'up',
         pygame.K_DOWN: 'down', pygame.K_s: 'down',
         pygame.K_LEFT: 'left', pygame.K_a: 'left',
         pygame.K_RIGHT: 'right', pygame.K_d: 'right',
         pygame.K_SPACE: 'fire',
     }
-    def __init__(self, kb, tp: set):
-        self._kb = kb; self._tp = tp
+    def __init__(self, kb, tp: set, bindings: dict = None):
+        self._kb = kb; self._tp = tp; self._bindings = bindings or {}
     def __getitem__(self, k):
-        return bool(self._kb[k]) or (self._MAP.get(k) in self._tp)
+        if bool(self._kb[k]):
+            return True
+        action = self._STANDARD.get(k)
+        if action:
+            if action in self._tp:
+                return True
+            bound = self._bindings.get(action)
+            if bound is not None and bool(self._kb[bound]):
+                return True
+        return False
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1173,6 +1182,10 @@ class Game:
         self._del_key_held     = False  # tracked via KEYDOWN/KEYUP events
         self._volume           = self._load_volume()
         self.sounds.set_master_volume(self._volume)
+        self._bindings         = self._load_bindings()
+        self._rebind_action    = None
+        self._joy_scale        = self._load_joy_scale()
+        self._apply_joy_scale()
         self._cheat_buf        = ''
         self._cheat_msg        = ''
         self._cheat_timer      = 0
@@ -1731,87 +1744,137 @@ class Game:
         t = self.font_b.render("SETTINGS", True, CYAN)
         ctr(t, 46)
 
-        # Back button
-        back_r = pygame.Rect(14, 8, 80, 32)
+        # Back / Cancel button
+        back_r = pygame.Rect(14, 8, 90, 32)
         self._btn_rects['set_back'] = back_r
-        col = CYAN if self._hover_btn == 'set_back' else (80, 120, 160)
+        is_rebinding = self._rebind_action is not None
+        col = (255, 100, 60) if is_rebinding else (CYAN if self._hover_btn == 'set_back' else (80, 120, 160))
         pygame.draw.rect(self.screen, (20, 40, 80), back_r, border_radius=6)
         pygame.draw.rect(self.screen, col, back_r, 2, border_radius=6)
-        lbl = self.font_s.render('< BACK', True, col)
+        lbl = self.font_s.render('✕ CANCEL' if is_rebinding else '< BACK', True, col)
         self.screen.blit(lbl, lbl.get_rect(center=back_r.center))
 
         # ── Volume ────────────────────────────────────────────────────────────
-        vl = self.font_s.render('🔊  VOLUME', True, (170, 170, 170))
-        self.screen.blit(vl, (80, 82))
-
+        vl = self.font_s.render('VOLUME', True, (170, 170, 170))
+        self.screen.blit(vl, (60, 82))
         lvl = round(self._volume * 10)
-        seg_w, seg_h, seg_gap, segs = 34, 28, 5, 10
+        seg_w, seg_h, seg_gap, segs = 28, 24, 4, 10
         bar_w = segs * seg_w + (segs - 1) * seg_gap
-        btn_w = 36; btn_gap = 10
+        btn_w = 32; btn_gap = 8
         total_w = btn_w + btn_gap + bar_w + btn_gap + btn_w
         bx0 = (SCREEN_WIDTH - total_w) // 2
-        bar_y = 102
-
+        bar_y = 100
         minus_r = pygame.Rect(bx0, bar_y, btn_w, seg_h)
         self._btn_rects['set_vol_down'] = minus_r
         mc = CYAN if self._hover_btn == 'set_vol_down' else (80, 120, 160)
-        pygame.draw.rect(self.screen, (20, 36, 56), minus_r, border_radius=6)
-        pygame.draw.rect(self.screen, mc, minus_r, 2, border_radius=6)
+        pygame.draw.rect(self.screen, (20, 36, 56), minus_r, border_radius=5)
+        pygame.draw.rect(self.screen, mc, minus_r, 2, border_radius=5)
         mt = self.font_b.render('-', True, mc)
         self.screen.blit(mt, mt.get_rect(center=(minus_r.centerx, minus_r.centery + 2)))
-
         seg0 = bx0 + btn_w + btn_gap
         for i in range(segs):
             sx = seg0 + i * (seg_w + seg_gap)
             on = i < lvl
-            pygame.draw.rect(self.screen, (0, 160, 200) if on else (20, 36, 56),
-                             (sx, bar_y, seg_w, seg_h), border_radius=4)
-            pygame.draw.rect(self.screen, (0, 120, 160) if on else (40, 60, 80),
-                             (sx, bar_y, seg_w, seg_h), 1, border_radius=4)
-
+            pygame.draw.rect(self.screen, (0, 160, 200) if on else (20, 36, 56), (sx, bar_y, seg_w, seg_h), border_radius=3)
+            pygame.draw.rect(self.screen, (0, 120, 160) if on else (40, 60, 80), (sx, bar_y, seg_w, seg_h), 1, border_radius=3)
         plus_r = pygame.Rect(seg0 + bar_w + btn_gap, bar_y, btn_w, seg_h)
         self._btn_rects['set_vol_up'] = plus_r
         pc = CYAN if self._hover_btn == 'set_vol_up' else (80, 120, 160)
-        pygame.draw.rect(self.screen, (20, 36, 56), plus_r, border_radius=6)
-        pygame.draw.rect(self.screen, pc, plus_r, 2, border_radius=6)
+        pygame.draw.rect(self.screen, (20, 36, 56), plus_r, border_radius=5)
+        pygame.draw.rect(self.screen, pc, plus_r, 2, border_radius=5)
         pt = self.font_b.render('+', True, pc)
         self.screen.blit(pt, pt.get_rect(center=(plus_r.centerx, plus_r.centery + 2)))
-
         pct = self.font_s.render(f'{round(self._volume * 100)}%', True, (100, 120, 140))
-        self.screen.blit(pct, (plus_r.right + 10, bar_y + 6))
+        self.screen.blit(pct, (plus_r.right + 8, bar_y + 4))
 
         # ── Divider ───────────────────────────────────────────────────────────
-        pygame.draw.line(self.screen, (30, 50, 80), (60, 152), (SCREEN_WIDTH - 60, 152))
+        pygame.draw.line(self.screen, (30, 50, 80), (30, 140), (SCREEN_WIDTH - 30, 140))
 
-        ct = self.font_s.render('CONTROLS', True, (170, 170, 170))
-        ctr(ct, 176)
-
+        # ── Two columns ───────────────────────────────────────────────────────
         c1, c2 = SCREEN_WIDTH // 4, 3 * SCREEN_WIDTH // 4
-        lbl_pc   = self.font_s.render('PC / Keyboard', True, CYAN)
-        lbl_ph   = self.font_s.render('Phone / Touch',  True, CYAN)
-        self.screen.blit(lbl_pc, lbl_pc.get_rect(center=(c1, 200)))
-        self.screen.blit(lbl_ph, lbl_ph.get_rect(center=(c2, 200)))
+        pygame.draw.line(self.screen, (30, 50, 80), (SCREEN_WIDTH//2, 138), (SCREEN_WIDTH//2, 530))
 
-        pygame.draw.line(self.screen, (30, 50, 80), (SCREEN_WIDTH//2, 188), (SCREEN_WIDTH//2, 440))
+        # PC Controls heading
+        lpc = self.font_s.render('PC CONTROLS  (click to rebind)', True, CYAN)
+        self.screen.blit(lpc, lpc.get_rect(center=(c1, 158)))
 
-        pc_rows = [('Move',  '← → ↑ ↓   /   W A S D'),
-                   ('Fire',  'SPACE  /  Z  /  X'),
-                   ('Pause', 'ESC')]
-        ph_rows = [('Move',  'Joystick (left half)'),
-                   ('Fire',  'Button (bottom right)'),
-                   ('Pause', 'Button (top center)')]
-        for i, ((a1, k1), (a2, k2)) in enumerate(zip(pc_rows, ph_rows)):
-            y = 232 + i * 62
-            for cx, a, k in ((c1, a1, k1), (c2, a2, k2)):
-                al = self.font_s.render(a, True, (80, 100, 120))
-                kl = self.font_s.render(k, True, (180, 210, 230))
-                self.screen.blit(al, al.get_rect(center=(cx, y)))
-                self.screen.blit(kl, kl.get_rect(center=(cx, y + 22)))
+        # Key binding rows
+        actions = [('up','↑  Up'),('down','↓  Down'),('left','←  Left'),('right','→  Right'),('fire','🔥  Fire')]
+        row_h = 50; row_y = 176
+        for i, (a, label) in enumerate(actions):
+            y = row_y + i * row_h
+            active = self._rebind_action == a
+            al = self.font_s.render(label, True, (255, 200, 60) if active else (100, 130, 160))
+            self.screen.blit(al, (30, y + 8))
+            bw, bh, bx = 100, 28, c1 + 10
+            br = pygame.Rect(bx, y + 2, bw, bh)
+            self._btn_rects['set_bind_' + a] = br
+            pygame.draw.rect(self.screen, (60, 40, 0) if active else (20, 36, 56), br, border_radius=5)
+            pygame.draw.rect(self.screen, (255, 200, 60) if active else (60, 80, 110), br, 2, border_radius=5)
+            key_label = 'PRESS KEY...' if active else pygame.key.name(self._bindings[a]).upper()
+            kl = self.font_s.render(key_label, True, (255, 200, 60) if active else (180, 210, 230))
+            self.screen.blit(kl, kl.get_rect(center=br.center))
 
-        pygame.draw.line(self.screen, (30, 50, 80), (60, 448), (SCREEN_WIDTH - 60, 448))
+        # Reset button
+        rb_y = row_y + len(actions) * row_h + 4
+        rb = pygame.Rect(30, rb_y, c1 * 2 - 60, 24)
+        self._btn_rects['set_bind_reset'] = rb
+        rc = (170, 80, 60) if self._hover_btn == 'set_bind_reset' else (80, 50, 40)
+        pygame.draw.rect(self.screen, (25, 10, 10), rb, border_radius=4)
+        pygame.draw.rect(self.screen, rc, rb, 1, border_radius=4)
+        rl = self.font_s.render('↺ Reset to defaults', True, rc)
+        self.screen.blit(rl, rl.get_rect(center=rb.center))
+
+        # Phone Controls heading
+        lph = self.font_s.render('PHONE CONTROLS', True, CYAN)
+        self.screen.blit(lph, lph.get_rect(center=(c2, 158)))
+
+        # Joystick size slider
+        jlvl = round((self._joy_scale - 0.5) / 0.1)
+        jsegs = round((2.0 - 0.5) / 0.1) + 1
+        jsw, jsh, jsg = 14, 20, 3
+        jtw = jsegs * jsw + (jsegs - 1) * jsg
+        jbw = 26; jbg = 6
+        jx0 = SCREEN_WIDTH // 2 + (SCREEN_WIDTH // 2 - jbw - jbg - jtw - jbg - jbw) // 2
+        jy = 178
+        jl = self.font_s.render('Joystick size', True, (170, 170, 170))
+        self.screen.blit(jl, jl.get_rect(midright=(jx0 - 4, jy + jsh // 2)))
+        jmr = pygame.Rect(jx0, jy, jbw, jsh)
+        self._btn_rects['set_joy_down'] = jmr
+        jmc = CYAN if self._hover_btn == 'set_joy_down' else (80, 120, 160)
+        pygame.draw.rect(self.screen, (20, 36, 56), jmr, border_radius=4)
+        pygame.draw.rect(self.screen, jmc, jmr, 2, border_radius=4)
+        jmt = self.font_b.render('-', True, jmc)
+        self.screen.blit(jmt, jmt.get_rect(center=(jmr.centerx, jmr.centery + 2)))
+        jseg0 = jx0 + jbw + jbg
+        for i in range(jsegs):
+            sx = jseg0 + i * (jsw + jsg)
+            on = i <= jlvl
+            pygame.draw.rect(self.screen, (30, 160, 90) if on else (20, 36, 56), (sx, jy, jsw, jsh), border_radius=2)
+            pygame.draw.rect(self.screen, (20, 120, 60) if on else (40, 60, 80), (sx, jy, jsw, jsh), 1, border_radius=2)
+        jpr = pygame.Rect(jseg0 + jtw + jbg, jy, jbw, jsh)
+        self._btn_rects['set_joy_up'] = jpr
+        jpc = CYAN if self._hover_btn == 'set_joy_up' else (80, 120, 160)
+        pygame.draw.rect(self.screen, (20, 36, 56), jpr, border_radius=4)
+        pygame.draw.rect(self.screen, jpc, jpr, 2, border_radius=4)
+        jpt = self.font_b.render('+', True, jpc)
+        self.screen.blit(jpt, jpt.get_rect(center=(jpr.centerx, jpr.centery + 2)))
+        jpct = self.font_s.render(f'{round(self._joy_scale*100)}%', True, (100, 120, 140))
+        self.screen.blit(jpct, (jpr.right + 6, jy + 2))
+
+        # Phone hints
+        ph_rows = [('Move', 'Joystick (left half)'), ('Fire', 'Button (bottom right)'), ('Pause', 'Button (top center)')]
+        for i, (a, k) in enumerate(ph_rows):
+            y = 216 + i * 52
+            al = self.font_s.render(a, True, (80, 100, 120))
+            kl = self.font_s.render(k, True, (180, 210, 230))
+            self.screen.blit(al, al.get_rect(center=(c2, y)))
+            self.screen.blit(kl, kl.get_rect(center=(c2, y + 22)))
+
+        pygame.draw.line(self.screen, (30, 50, 80), (30, 534), (SCREEN_WIDTH - 30, 534))
         h1 = self.font_s.render('Unlock all levels — keyboard: type  lavelall', True, (60, 80, 100))
-        h2 = self.font_s.render('Unlock all levels — phone: tap title × 7',     True, (60, 80, 100))
-        ctr(h1, 470); ctr(h2, 494)
+        h2 = self.font_s.render('Unlock all levels — phone: tap title × 7', True, (60, 80, 100))
+        ctr(h1, 552); ctr(h2, 574)
 
     def _draw_menu(self):
         self._btn_rects.clear()
@@ -1921,6 +1984,15 @@ class Game:
                 if event.type == pygame.QUIT: pygame.quit(); raise SystemExit
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_q: pygame.quit(); raise SystemExit
+
+                    # Rebind capture — intercepts all keys while waiting
+                    if self._rebind_action is not None:
+                        if event.key != pygame.K_ESCAPE:
+                            self._bindings[self._rebind_action] = event.key
+                            self._save_bindings()
+                            self.sounds.play('ui_click')
+                        self._rebind_action = None
+                        continue
 
                     # DEL hold — works from menu and level select
                     if event.key == pygame.K_DELETE and self.state in ('menu', 'level_select'):
@@ -2092,7 +2164,7 @@ class Game:
                 continue
 
             if self.state == 'playing':
-                keys = _MergedKeys(pygame.key.get_pressed(), self._touch.pressed)
+                keys = _MergedKeys(pygame.key.get_pressed(), self._touch.pressed, self._bindings)
                 self.player.update(keys)
                 if self.player.just_shot: self.sounds.play('shoot')
 
@@ -2217,6 +2289,65 @@ class Game:
                 return int(json.load(f).get('max_unlocked', 0))
         except Exception:
             return 0
+
+    _DEFAULT_BINDINGS = {'up': pygame.K_UP, 'down': pygame.K_DOWN,
+                         'left': pygame.K_LEFT, 'right': pygame.K_RIGHT,
+                         'fire': pygame.K_SPACE}
+
+    def _load_bindings(self) -> dict:
+        try:
+            with open(self._save_path) as f:
+                raw = json.load(f).get('bindings', {})
+            result = dict(self._DEFAULT_BINDINGS)
+            for action, kname in raw.items():
+                try:
+                    result[action] = pygame.key.key_code(kname)
+                except Exception:
+                    pass
+            return result
+        except Exception:
+            return dict(self._DEFAULT_BINDINGS)
+
+    def _save_bindings(self):
+        try:
+            data = {}
+            try:
+                with open(self._save_path) as f:
+                    data = json.load(f)
+            except Exception:
+                pass
+            data['bindings'] = {a: pygame.key.name(k) for a, k in self._bindings.items()}
+            with open(self._save_path, 'w') as f:
+                json.dump(data, f)
+        except Exception:
+            pass
+
+    def _load_joy_scale(self) -> float:
+        try:
+            with open(self._save_path) as f:
+                return float(json.load(f).get('joy_scale', 1.0))
+        except Exception:
+            return 1.0
+
+    def _save_joy_scale(self):
+        try:
+            data = {}
+            try:
+                with open(self._save_path) as f:
+                    data = json.load(f)
+            except Exception:
+                pass
+            data['joy_scale'] = round(self._joy_scale, 1)
+            with open(self._save_path, 'w') as f:
+                json.dump(data, f)
+        except Exception:
+            pass
+
+    def _apply_joy_scale(self):
+        s = self._joy_scale
+        self._touch.JOY_BASE_R = round(80 * s)
+        self._touch.JOY_NUB_R  = round(28 * s)
+        self._touch.JOY_MAX_R  = round(55 * s)
 
     def _load_volume(self) -> float:
         try:
@@ -2424,6 +2555,7 @@ class Game:
 
         if self.state == 'settings':
             if name == 'set_back':
+                self._rebind_action = None
                 self.state = 'menu'
             elif name == 'set_vol_down':
                 self._volume = max(0.0, round(self._volume - 0.1, 2))
@@ -2433,6 +2565,20 @@ class Game:
                 self._volume = min(1.0, round(self._volume + 0.1, 2))
                 self.sounds.set_master_volume(self._volume)
                 self._save_volume()
+            elif name == 'set_joy_down':
+                self._joy_scale = max(0.5, round(self._joy_scale - 0.1, 1))
+                self._apply_joy_scale(); self._save_joy_scale()
+            elif name == 'set_joy_up':
+                self._joy_scale = min(2.0, round(self._joy_scale + 0.1, 1))
+                self._apply_joy_scale(); self._save_joy_scale()
+            elif name == 'set_bind_reset':
+                self._bindings = dict(self._DEFAULT_BINDINGS)
+                self._save_bindings(); self._rebind_action = None
+            else:
+                for a in ('up', 'down', 'left', 'right', 'fire'):
+                    if name == 'set_bind_' + a:
+                        self._rebind_action = None if self._rebind_action == a else a
+                        break
             return
 
         if self.state == 'menu':
