@@ -8,7 +8,7 @@ source.include_exts = py,json,png,jpg,wav,ogg
 version = 1.0
 
 # Python + pygame-ce (community edition — best Android support)
-requirements = python3==3.11.0,pygame-ce
+requirements = python3,pygame
 
 orientation = landscape
 fullscreen = 1
