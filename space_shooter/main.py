@@ -548,7 +548,6 @@ class Enemy:
 #  MINI-BOSS — Marauder
 # ══════════════════════════════════════════════════════════════════════════════
 class MiniBoss:
-    INVULN_FRAMES = 240   # 4 s at 60 fps
 
     def __init__(self):
         self.x = float(SCREEN_WIDTH + 80)
@@ -562,11 +561,8 @@ class MiniBoss:
         self.move_timer  = 0.0
         self._target_x   = SCREEN_WIDTH * 0.68
         self.entering    = True
-        self.invuln_timer = self.INVULN_FRAMES
 
     def update(self, time_scale=1.0, effects=None):
-        if self.invuln_timer > 0 and not self.entering:
-            self.invuln_timer = max(0, self.invuln_timer - time_scale)
         if self.x > self._target_x:
             self.x -= 3.5 * time_scale
         else:
@@ -586,8 +582,6 @@ class MiniBoss:
         self.bullets = [b for b in self.bullets if b.active]
 
     def take_hit(self) -> bool:
-        if self.invuln_timer > 0:
-            return False   # invulnerable — ignore hit
         self.hp -= 1
         return self.hp <= 0
 
@@ -596,13 +590,6 @@ class MiniBoss:
 
     def draw(self, surf):
         x, y = int(self.x), int(self.y)
-        # Shield glow while invulnerable
-        if self.invuln_timer > 0:
-            alpha = int(120 * (self.invuln_timer / self.INVULN_FRAMES))
-            pulse = int(8 * abs(math.sin(self.invuln_timer * 0.15)))
-            s = pygame.Surface((110 + pulse*2, 110 + pulse*2), pygame.SRCALPHA)
-            pygame.draw.ellipse(s, (80, 180, 255, alpha), s.get_rect())
-            surf.blit(s, (x - 55 - pulse, y - 55 - pulse))
         pygame.draw.polygon(surf, (150,120,0), [(x-36,y-10),(x-8,y-38),(x+22,y-10)])
         pygame.draw.polygon(surf, (150,120,0), [(x-36,y+10),(x-8,y+38),(x+22,y+10)])
         pygame.draw.ellipse(surf, GOLD,   (x-36,y-23,72,46))
@@ -648,11 +635,8 @@ class Boss:
         self.laser_active= False
         self.laser_timer = 0.0
         self.laser_cd    = 0.0
-        self.invuln_timer = self.INVULN_FRAMES
 
     def update(self, time_scale=1.0, effects=None):
-        if self.invuln_timer > 0 and not self.entering:
-            self.invuln_timer = max(0, self.invuln_timer - time_scale)
         if self.x > self._target_x:
             self.x -= 2.5 * time_scale
         else:
@@ -686,8 +670,6 @@ class Boss:
         self.bullets = [b for b in self.bullets if b.active]
 
     def take_hit(self) -> bool:
-        if self.invuln_timer > 0:
-            return False
         self.hp -= 1
         return self.hp <= 0
 
@@ -703,13 +685,6 @@ class Boss:
 
     def draw(self, surf):
         x, y = int(self.x), int(self.y)
-        # Shield glow while invulnerable
-        if self.invuln_timer > 0:
-            alpha = int(130 * (self.invuln_timer / self.INVULN_FRAMES))
-            pulse = int(10 * abs(math.sin(self.invuln_timer * 0.13)))
-            s = pygame.Surface((150 + pulse*2, 120 + pulse*2), pygame.SRCALPHA)
-            pygame.draw.ellipse(s, (80, 180, 255, alpha), s.get_rect())
-            surf.blit(s, (x - 75 - pulse, y - 60 - pulse))
         lr = self.get_laser_rect()
         if lr:
             flickering = self.laser_timer > self.LASER_DURATION-20 or self.laser_timer < 20
@@ -773,7 +748,6 @@ class FinalBoss:
         self.move_timer  = 0.0
         self._target_x   = SCREEN_WIDTH * 0.73
         self.entering    = True
-        self.invuln_timer = self.INVULN_FRAMES
         # Two lasers max (was 3) — reduces per-frame work
         self._lasers = [
             [False, 0.0, 0.0, -22],
@@ -797,8 +771,6 @@ class FinalBoss:
         pass  # phase is now a computed property
 
     def update(self, time_scale=1.0, effects=None):
-        if self.invuln_timer > 0 and not self.entering:
-            self.invuln_timer = max(0, self.invuln_timer - time_scale)
         if self.x > self._target_x:
             self.x -= 2.0 * time_scale
         else:
@@ -860,8 +832,6 @@ class FinalBoss:
         self.bullets = [b for b in self.bullets if b.active]
 
     def take_hit(self) -> bool:
-        if self.invuln_timer > 0:
-            return False
         self.hp -= 1
         self._update_phase()
         return self.hp <= 0
@@ -879,14 +849,6 @@ class FinalBoss:
     def draw(self, surf):
         x, y = int(self.x), int(self.y)
         mt = self.move_timer
-
-        # Shield glow while invulnerable
-        if self.invuln_timer > 0:
-            alpha = int(140 * (self.invuln_timer / self.INVULN_FRAMES))
-            pulse = int(14 * abs(math.sin(self.invuln_timer * 0.12)))
-            s = pygame.Surface((200 + pulse*2, 160 + pulse*2), pygame.SRCALPHA)
-            pygame.draw.ellipse(s, (80, 180, 255, alpha), s.get_rect())
-            surf.blit(s, (x - 100 - pulse, y - 80 - pulse))
 
         # Draw laser beams
         for laser in self._lasers:
@@ -1950,24 +1912,17 @@ class Game:
             lbl = self.font_s.render(label, True, text_col)
             self.screen.blit(lbl, lbl.get_rect(center=rect.center))
 
-        # DEL hold-to-reset indicator (same as level select screen)
+        # DEL hold-to-wipe all data
         if self._del_hold > 0:
             prog = min(1.0, self._del_hold / DEL_HOLD_FRAMES)
-            bar_w, bar_h = 280, 12
+            bar_w, bar_h = 300, 8
             bx = SCREEN_WIDTH//2 - bar_w//2
-            by = SCREEN_HEIGHT - 65
-            pygame.draw.rect(self.screen, DARK_GRAY, (bx, by, bar_w, bar_h), border_radius=4)
-            pygame.draw.rect(self.screen, RED,       (bx, by, int(bar_w * prog), bar_h), border_radius=4)
-            pygame.draw.rect(self.screen, GRAY,      (bx, by, bar_w, bar_h), 1, border_radius=4)
-            del_txt = self.font_s.render("Hold DEL to reset progress...", True, RED)
-            self.screen.blit(del_txt, del_txt.get_rect(center=(SCREEN_WIDTH//2, by - 14)))
-        elif self._del_wipe_confirm > 0:
-            self._del_wipe_confirm -= 1
-            conf = self.font.render("Progress reset!", True, GREEN)
-            self.screen.blit(conf, conf.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT - 68)))
+            by = SCREEN_HEIGHT - 16
+            pygame.draw.rect(self.screen, (40, 10, 10), (bx, by, bar_w, bar_h), border_radius=4)
+            pygame.draw.rect(self.screen, RED,          (bx, by, int(bar_w * prog), bar_h), border_radius=4)
 
-        hint = self.font_s.render("Click to choose mode    DEL — reset progress", True, GRAY)
-        ctr(hint, SCREEN_HEIGHT - 40)
+        hint = self.font_s.render("Удерживай DEL ~2с — сбросить все данные", True, (50, 60, 70))
+        ctr(hint, SCREEN_HEIGHT - 22)
 
     # ── main loop ─────────────────────────────────────────────────────────────
     async def run(self):
@@ -2134,12 +2089,10 @@ class Game:
                 continue
 
             if self.state == 'menu':
-                # DEL hold-to-wipe detection
                 if self._del_key_held:
                     self._del_hold += 1
                     if self._del_hold >= DEL_HOLD_FRAMES:
-                        self._wipe_progress()
-                        self._del_key_held = False
+                        self._wipe_all_data()
                 self._draw_menu()
                 pygame.display.flip(); self.clock.tick(FPS)
                 await asyncio.sleep(0)
@@ -2391,11 +2344,32 @@ class Game:
         self._ls_cursor        = 0
         self._del_hold         = 0
         self._del_key_held     = False
-        self._del_wipe_confirm = 150  # show "Progress reset!" banner for 2.5 s
+        self._del_wipe_confirm = 150
         self.sounds.play('wipe')
         try:
             with open(self._save_path, 'w') as f:
                 json.dump({'max_unlocked': 0}, f)
+        except Exception:
+            pass
+
+    def _wipe_all_data(self):
+        """Erase ALL data: progress + volume + bindings + joystick scale."""
+        self._max_unlocked  = 0
+        self._ls_cursor     = 0
+        self._del_hold      = 0
+        self._del_key_held  = False
+        self._volume        = 0.7
+        self._bindings      = dict(self._DEFAULT_BINDINGS)
+        self._joy_scale     = 1.0
+        self._apply_joy_scale()
+        self.sounds.set_master_volume(self._volume)
+        self._cheat_msg     = '✓ ВСЕ ДАННЫЕ СБРОШЕНЫ'
+        self._cheat_timer   = 200
+        self.sounds.play('wipe')
+        try:
+            with open(self._save_path, 'w') as f:
+                json.dump({'max_unlocked': 0, 'volume': 0.7,
+                           'bindings': {}, 'joy_scale': 1.0}, f)
         except Exception:
             pass
 
