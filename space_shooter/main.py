@@ -1146,6 +1146,7 @@ class Game:
         self.sounds.set_master_volume(self._volume)
         self._bindings         = self._load_bindings()
         self._rebind_action    = None
+        self._wipe_confirm     = False
         self._joy_scale        = self._load_joy_scale()
         self._apply_joy_scale()
         self._cheat_buf        = ''
@@ -1834,9 +1835,31 @@ class Game:
             self.screen.blit(kl, kl.get_rect(center=(c2, y + 22)))
 
         pygame.draw.line(self.screen, (30, 50, 80), (30, 534), (SCREEN_WIDTH - 30, 534))
-        h1 = self.font_s.render('Unlock all levels — keyboard: type  lavelall', True, (60, 80, 100))
-        h2 = self.font_s.render('Unlock all levels — phone: tap title × 7', True, (60, 80, 100))
-        ctr(h1, 552); ctr(h2, 574)
+        h1 = self.font_s.render('Unlock all levels — keyboard: lavelall   |   phone: tap title × 7', True, (60, 80, 100))
+        ctr(h1, 549)
+        # Wipe all data button / confirmation
+        if self._wipe_confirm:
+            q = self.font_s.render('Сбросить ВСЕ данные?', True, (200, 100, 70))
+            ctr(q, 566)
+            yr = pygame.Rect(SCREEN_WIDTH//2 - 122, 572, 112, 26)
+            nr = pygame.Rect(SCREEN_WIDTH//2 + 10,  572, 112, 26)
+            self._btn_rects['set_wipe_yes'] = yr
+            self._btn_rects['set_wipe_no']  = nr
+            pygame.draw.rect(self.screen, (100, 20, 10), yr, border_radius=5)
+            pygame.draw.rect(self.screen, (220, 60, 40), yr, 2, border_radius=5)
+            yl = self.font_s.render('✓ ДА, СБРОСИТЬ', True, (255, 130, 100))
+            self.screen.blit(yl, yl.get_rect(center=yr.center))
+            pygame.draw.rect(self.screen, (15, 35, 20), nr, border_radius=5)
+            pygame.draw.rect(self.screen, (60, 160, 80), nr, 2, border_radius=5)
+            nl = self.font_s.render('✗ ОТМЕНА', True, (100, 200, 120))
+            self.screen.blit(nl, nl.get_rect(center=nr.center))
+        else:
+            wr = pygame.Rect(SCREEN_WIDTH//2 - 112, 560, 224, 28)
+            self._btn_rects['set_wipe'] = wr
+            pygame.draw.rect(self.screen, (35, 10, 10), wr, border_radius=5)
+            pygame.draw.rect(self.screen, (90, 45, 35), wr, 1, border_radius=5)
+            wl = self.font_s.render('🗑  Сбросить все данные', True, (130, 70, 55))
+            self.screen.blit(wl, wl.get_rect(center=wr.center))
 
     def _draw_menu(self):
         self._btn_rects.clear()
@@ -2530,6 +2553,7 @@ class Game:
         if self.state == 'settings':
             if name == 'set_back':
                 self._rebind_action = None
+                self._wipe_confirm = False
                 self.state = 'menu'
             elif name == 'set_vol_down':
                 self._volume = max(0.0, round(self._volume - 0.1, 2))
@@ -2548,6 +2572,13 @@ class Game:
             elif name == 'set_bind_reset':
                 self._bindings = dict(self._DEFAULT_BINDINGS)
                 self._save_bindings(); self._rebind_action = None
+            elif name == 'set_wipe':
+                self._wipe_confirm = True
+            elif name == 'set_wipe_no':
+                self._wipe_confirm = False
+            elif name == 'set_wipe_yes':
+                self._wipe_confirm = False
+                self._wipe_all_data()
             else:
                 for a in ('up', 'down', 'left', 'right', 'fire'):
                     if name == 'set_bind_' + a:
