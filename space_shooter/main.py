@@ -582,6 +582,7 @@ class MiniBoss:
         self.bullets = [b for b in self.bullets if b.active]
 
     def take_hit(self) -> bool:
+        if self.entering: return False
         self.hp -= 1
         return self.hp <= 0
 
@@ -590,6 +591,12 @@ class MiniBoss:
 
     def draw(self, surf):
         x, y = int(self.x), int(self.y)
+        if self.entering:
+            t = pygame.time.get_ticks()
+            alpha = int(128 + 80 * math.sin(t * 0.01))
+            sh = pygame.Surface((104, 72), pygame.SRCALPHA)
+            pygame.draw.ellipse(sh, (80, 180, 255, alpha), (0, 0, 104, 72))
+            surf.blit(sh, (x - 52, y - 36))
         pygame.draw.polygon(surf, (150,120,0), [(x-36,y-10),(x-8,y-38),(x+22,y-10)])
         pygame.draw.polygon(surf, (150,120,0), [(x-36,y+10),(x-8,y+38),(x+22,y+10)])
         pygame.draw.ellipse(surf, GOLD,   (x-36,y-23,72,46))
@@ -670,6 +677,7 @@ class Boss:
         self.bullets = [b for b in self.bullets if b.active]
 
     def take_hit(self) -> bool:
+        if self.entering: return False
         self.hp -= 1
         return self.hp <= 0
 
@@ -685,6 +693,12 @@ class Boss:
 
     def draw(self, surf):
         x, y = int(self.x), int(self.y)
+        if self.entering:
+            t = pygame.time.get_ticks()
+            alpha = int(128 + 80 * math.sin(t * 0.01))
+            sh = pygame.Surface((152, 104), pygame.SRCALPHA)
+            pygame.draw.ellipse(sh, (80, 180, 255, alpha), (0, 0, 152, 104))
+            surf.blit(sh, (x - 76, y - 52))
         lr = self.get_laser_rect()
         if lr:
             flickering = self.laser_timer > self.LASER_DURATION-20 or self.laser_timer < 20
@@ -832,6 +846,7 @@ class FinalBoss:
         self.bullets = [b for b in self.bullets if b.active]
 
     def take_hit(self) -> bool:
+        if self.entering: return False
         self.hp -= 1
         self._update_phase()
         return self.hp <= 0
@@ -849,6 +864,12 @@ class FinalBoss:
     def draw(self, surf):
         x, y = int(self.x), int(self.y)
         mt = self.move_timer
+        if self.entering:
+            t = pygame.time.get_ticks()
+            alpha = int(128 + 80 * math.sin(t * 0.01))
+            sh = pygame.Surface((200, 136), pygame.SRCALPHA)
+            pygame.draw.ellipse(sh, (80, 180, 255, alpha), (0, 0, 200, 136))
+            surf.blit(sh, (x - 100, y - 68))
 
         # Draw laser beams
         for laser in self._lasers:
@@ -1935,7 +1956,7 @@ class Game:
             lbl = self.font_s.render(label, True, text_col)
             self.screen.blit(lbl, lbl.get_rect(center=rect.center))
 
-        # DEL hold-to-wipe all data
+        # DEL hold-to-wipe all data (PC)
         if self._del_hold > 0:
             prog = min(1.0, self._del_hold / DEL_HOLD_FRAMES)
             bar_w, bar_h = 300, 8
@@ -1946,6 +1967,32 @@ class Game:
 
         hint = self.font_s.render("Удерживай DEL ~2с — сбросить все данные", True, (50, 60, 70))
         ctr(hint, SCREEN_HEIGHT - 22)
+
+        # Trash button (always visible — easy to reach on phone)
+        if not self._wipe_confirm:
+            wr = pygame.Rect(8, 9, 42, 28)
+            self._btn_rects['m_wipe'] = wr
+            pygame.draw.rect(self.screen, (60, 15, 15), wr, border_radius=6)
+            pygame.draw.rect(self.screen, (120, 40, 40), wr, 1, border_radius=6)
+            lbl = self.font_s.render('\U0001f5d1', True, (220, 80, 80))
+            self.screen.blit(lbl, lbl.get_rect(center=wr.center))
+        else:
+            # Confirmation overlay
+            overlay = pygame.Surface((SCREEN_WIDTH, 52), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 190))
+            self.screen.blit(overlay, (0, SCREEN_HEIGHT - 60))
+            q = self.font_s.render('Сбросить ВСЕ данные?', True, (255, 140, 140))
+            self.screen.blit(q, q.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT - 48)))
+            yr = pygame.Rect(SCREEN_WIDTH//2 - 120, SCREEN_HEIGHT - 32, 108, 24)
+            nr = pygame.Rect(SCREEN_WIDTH//2 + 12,  SCREEN_HEIGHT - 32, 108, 24)
+            self._btn_rects['m_wipe_yes'] = yr
+            self._btn_rects['m_wipe_no']  = nr
+            pygame.draw.rect(self.screen, (120, 20, 20), yr, border_radius=5)
+            pygame.draw.rect(self.screen, (20, 90, 20),  nr, border_radius=5)
+            yes_l = self.font_s.render('ДА, СБРОСИТЬ', True, WHITE)
+            no_l  = self.font_s.render('ОТМЕНА', True, WHITE)
+            self.screen.blit(yes_l, yes_l.get_rect(center=yr.center))
+            self.screen.blit(no_l,  no_l.get_rect(center=nr.center))
 
     # ── main loop ─────────────────────────────────────────────────────────────
     async def run(self):
@@ -2587,8 +2634,14 @@ class Game:
             return
 
         if self.state == 'menu':
+            if name == 'm_wipe':
+                self._wipe_confirm = True; return
+            if name == 'm_wipe_no':
+                self._wipe_confirm = False; return
+            if name == 'm_wipe_yes':
+                self._wipe_confirm = False; self._wipe_all_data(); return
             if name == 'menu_settings':
-                self.state = 'settings'; return
+                self._wipe_confirm = False; self.state = 'settings'; return
             if name == 'menu_title':
                 import time as _t
                 now = _t.time()
