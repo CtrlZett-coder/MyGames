@@ -12,6 +12,13 @@ try:
 except ImportError:
     _HAS_NUMPY = False
 
+# ─── Android detection ────────────────────────────────────────────────────────
+try:
+    import android        # only present inside a buildozer APK
+    _ANDROID = True
+except ImportError:
+    _ANDROID = False
+
 # ─── Constants ────────────────────────────────────────────────────────────────
 SCREEN_WIDTH    = 900
 SCREEN_HEIGHT   = 600
@@ -1140,7 +1147,11 @@ class Game:
     def __init__(self):
         pygame.init()
         pygame.display.set_caption("Space Shooter")
-        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+        if _ANDROID:
+            # Full-screen on Android; logical game surface stays 900×600
+            self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+        else:
+            self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         self.game_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         self.clock  = pygame.time.Clock()
         self.font   = pygame.font.Font(None, 36)
@@ -1155,7 +1166,13 @@ class Game:
         self._ls_cursor = 0    # level-select grid cursor (0-19)
         self._pause_sel = 0    # 0=Resume  1=Main Menu
         self._pause_surf: pygame.Surface | None = None
-        self._save_path = os.path.join(os.path.dirname(__file__), 'save.json')
+        if _ANDROID:
+            # Android writable storage (app-private)
+            from android.storage import app_storage_path  # type: ignore
+            _data_dir = app_storage_path()
+        else:
+            _data_dir = os.path.dirname(os.path.abspath(__file__))
+        self._save_path = os.path.join(_data_dir, 'save.json')
         self._max_unlocked = self._load_save()
         self._btn_rects: dict  = {}   # button_name → pygame.Rect
         self._hover_btn: str   = ''   # currently hovered button key
@@ -2259,9 +2276,18 @@ class Game:
             for ex in self.explosions: ex.draw(self.game_surf)
             self.player.draw(self.game_surf)
 
-            # ── Blit game_surf with shake offset ──────────────────────────────
+            # ── Blit game_surf with shake offset (scale to fill screen on Android)
             self.screen.fill(BLACK)
-            self.screen.blit(self.game_surf, self.effects.shake_offset)
+            if _ANDROID:
+                sw, sh = self.screen.get_size()
+                scale = min(sw / SCREEN_WIDTH, sh / SCREEN_HEIGHT)
+                scaled_w, scaled_h = int(SCREEN_WIDTH * scale), int(SCREEN_HEIGHT * scale)
+                ox = (sw - scaled_w) // 2 + self.effects.shake_offset[0]
+                oy = (sh - scaled_h) // 2 + self.effects.shake_offset[1]
+                scaled = pygame.transform.scale(self.game_surf, (scaled_w, scaled_h))
+                self.screen.blit(scaled, (ox, oy))
+            else:
+                self.screen.blit(self.game_surf, self.effects.shake_offset)
 
             # ── HUD and overlays drawn directly to screen (no shake) ──────────
             if self.state in ('playing', 'level_complete', 'victory', 'game_over'):
