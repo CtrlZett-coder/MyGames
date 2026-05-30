@@ -177,18 +177,20 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            git zip unzip python3-pip \
+            git zip unzip openjdk-17-jdk python3-pip \
             autoconf libtool pkg-config zlib1g-dev \
             libncurses-dev cmake libffi-dev libssl-dev \
             libltdl-dev
+          sudo update-java-alternatives --set java-1.17.0-openjdk-amd64 2>/dev/null || true
           pip install --upgrade buildozer cython
+          java -version
 
       - name: Configure Android SDK/NDK for buildozer
         run: |
           SDK="$ANDROID_HOME"
           echo "System SDK: $SDK"
-          echo "Build-tools available: $(ls $SDK/build-tools/ 2>/dev/null | tr '\n' ' ')"
-          echo "NDK available: $(ls $SDK/ndk/ 2>/dev/null | tr '\n' ' ')"
+          echo "Build-tools: $(ls $SDK/build-tools/ 2>/dev/null | tr '\n' ' ')"
+          echo "NDK: $(ls $SDK/ndk/ 2>/dev/null | tr '\n' ' ')"
 
           # Install NDK 25b if not present
           NDK=$(ls -d "$SDK/ndk/25."* 2>/dev/null | sort -V | tail -1)
@@ -204,16 +206,13 @@ jobs:
           fi
 
           # buildozer/p4a looks for sdkmanager at old path tools/bin/sdkmanager
-          # GitHub Actions SDK has it at cmdline-tools/latest/bin/sdkmanager
           mkdir -p "$SDK/tools/bin"
           ln -sf "$SDK/cmdline-tools/latest/bin/sdkmanager" "$SDK/tools/bin/sdkmanager"
-          echo "sdkmanager symlink: $(ls -la $SDK/tools/bin/sdkmanager)"
 
           # Insert sdk_path + ndk_path into [app] section (before [buildozer] header)
           for SPEC in space_shooter/buildozer.spec red_ball/buildozer.spec; do
             sed -i "s|^\[buildozer\]|android.sdk_path = $SDK\nandroid.ndk_path = $NDK\n\n[buildozer]|" "$SPEC"
           done
-          echo "Updated specs:"
           grep -E "sdk_path|ndk_path" space_shooter/buildozer.spec
 
       - name: Cache p4a build artifacts
@@ -225,15 +224,11 @@ jobs:
 
       - name: Build Space Shooter APK with buildozer
         working-directory: space_shooter
-        run: |
-          set -o pipefail
-          buildozer android debug 2>&1 | tail -100
+        run: buildozer android debug 2>&1
 
       - name: Build Red Ball APK with buildozer
         working-directory: red_ball
-        run: |
-          set -o pipefail
-          buildozer android debug 2>&1 | tail -100
+        run: buildozer android debug 2>&1
 
       - name: Copy APKs into web output
         run: |
