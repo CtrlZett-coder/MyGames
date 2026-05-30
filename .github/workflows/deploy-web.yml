@@ -329,7 +329,6 @@ jobs:
 
           gh release create "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
-            --tag-name "$TAG" \
             --title "$TITLE" \
             --notes "$NOTES" \
             --latest \
