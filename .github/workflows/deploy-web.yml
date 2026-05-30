@@ -177,18 +177,43 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            git zip unzip openjdk-17-jdk python3-pip \
+            git zip unzip python3-pip \
             autoconf libtool pkg-config zlib1g-dev \
             libncurses-dev cmake libffi-dev libssl-dev \
             libltdl-dev
           pip install --upgrade buildozer cython
 
-      - name: Cache buildozer global dir
+      - name: Configure Android SDK/NDK for buildozer
+        run: |
+          SDK="$ANDROID_HOME"
+          echo "System SDK: $SDK"
+          echo "Build-tools available: $(ls $SDK/build-tools/ 2>/dev/null | tr '\n' ' ')"
+          echo "NDK available: $(ls $SDK/ndk/ 2>/dev/null | tr '\n' ' ')"
+
+          # Install NDK 25b if not present
+          NDK=$(ls -d "$SDK/ndk/25."* 2>/dev/null | sort -V | tail -1)
+          if [ -z "$NDK" ]; then
+            yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" "ndk;25.1.8937393" 2>&1 | tail -5 || true
+            NDK="$SDK/ndk/25.1.8937393"
+          fi
+          echo "Using NDK: $NDK"
+
+          # Ensure build-tools 33.0.0 exist
+          if [ ! -d "$SDK/build-tools/33.0.0" ]; then
+            yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" "build-tools;33.0.0" 2>&1 | tail -5 || true
+          fi
+
+          # Append sdk_path + ndk_path to both spec files (last value wins in ConfigParser)
+          for SPEC in space_shooter/buildozer.spec red_ball/buildozer.spec; do
+            printf "\n# CI: GitHub Actions pre-installed SDK\nandroid.sdk_path = %s\nandroid.ndk_path = %s\n" "$SDK" "$NDK" >> "$SPEC"
+          done
+
+      - name: Cache p4a build artifacts
         uses: actions/cache@v4
         with:
           path: ~/.buildozer
-          key: buildozer-v2-${{ runner.os }}-${{ hashFiles('space_shooter/buildozer.spec', 'red_ball/buildozer.spec') }}
-          restore-keys: buildozer-v2-${{ runner.os }}-
+          key: buildozer-p4a-${{ runner.os }}-${{ hashFiles('space_shooter/buildozer.spec', 'red_ball/buildozer.spec') }}
+          restore-keys: buildozer-p4a-${{ runner.os }}-
 
       - name: Build Space Shooter APK with buildozer
         working-directory: space_shooter
