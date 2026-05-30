@@ -731,7 +731,7 @@ let lvIntroTimer=0,lvCompleteTimer=0;
 let warnText='',warnTimer=0;
 let cheatBuf='',cheatMsg='',cheatTimer=0;
 let titleTapCount=0,titleTapTime=0;
-let menuDelHold=0;
+let menuDelHold=0,wipeConfirm=false;
 function wipeAllData(){
   try{['ss_unlocked','ss_vol','ss_keys','ss_joy'].forEach(k=>localStorage.removeItem(k));}catch(e){}
   maxUnlocked=0;masterVolume=0.7;bindings={...DEFAULT_BINDINGS};joyScale=1.0;applyJoyScale();
@@ -1279,7 +1279,28 @@ function drawSettings(){
   ctx.strokeStyle='#1e3050';ctx.lineWidth=1;
   ctx.beginPath();ctx.moveTo(30,534);ctx.lineTo(GW-30,534);ctx.stroke();
   ctx.fillStyle='#445566';ctx.font='12px monospace';ctx.textAlign='center';
-  ctx.fillText('Unlock all levels — keyboard: type  lavelall   |   phone: tap title × 7',GW/2,554);
+  ctx.fillText('Unlock all levels — keyboard: lavelall   |   phone: tap title × 7',GW/2,549);
+  // Wipe all data button
+  if(wipeConfirm){
+    ctx.fillStyle='#553322';ctx.font='bold 13px sans-serif';
+    ctx.fillText('Сбросить ВСЕ данные?',GW/2,571);
+    const yw=578,yw2=578;
+    const byw=560;
+    btnRects['set_wipe_yes']={x:GW/2-120,y:byw,w:108,h:28};
+    btnRects['set_wipe_no'] ={x:GW/2+12, y:byw,w:108,h:28};
+    ctx.fillStyle='rgba(120,20,10,0.9)';roundRect(GW/2-120,byw,108,28,6);ctx.fill();
+    ctx.strokeStyle='#ee4422';ctx.lineWidth=1.5;roundRect(GW/2-120,byw,108,28,6);ctx.stroke();
+    ctx.fillStyle='#ff8866';ctx.fillText('✓ ДА, СБРОСИТЬ',GW/2-66,byw+18);
+    ctx.fillStyle='rgba(20,40,30,0.9)';roundRect(GW/2+12,byw,108,28,6);ctx.fill();
+    ctx.strokeStyle='#448844';ctx.lineWidth=1.5;roundRect(GW/2+12,byw,108,28,6);ctx.stroke();
+    ctx.fillStyle='#88cc88';ctx.fillText('✗ ОТМЕНА',GW/2+66,byw+18);
+  }else{
+    btnRects['set_wipe']={x:GW/2-110,y:560,w:220,h:28};
+    ctx.fillStyle='rgba(40,10,10,0.7)';roundRect(GW/2-110,560,220,28,6);ctx.fill();
+    ctx.strokeStyle='#663322';ctx.lineWidth=1.5;roundRect(GW/2-110,560,220,28,6);ctx.stroke();
+    ctx.fillStyle='#885544';ctx.font='13px sans-serif';
+    ctx.fillText('🗑 Сбросить все данные',GW/2,578);
+  }
 }
 function drawLevelIntro(){
   const a=Math.min(1,lvIntroTimer/40)*Math.min(1,lvIntroTimer>20?1:lvIntroTimer/20);
@@ -1437,7 +1458,10 @@ function handleBtn(key){
   if(!key)return;
   SND.uiClick();
   if(key==='m_settings'){gameState='settings';return;}
-  if(key==='set_back'){rebindAction=null;gameState='menu';return;}
+  if(key==='set_back'){rebindAction=null;wipeConfirm=false;gameState='menu';return;}
+  if(key==='set_wipe'){wipeConfirm=true;SND.uiClick();return;}
+  if(key==='set_wipe_no'){wipeConfirm=false;SND.uiClick();return;}
+  if(key==='set_wipe_yes'){wipeConfirm=false;wipeAllData();return;}
   if(key==='set_joy_down'){
     joyScale=Math.max(0.5,+(joyScale-0.1).toFixed(1));applyJoyScale();saveJoyScale();SND.uiClick();return;
   }
