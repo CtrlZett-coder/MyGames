@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android APKs & Release
 
 on:
   push:
@@ -28,26 +28,67 @@ jobs:
         with:
           gradle-version: '7.6.1'
 
-      - name: Copy HTML game into Android assets
-        run: cp space_shooter.html android/app/src/main/assets/game.html
-
-      - name: Build debug APK
+      # ── Space Shooter APK ────────────────────────────────────────────────────
+      - name: Build Space Shooter APK
         run: |
+          cp space_shooter.html android/app/src/main/assets/game.html
           cd android
           gradle assembleDebug --no-daemon
+          mv app/build/outputs/apk/debug/app-debug.apk ../SpaceShooter.apk
 
-      - name: Rename APK
-        run: mv android/app/build/outputs/apk/debug/app-debug.apk SpaceShooter.apk
+      # ── Red Ball APK ─────────────────────────────────────────────────────────
+      - name: Build Red Ball APK
+        run: |
+          cp red_ball.html android/app/src/main/assets/game.html
+          sed -i 's/Space Shooter/Red Ball/g' android/app/src/main/res/values/strings.xml
+          sed -i 's/Space Shooter/Red Ball/g' android/app/src/main/AndroidManifest.xml
+          cd android
+          gradle assembleDebug --no-daemon
+          mv app/build/outputs/apk/debug/app-debug.apk ../RedBall.apk
 
-      - name: Upload APK as artifact
+      # ── Upload artifacts ─────────────────────────────────────────────────────
+      - name: Upload APKs as artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: SpaceShooter-Android
-          path: SpaceShooter.apk
+          name: MyGames-APKs
+          path: |
+            SpaceShooter.apk
+            RedBall.apk
           retention-days: 30
 
-      - name: Attach APK to latest release (if tag)
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: SpaceShooter.apk
+      # ── GitHub Release ───────────────────────────────────────────────────────
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="latest"
+          TITLE="MyGames — последняя версия"
+          NOTES="## 🎮 Мои игры — скачать
+
+          ### 🚀 Space Shooter
+          | Файл | Описание |
+          |---|---|
+          | \`SpaceShooter.apk\` | Android APK — установи и играй |
+          | \`SpaceShooterHTML5.html\` | HTML5 — открой в браузере без интернета |
+
+          ### 🔴 Red Ball
+          | Файл | Описание |
+          |---|---|
+          | \`RedBall.apk\` | Android APK — установи и играй |
+          | \`RedBall.html\` | HTML5 — открой в браузере без интернета |
+
+          **Установка APK:** Настройки → Безопасность → Разрешить из неизвестных источников"
+
+          cp space_shooter.html SpaceShooterHTML5.html
+          cp red_ball.html RedBallHTML5.html
+
+          gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --yes 2>/dev/null || true
+          git push origin ":refs/tags/$TAG" 2>/dev/null || true
+          sleep 2
+
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$TITLE" \
+            --notes "$NOTES" \
+            --latest \
+            SpaceShooter.apk RedBall.apk SpaceShooterHTML5.html RedBallHTML5.html
