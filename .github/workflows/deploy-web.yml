@@ -187,8 +187,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.buildozer
-          key: buildozer-${{ runner.os }}-${{ hashFiles('space_shooter/buildozer.spec', 'red_ball/buildozer.spec') }}
-          restore-keys: buildozer-${{ runner.os }}-
+          key: buildozer-v2-${{ runner.os }}-${{ hashFiles('space_shooter/buildozer.spec', 'red_ball/buildozer.spec') }}
+          restore-keys: buildozer-v2-${{ runner.os }}-
 
       - name: Build Space Shooter APK with buildozer
         working-directory: space_shooter
