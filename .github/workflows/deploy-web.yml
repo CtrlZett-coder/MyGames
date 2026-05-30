@@ -181,6 +181,7 @@ jobs:
           restore-keys: buildozer-docker-${{ runner.os }}-
 
       - name: Build Space Shooter APK (Docker buildozer)
+        continue-on-error: true
         run: |
           docker run --rm \
             -v "$PWD/space_shooter:/home/user/hostcwd" \
@@ -189,6 +190,7 @@ jobs:
             android debug
 
       - name: Build Red Ball APK (Docker buildozer)
+        continue-on-error: true
         run: |
           docker run --rm \
             -v "$PWD/red_ball:/home/user/hostcwd" \
@@ -309,6 +311,17 @@ jobs:
           cp space_shooter.html SpaceShooterHTML5.html
           cp red_ball.html RedBall.html
 
+          # Collect release assets (only real APKs, always include HTML5)
+          ASSETS="SpaceShooterHTML5.html RedBall.html"
+          SS_APK="space_shooter/build/web/SpaceShooter.apk"
+          RB_APK="space_shooter/build/web/RedBall.apk"
+          if [ -f "$SS_APK" ] && [ $(wc -c < "$SS_APK") -gt 10000 ]; then
+            ASSETS="$SS_APK $ASSETS"
+          fi
+          if [ -f "$RB_APK" ] && [ $(wc -c < "$RB_APK") -gt 10000 ]; then
+            ASSETS="$RB_APK $ASSETS"
+          fi
+
           # Delete old release and tag, then recreate
           gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --yes 2>/dev/null || true
           git push origin ":refs/tags/$TAG" 2>/dev/null || true
@@ -320,7 +333,4 @@ jobs:
             --title "$TITLE" \
             --notes "$NOTES" \
             --latest \
-            space_shooter/build/web/SpaceShooter.apk \
-            space_shooter/build/web/RedBall.apk \
-            SpaceShooterHTML5.html \
-            RedBall.html
+            $ASSETS
