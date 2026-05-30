@@ -203,10 +203,12 @@ jobs:
             yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" "build-tools;33.0.0" 2>&1 | tail -5 || true
           fi
 
-          # Append sdk_path + ndk_path to both spec files (last value wins in ConfigParser)
+          # Insert sdk_path + ndk_path into [app] section (before [buildozer] header)
           for SPEC in space_shooter/buildozer.spec red_ball/buildozer.spec; do
-            printf "\n# CI: GitHub Actions pre-installed SDK\nandroid.sdk_path = %s\nandroid.ndk_path = %s\n" "$SDK" "$NDK" >> "$SPEC"
+            sed -i "s|^\[buildozer\]|android.sdk_path = $SDK\nandroid.ndk_path = $NDK\n\n[buildozer]|" "$SPEC"
           done
+          echo "Updated specs:"
+          grep -E "sdk_path|ndk_path" space_shooter/buildozer.spec
 
       - name: Cache p4a build artifacts
         uses: actions/cache@v4
