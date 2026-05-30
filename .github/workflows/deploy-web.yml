@@ -203,6 +203,12 @@ jobs:
             yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" "build-tools;33.0.0" 2>&1 | tail -5 || true
           fi
 
+          # buildozer/p4a looks for sdkmanager at old path tools/bin/sdkmanager
+          # GitHub Actions SDK has it at cmdline-tools/latest/bin/sdkmanager
+          mkdir -p "$SDK/tools/bin"
+          ln -sf "$SDK/cmdline-tools/latest/bin/sdkmanager" "$SDK/tools/bin/sdkmanager"
+          echo "sdkmanager symlink: $(ls -la $SDK/tools/bin/sdkmanager)"
+
           # Insert sdk_path + ndk_path into [app] section (before [buildozer] header)
           for SPEC in space_shooter/buildozer.spec red_ball/buildozer.spec; do
             sed -i "s|^\[buildozer\]|android.sdk_path = $SDK\nandroid.ndk_path = $NDK\n\n[buildozer]|" "$SPEC"
