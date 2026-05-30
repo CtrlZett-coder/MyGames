@@ -383,12 +383,11 @@ class MiniBoss{
     this.hp=8;this.maxHp=8;this.W=72;this.H=48;
     this.score=1500;this.dropCount=2;
     this.targetX=GW*0.68;this.moveTimer=0;this.entering=true;
-    this.shootTimer=90;this.invuln=240;
+    this.shootTimer=90;
     this.bullets=[];this.dead=false;
   }
   update(ts){
     ts=ts===undefined?1:ts;
-    if(this.invuln>0&&!this.entering)this.invuln=Math.max(0,this.invuln-ts);
     if(this.x>this.targetX){this.x-=3.5*ts;}
     else{
       this.entering=false;
@@ -404,15 +403,10 @@ class MiniBoss{
     }
     this.bullets=this.bullets.filter(b=>{b.update();return !b.dead;});
   }
-  takeHit(){if(this.invuln>0)return false;this.hp--;return this.hp<=0;}
+  takeHit(){this.hp--;return this.hp<=0;}
   draw(){
     const x=Math.round(this.x),y=Math.round(this.y),mt=this.moveTimer;
     ctx.save();ctx.translate(x,y);
-    if(this.invuln>0){
-      const p=8*Math.abs(Math.sin(this.invuln*0.15));
-      ctx.globalAlpha=0.47*(this.invuln/240);ctx.fillStyle='#50b4ff';
-      ctx.beginPath();ctx.ellipse(0,0,55+p,55+p,0,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
-    }
     ctx.fillStyle='#967800';
     ctx.beginPath();ctx.moveTo(-36,-10);ctx.lineTo(-8,-38);ctx.lineTo(22,-10);ctx.closePath();ctx.fill();
     ctx.beginPath();ctx.moveTo(-36,10);ctx.lineTo(-8,38);ctx.lineTo(22,10);ctx.closePath();ctx.fill();
@@ -444,7 +438,7 @@ class Dreadnought{
     this.hp=25;this.maxHp=25;this.W=114;this.H=78;
     this.score=5000;this.dropCount=4;
     this.targetX=GW*0.72;this.moveTimer=0;this.entering=true;
-    this.shootTimer=100;this.invuln=240;
+    this.shootTimer=100;
     this.laserActive=false;this.laserTimer=0;this.laserCd=0;
     this.LASER_DUR=105;this.LASER_CD=230;
     this.bullets=[];this.dead=false;
@@ -452,7 +446,6 @@ class Dreadnought{
   get phase(){return this.hp<=12?2:1;}
   update(ts){
     ts=ts===undefined?1:ts;
-    if(this.invuln>0&&!this.entering)this.invuln=Math.max(0,this.invuln-ts);
     if(this.x>this.targetX){this.x-=2.5*ts;}
     else{
       this.entering=false;
@@ -478,7 +471,7 @@ class Dreadnought{
     }
     this.bullets=this.bullets.filter(b=>{b.update();return !b.dead;});
   }
-  takeHit(){if(this.invuln>0)return false;this.hp--;return this.hp<=0;}
+  takeHit(){this.hp--;return this.hp<=0;}
   getLaserRect(){
     if(!this.laserActive||this.laserTimer<=0)return null;
     return{x:0,y:Math.round(this.y)-6,w:Math.max(0,Math.round(this.x-this.W/2)),h:12};
@@ -496,11 +489,6 @@ class Dreadnought{
       }
     }
     ctx.save();ctx.translate(x,y);
-    if(this.invuln>0){
-      const p=10*Math.abs(Math.sin(this.invuln*0.13));
-      ctx.globalAlpha=0.51*(this.invuln/240);ctx.fillStyle='#50b4ff';
-      ctx.beginPath();ctx.ellipse(0,0,75+p,60+p,0,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
-    }
     const wc=this.phase===2?'rgb(90,10,10)':'rgb(70,10,10)';
     ctx.fillStyle=wc;
     ctx.beginPath();ctx.moveTo(-52,-28);ctx.lineTo(-14,-68);ctx.lineTo(32,-22);ctx.closePath();ctx.fill();
@@ -540,7 +528,7 @@ class FinalBoss{
     this.hp=65;this.maxHp=65;this.W=150;this.H=100;
     this.score=15000;this.dropCount=6;
     this.targetX=GW*0.73;this.moveTimer=0;this.entering=true;
-    this.shootTimer=100;this.invuln=240;
+    this.shootTimer=100;
     this.LASER_DUR=115;this.LASER_CD=170;
     this._lasers=[{active:false,timer:0,cd:0,yOff:-22},{active:false,timer:0,cd:0,yOff:22}];
     this.bullets=[];this.dead=false;
@@ -548,7 +536,6 @@ class FinalBoss{
   get phase(){const r=this.hp/this.maxHp;return r>0.66?1:r>0.33?2:3;}
   update(ts){
     ts=ts===undefined?1:ts;
-    if(this.invuln>0&&!this.entering)this.invuln=Math.max(0,this.invuln-ts);
     if(this.x>this.targetX){this.x-=2.0*ts;}
     else{
       this.entering=false;
@@ -579,7 +566,7 @@ class FinalBoss{
     }
     this.bullets=this.bullets.filter(b=>{b.update();return !b.dead;});
   }
-  takeHit(){if(this.invuln>0)return false;this.hp--;return this.hp<=0;}
+  takeHit(){this.hp--;return this.hp<=0;}
   getLaserRects(){
     return this._lasers.filter(l=>l.active&&l.timer>0).map(l=>{
       const lw=Math.max(0,Math.round(this.x-this.W/2));
@@ -601,11 +588,6 @@ class FinalBoss{
       }
     }
     ctx.save();ctx.translate(x,y);
-    if(this.invuln>0){
-      const p=14*Math.abs(Math.sin(this.invuln*0.12));
-      ctx.globalAlpha=0.55*(this.invuln/240);ctx.fillStyle='#50b4ff';
-      ctx.beginPath();ctx.ellipse(0,0,100+p,80+p,0,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
-    }
     ctx.fillStyle='#4b0000';
     ctx.beginPath();ctx.moveTo(-70,-20);ctx.lineTo(-20,-80);ctx.lineTo(30,-30);ctx.closePath();ctx.fill();
     ctx.beginPath();ctx.moveTo(-70,20);ctx.lineTo(-20,80);ctx.lineTo(30,30);ctx.closePath();ctx.fill();
@@ -749,6 +731,13 @@ let lvIntroTimer=0,lvCompleteTimer=0;
 let warnText='',warnTimer=0;
 let cheatBuf='',cheatMsg='',cheatTimer=0;
 let titleTapCount=0,titleTapTime=0;
+let menuDelHold=0;
+function wipeAllData(){
+  try{['ss_unlocked','ss_vol','ss_keys','ss_joy'].forEach(k=>localStorage.removeItem(k));}catch(e){}
+  maxUnlocked=0;masterVolume=0.7;bindings={...DEFAULT_BINDINGS};joyScale=1.0;applyJoyScale();
+  if(masterGain)masterGain.gain.value=0.7;
+  cheatMsg='✓ ВСЕ ДАННЫЕ СБРОШЕНЫ';cheatTimer=200;
+}
 let menuSel=0,lsCursor=0,btnRects={};
 let screenShake=0,flashAlpha=0,vigAlpha=0,enrageFlash=0,bossEnraged=false;
 const bossesSpawnedArcade=new Set();
@@ -1340,8 +1329,22 @@ function drawMenu(){
     ctx.fillStyle=sel?'#fff':'#88ccff';ctx.font='bold 18px sans-serif';ctx.textAlign='center';
     ctx.fillText(label,x+w/2,y+h/2+6);
   });
+  // DEL hold to wipe all data
+  if(KB.Delete){
+    menuDelHold=Math.min(180,menuDelHold+1);
+    if(menuDelHold>=180){wipeAllData();menuDelHold=0;}
+  } else {
+    menuDelHold=Math.max(0,menuDelHold-3);
+  }
+  const delPct=menuDelHold/180;
+  if(delPct>0){
+    ctx.fillStyle=rgba(200,60,40,0.85);
+    ctx.fillRect(0,GH-6,GW*delPct,6);
+  }
   ctx.fillStyle='#334455';ctx.font='13px sans-serif';ctx.textAlign='center';
-  ctx.fillText('Phone Mode = show on-screen joystick',GW/2,GH-18);
+  ctx.fillText('Phone Mode = show on-screen joystick',GW/2,GH-22);
+  ctx.fillStyle='#2a3a45';ctx.font='12px sans-serif';
+  ctx.fillText('Удерживай DEL 3с — сбросить все данные',GW/2,GH-6);
 }
 
 function drawLevelSelect(){
