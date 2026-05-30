@@ -24,7 +24,7 @@ function resize(){
 }
 resize();window.addEventListener('resize',resize);
 
-function gctx(fn){ctx.save();ctx.translate(OX,OY);ctx.scale(SC,SC);fn();ctx.restore();}
+function gctx(fn){ctx.save();ctx.translate(OX,OY);ctx.scale(SC,SC);try{fn();}finally{ctx.restore();}}
 
 // ── Physics ───────────────────────────────────────────────────────────────────
 const GRAV=0.58,JUMPV=-13.2,MAXFALL=16,HACC=0.9,FRIC=0.83,MAXHS=6.5;
@@ -468,7 +468,6 @@ function dieBall(){
 }
 
 function updatePlay(){
-  gameT++;
   updateMPlats();
   updateBall();
 
@@ -765,7 +764,7 @@ function drawMenu(){
   });
 
   ctx.fillStyle='#666';ctx.font='14px monospace';ctx.textAlign='center';
-  ctx.fillText('Best: '+hiScore,GW/2,SH-30);
+  ctx.fillText('Best: '+hiScore,GW/2,GH-30);
   ctx.fillStyle='#444';ctx.font='13px monospace';
   ctx.fillText('← → / A D = Move    Space / ↑ / W = Jump',GW/2,GH-10);
   ctx.textAlign='left';
