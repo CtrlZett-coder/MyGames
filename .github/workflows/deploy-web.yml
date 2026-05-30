@@ -146,9 +146,10 @@ jobs:
           with open("space_shooter/build/web/sw.js", "w") as f:
               f.write(sw)
 
-          # Copy standalone HTML5 game too
+          # Copy standalone HTML5 games
           import shutil
           shutil.copy("space_shooter.html", "space_shooter/build/web/play.html")
+          shutil.copy("red_ball.html",      "space_shooter/build/web/redball.html")
 
           # Copy favicon / icon files
           import glob
@@ -226,23 +227,24 @@ jobs:
           </head>
           <body>
           <div class="card">
-            <h1>🚀 Space Shooter</h1>
-            <p>Выбери способ поиграть</p>
+            <h1>🎮 My Games</h1>
+            <p>Выбери игру</p>
 
+            <h2 style="color:#0af;margin:16px 0 8px;font-size:1.1em">🚀 Space Shooter</h2>
             <a class="btn apk" href="SpaceShooter.apk" download>
-              📦 Скачать APK для Android
+              📦 APK для Android
             </a>
-            <div class="note">Установить: Настройки → Безопасность → Разрешить из неизвестных источников</div>
-
+            <div class="note">Настройки → Безопасность → Разрешить из неизвестных источников</div>
             <a class="btn html" href="play.html">
-              🌐 Играть в браузере (HTML5)
+              🌐 Играть в браузере
             </a>
-            <div class="note">Работает на iPhone, Android, ПК — мгновенно</div>
+            <div class="note">HTML5 — iPhone, Android, ПК — мгновенно</div>
 
-            <a class="btn web" href="index.html">
-              🐍 Python-версия (pygbag)
+            <h2 style="color:#f44;margin:20px 0 8px;font-size:1.1em">🔴 Red Ball</h2>
+            <a class="btn html" href="redball.html" style="background:#442222;border-color:#f44;color:#f88">
+              🌐 Играть в браузере
             </a>
-            <div class="note">Полная версия, первый запуск ~1-2 мин</div>
+            <div class="note">Платформер — работает везде</div>
           </div>
           </body>
           </html>
@@ -264,32 +266,37 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="latest"
-          TITLE="Space Shooter — последняя версия"
-          NOTES="### 🚀 Space Shooter
+          TITLE="MyGames — последняя версия"
+          NOTES="## 🎮 Мои игры — скачать
 
-          **Скачай и играй:**
-
+          ### 🚀 Space Shooter
           | Файл | Описание |
           |---|---|
-          | \`SpaceShooter.apk\` | Android-приложение |
-          | \`SpaceShooterHTML5.html\` | Автономная HTML5-версия (открой в браузере) |
+          | \`SpaceShooter.apk\` | Android APK |
+          | \`SpaceShooterHTML5.html\` | HTML5 — открой в браузере |
 
-          > **APK:** Настройки → Безопасность → Разрешить из неизвестных источников → установить apk
-          > **HTML5:** Скачай файл и открой в браузере — работает без интернета
+          ### 🔴 Red Ball
+          | Файл | Описание |
+          |---|---|
+          | \`RedBall.html\` | HTML5 — открой в браузере |
 
-          🌐 [Играть онлайн](https://ctrlzett-coder.github.io/mygames/play.html) | [Страница загрузки](https://ctrlzett-coder.github.io/mygames/download.html)"
+          **APK:** Настройки → Безопасность → Разрешить из неизвестных источников
+          **HTML5:** Скачай файл → открой в любом браузере (без интернета)"
 
-          # Copy HTML with a friendlier name
           cp space_shooter.html SpaceShooterHTML5.html
+          cp red_ball.html RedBall.html
 
-          # Delete old 'latest' release if it exists, then recreate
+          # Delete old release and tag, then recreate
           gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --yes 2>/dev/null || true
           git push origin ":refs/tags/$TAG" 2>/dev/null || true
+          sleep 2
 
           gh release create "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
+            --tag-name "$TAG" \
             --title "$TITLE" \
             --notes "$NOTES" \
             --latest \
             space_shooter/build/web/SpaceShooter.apk \
-            SpaceShooterHTML5.html
+            SpaceShooterHTML5.html \
+            RedBall.html
