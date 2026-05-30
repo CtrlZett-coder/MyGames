@@ -187,25 +187,38 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.buildozer
-          key: buildozer-${{ runner.os }}-${{ hashFiles('space_shooter/buildozer.spec') }}
+          key: buildozer-${{ runner.os }}-${{ hashFiles('space_shooter/buildozer.spec', 'red_ball/buildozer.spec') }}
           restore-keys: buildozer-${{ runner.os }}-
 
-      - name: Build Android APK with buildozer
+      - name: Build Space Shooter APK with buildozer
         working-directory: space_shooter
         run: |
           set -o pipefail
           buildozer android debug 2>&1 | tail -100
 
-      - name: Copy APK into web output
+      - name: Build Red Ball APK with buildozer
+        working-directory: red_ball
         run: |
-          APK=$(find space_shooter/bin -name "*.apk" | head -1)
-          if [ -n "$APK" ]; then
-            cp "$APK" space_shooter/build/web/SpaceShooter.apk
-            echo "APK copied: $APK"
+          set -o pipefail
+          buildozer android debug 2>&1 | tail -100
+
+      - name: Copy APKs into web output
+        run: |
+          APK_SS=$(find space_shooter/bin -name "*.apk" | head -1)
+          if [ -n "$APK_SS" ]; then
+            cp "$APK_SS" space_shooter/build/web/SpaceShooter.apk
+            echo "Space Shooter APK copied: $APK_SS"
           else
-            echo "WARNING: No APK found, buildozer may have failed"
-            # Fallback: small placeholder so release step doesn't break
+            echo "WARNING: No Space Shooter APK found"
             echo "APK build failed" > space_shooter/build/web/SpaceShooter.apk
+          fi
+          APK_RB=$(find red_ball/bin -name "*.apk" | head -1)
+          if [ -n "$APK_RB" ]; then
+            cp "$APK_RB" space_shooter/build/web/RedBall.apk
+            echo "Red Ball APK copied: $APK_RB"
+          else
+            echo "WARNING: No Red Ball APK found"
+            echo "APK build failed" > space_shooter/build/web/RedBall.apk
           fi
 
       # ── Download page ─────────────────────────────────────────────────────
@@ -252,10 +265,14 @@ jobs:
             <div class="note">HTML5 — iPhone, Android, ПК — мгновенно</div>
 
             <h2 style="color:#f44;margin:20px 0 8px;font-size:1.1em">🔴 Red Ball</h2>
+            <a class="btn apk" href="RedBall.apk" download style="background:#a33">
+              📦 APK для Android
+            </a>
+            <div class="note">Настройки → Безопасность → Разрешить из неизвестных источников</div>
             <a class="btn html" href="redball.html" style="background:#442222;border-color:#f44;color:#f88">
               🌐 Играть в браузере
             </a>
-            <div class="note">Платформер — работает везде</div>
+            <div class="note">Платформер — iPhone, Android, ПК — мгновенно</div>
           </div>
           </body>
           </html>
@@ -283,12 +300,13 @@ jobs:
           ### 🚀 Space Shooter
           | Файл | Описание |
           |---|---|
-          | \`SpaceShooter.apk\` | Android APK |
+          | \`SpaceShooter.apk\` | Android APK (нативный Python) |
           | \`SpaceShooterHTML5.html\` | HTML5 — открой в браузере |
 
           ### 🔴 Red Ball
           | Файл | Описание |
           |---|---|
+          | \`RedBall.apk\` | Android APK (нативный Python) |
           | \`RedBall.html\` | HTML5 — открой в браузере |
 
           **APK:** Настройки → Безопасность → Разрешить из неизвестных источников
@@ -309,5 +327,6 @@ jobs:
             --notes "$NOTES" \
             --latest \
             space_shooter/build/web/SpaceShooter.apk \
+            space_shooter/build/web/RedBall.apk \
             SpaceShooterHTML5.html \
             RedBall.html

@@ -5,11 +5,49 @@ Web: python -m pygbag --build red_ball
 """
 import pygame, math, sys, os, random, asyncio
 
+try:
+    import android
+    _ANDROID = True
+except ImportError:
+    _ANDROID = False
+
 pygame.init()
 SW, SH = 900, 600
-screen = pygame.display.set_mode((SW, SH))
-pygame.display.set_caption("Red Ball")
+if _ANDROID:
+    _real_screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+    screen = pygame.Surface((SW, SH))
+    _rw, _rh = _real_screen.get_size()
+    _rscale = min(_rw / SW, _rh / SH)
+    _rsw, _rsh = int(SW * _rscale), int(SH * _rscale)
+    _rox = (_rw - _rsw) // 2
+    _roy = (_rh - _rsh) // 2
+else:
+    _real_screen = None
+    _rw = _rh = _rscale = _rsw = _rsh = _rox = _roy = 0
+    screen = pygame.display.set_mode((SW, SH))
+    pygame.display.set_caption("Red Ball")
+
 clock  = pygame.time.Clock()
+
+# Touch state (Android)
+_touch_left    = False
+_touch_right   = False
+_touch_jump    = False
+_touch_fingers = {}
+
+def _finger_to_game(fx, fy):
+    if _ANDROID:
+        return (fx * _rw - _rox) / max(1, _rscale), (fy * _rh - _roy) / max(1, _rscale)
+    return fx * SW, fy * SH
+
+def _update_touch_state():
+    global _touch_left, _touch_right, _touch_jump
+    _touch_left = _touch_right = _touch_jump = False
+    for gx, gy in _touch_fingers.values():
+        if gy > SH * 0.55:
+            if gx < SW * 0.30:   _touch_left  = True
+            elif gx < SW * 0.65: _touch_right = True
+            else:                  _touch_jump  = True
 
 FPS = 60
 
@@ -551,10 +589,9 @@ class Ball:
     def update(self, plats, mplats, keys):
         if not self.alive: return
 
-        # Input
-        left  = keys[pygame.K_LEFT]  or keys[pygame.K_a]
-        right = keys[pygame.K_RIGHT] or keys[pygame.K_d]
-        jump  = keys[pygame.K_SPACE] or keys[pygame.K_UP] or keys[pygame.K_w]
+        # Input (keyboard + touch)
+        left  = keys[pygame.K_LEFT]  or keys[pygame.K_a]  or _touch_left
+        right = keys[pygame.K_RIGHT] or keys[pygame.K_d]  or _touch_right
 
         if left:  self.vx -= H_ACC
         elif right: self.vx += H_ACC
@@ -1161,11 +1198,33 @@ class Game:
 
     def _check_hover(self):
         mx, my = pygame.mouse.get_pos()
+        if _ANDROID:
+            mx = (mx - _rox) / max(1, _rscale)
+            my = (my - _roy) / max(1, _rscale)
         self._hover = ''
         for k, r in self._btn_rects.items():
             if r.collidepoint(mx, my):
                 self._hover = k
                 break
+
+    def _draw_touch_hints(self):
+        h = pygame.Surface((SW, int(SH * 0.45)), pygame.SRCALPHA)
+        bw = int(SW * 0.30)
+        mw = int(SW * 0.35)
+        rw = SW - bw - mw
+        fnt = pygame.font.SysFont(None, 64)
+        zones = [
+            (0,   h.get_height(), bw, '←'),
+            (bw,  h.get_height(), mw, '→'),
+            (bw + mw, h.get_height(), rw, '↑'),
+        ]
+        for x, ht, w, lbl in zones:
+            pygame.draw.rect(h, (255, 255, 255, 28), (x, 0, w, ht))
+            pygame.draw.rect(h, (255, 255, 255, 55), (x, 0, w, ht), 2)
+            lt = fnt.render(lbl, True, (255, 255, 255))
+            lt.set_alpha(120)
+            h.blit(lt, lt.get_rect(center=(x + w // 2, ht // 2)))
+        screen.blit(h, (0, SH - h.get_height()))
 
     def _handle_click(self, pos):
         for k, r in getattr(self, '_btn_rects', {}).items():
@@ -1208,11 +1267,34 @@ class Game:
                         if self._state == 'play':
                             self._ball.jump_press()
                 if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
-                    self._handle_click(ev.pos)
+                    if _ANDROID:
+                        mx, my = ev.pos
+                        gx = (mx - _rox) / max(1, _rscale)
+                        gy = (my - _roy) / max(1, _rscale)
+                        self._handle_click((gx, gy))
+                    else:
+                        self._handle_click(ev.pos)
+                if ev.type == pygame.FINGERDOWN:
+                    gx, gy = _finger_to_game(ev.x, ev.y)
+                    _touch_fingers[ev.finger_id] = (gx, gy)
+                    if gy > SH * 0.55 and gx > SW * 0.65 and self._state == 'play':
+                        self._ball.jump_press()
+                    _update_touch_state()
+                    if self._state != 'play':
+                        self._handle_click((gx, gy))
+                if ev.type == pygame.FINGERUP:
+                    _touch_fingers.pop(ev.finger_id, None)
+                    _update_touch_state()
+                if ev.type == pygame.FINGERMOTION:
+                    gx, gy = _finger_to_game(ev.x, ev.y)
+                    _touch_fingers[ev.finger_id] = (gx, gy)
+                    _update_touch_state()
 
             if self._state == 'play':
                 self._update_play(keys)
                 self._draw_play()
+                if _ANDROID:
+                    self._draw_touch_hints()
             elif self._state == 'menu':
                 self._draw_menu()
                 self._check_hover()
@@ -1228,6 +1310,10 @@ class Game:
                 self._draw_victory()
                 self._check_hover()
 
+            if _ANDROID:
+                scaled = pygame.transform.scale(screen, (_rsw, _rsh))
+                _real_screen.fill((0, 0, 0))
+                _real_screen.blit(scaled, (_rox, _roy))
             pygame.display.flip()
             clock.tick(FPS)
             await asyncio.sleep(0)
