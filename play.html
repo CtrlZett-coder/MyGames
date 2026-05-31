@@ -88,6 +88,108 @@ const SND={
   victory:()=>{[261,329,392,523].forEach((f,i)=>setTimeout(()=>playTone(f,0.4,'sine',0.35),i*150));},
 };
 
+// ── Music Engine ───────────────────────────────────────────────────────────────
+let _mState='off',_mTimer=null,_mNodes=[];
+function _mStop(){
+  if(_mTimer){clearTimeout(_mTimer);_mTimer=null;}
+  const t=actx?actx.currentTime+0.2:0;
+  for(const n of _mNodes){try{n.stop(t);}catch(e){}}
+  _mNodes=[];_mState='off';
+}
+function _mAddN(n){_mNodes.push(n);return n;}
+function _mOsc(freq,t0,dur,type,vol,det){
+  if(!actx||!masterGain)return;
+  const o=actx.createOscillator(),g=actx.createGain();
+  o.type=type||'sine';o.frequency.value=freq;if(det)o.detune.value=det;
+  const atk=Math.min(0.04,dur*0.12);
+  g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(vol,t0+atk);
+  g.gain.setValueAtTime(vol,t0+dur*0.65);g.gain.exponentialRampToValueAtTime(0.001,t0+dur);
+  o.connect(g);g.connect(masterGain);o.start(t0);o.stop(t0+dur+0.08);_mAddN(o);
+}
+function _mPad(freqs,t0,dur,vol){
+  for(const f of freqs){
+    _mOsc(f,t0,dur,'sine',vol*0.45,0);_mOsc(f,t0,dur,'sine',vol*0.28,+10);_mOsc(f,t0,dur,'sine',vol*0.18,-10);
+  }
+}
+function _mKick(t0,vol){
+  if(!actx||!masterGain)return;
+  const o=actx.createOscillator(),g=actx.createGain();
+  o.type='sine';o.frequency.setValueAtTime(160,t0);o.frequency.exponentialRampToValueAtTime(40,t0+0.12);
+  g.gain.setValueAtTime(vol,t0);g.gain.exponentialRampToValueAtTime(0.001,t0+0.22);
+  o.connect(g);g.connect(masterGain);o.start(t0);o.stop(t0+0.26);_mAddN(o);
+}
+function _mHat(t0,vol){
+  if(!actx||!masterGain)return;
+  const n=Math.ceil(actx.sampleRate*0.045);
+  const buf=actx.createBuffer(1,n,actx.sampleRate);
+  const d=buf.getChannelData(0);for(let i=0;i<n;i++)d[i]=Math.random()*2-1;
+  const src=actx.createBufferSource(),flt=actx.createBiquadFilter(),g=actx.createGain();
+  flt.type='highpass';flt.frequency.value=7500;
+  g.gain.setValueAtTime(vol,t0);g.gain.exponentialRampToValueAtTime(0.001,t0+0.045);
+  src.buffer=buf;src.connect(flt);flt.connect(g);g.connect(masterGain);src.start(t0);_mAddN(src);
+}
+function _mBass(freq,t0,dur,vol){
+  if(!actx||!masterGain)return;
+  const o=actx.createOscillator(),flt=actx.createBiquadFilter(),g=actx.createGain();
+  o.type='sawtooth';o.frequency.value=freq;
+  flt.type='lowpass';flt.frequency.value=380;flt.Q.value=2.5;
+  g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(vol,t0+0.01);
+  g.gain.exponentialRampToValueAtTime(0.001,t0+dur*0.85);
+  o.connect(flt);flt.connect(g);g.connect(masterGain);o.start(t0);o.stop(t0+dur);_mAddN(o);
+}
+// Menu: ambient space pad, D minor, 72 BPM
+const _MBPM=72,_MBT=60/_MBPM;
+const _MCH=[[146.83,174.61,220],[116.54,146.83,174.61],[174.61,220,261.63],[110,138.59,164.81]];
+const _MARP=[220,261.63,329.63,261.63,174.61,220,261.63,220,261.63,329.63,392,329.63,220,261.63,329.63,261.63];
+const _MBAS=[73.42,58.27,87.31,55];
+function _menuLoop(t0){
+  if(_mState!=='menu')return;
+  const loop=16*_MBT;
+  for(let c=0;c<4;c++){
+    const ct=t0+c*4*_MBT;
+    _mPad(_MCH[c],ct,4*_MBT*0.92,0.065);
+    _mOsc(_MBAS[c],ct,4*_MBT*0.75,'sine',0.09,0);
+    for(let b=0;b<4;b++){
+      const at=ct+b*_MBT;
+      _mOsc(_MARP[c*4+b],at,_MBT*0.42,'triangle',0.032,0);
+      if(b%2===1)_mOsc(_MARP[c*4+b]*2,at+_MBT*0.5,_MBT*0.35,'triangle',0.016,0);
+    }
+  }
+  _mTimer=setTimeout(()=>{if(_mState==='menu')_menuLoop(t0+loop);},(loop-0.6)*1000);
+}
+function startMenuMusic(){if(!actx||_mState==='menu')return;_mStop();_mState='menu';_menuLoop(actx.currentTime+0.12);}
+// Game: electronic, E minor, 140 BPM
+const _GBPM=140,_GBT=60/_GBPM;
+const _GKICK=[1,0,0,0,1,0,0,1,1,0,0,0,1,0,0,0];
+const _GHAT= [0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0];
+const _GBAS=[82.41,82.41,82.41,98,82.41,82.41,110,110,123.47,110,98,82.41,73.42,73.42,82.41,98];
+const _GLEA=[164.81,0,196,0,220,0,196,246.94,220,0,196,164.81,0,164.81,0,196];
+function _gameLoop(t0){
+  if(_mState!=='game')return;
+  const loop=16*_GBT;
+  for(let i=0;i<16;i++){
+    const t=t0+i*_GBT;
+    if(_GKICK[i])_mKick(t,0.24);
+    if(_GHAT[i])_mHat(t,0.10);
+    _mBass(_GBAS[i],t,_GBT*0.82,0.16);
+    if(_GLEA[i])_mOsc(_GLEA[i],t,_GBT*0.38,'square',0.048,0);
+  }
+  _mTimer=setTimeout(()=>{if(_mState==='game')_gameLoop(t0+loop);},(loop-0.5)*1000);
+}
+function startGameMusic(){if(!actx||_mState==='game')return;_mStop();_mState='game';_gameLoop(actx.currentTime+0.1);}
+function stopMusic(){_mStop();}
+let _prevGS='';
+function _updateMusic(){
+  if(!actx)return;
+  let want='off';
+  if(['menu','level_select','settings','intro'].includes(gameState))want='menu';
+  else if(gameState==='playing'||gameState==='paused')want='game';
+  if(want===_prevGS)return;_prevGS=want;
+  if(want==='menu')startMenuMusic();
+  else if(want==='game')startGameMusic();
+  else stopMusic();
+}
+
 // ── Levels data ────────────────────────────────────────────────────────────────
 const LEVELS=[
   [{fighter:1},15,500,[]],
@@ -140,6 +242,34 @@ class Star{
     const bl=this.tint==='b'?Math.min(255,b+30):this.tint==='y'?Math.max(40,b-60):b;
     ctx.fillStyle=`rgb(${r},${b},${bl})`;
     ctx.beginPath();ctx.arc(this.x,this.y,this.r,0,Math.PI*2);ctx.fill();
+  }
+}
+
+// ── Background decoration rocks (non-interactive, purely visual) ──────────────
+let bgRocks=[];
+class BgRock{
+  constructor(anywhere){
+    this.r=rnd(2,7);
+    this.x=anywhere?rnd(0,GW):GW+this.r+4;
+    this.y=rnd(0,GH);
+    this.spd=rnd(0.04,0.22);
+    this.rotSpd=rnd(-0.007,0.007);
+    this.angle=rnd(0,Math.PI*2);
+    this.alpha=rnd(0.07,0.26);
+    const N=rndInt(5,8);this.v=[];
+    for(let i=0;i<N;i++){const a=i/N*Math.PI*2+rnd(-0.2,0.2);this.v.push({a,r:this.r*rnd(0.68,1.32)});}
+  }
+  update(){
+    this.x-=this.spd;this.angle+=this.rotSpd;
+    if(this.x<-this.r-4){this.r=rnd(2,7);this.x=GW+this.r+4;this.y=rnd(0,GH);this.alpha=rnd(0.07,0.26);}
+  }
+  draw(){
+    ctx.save();ctx.globalAlpha=this.alpha;ctx.translate(Math.round(this.x),Math.round(this.y));ctx.rotate(this.angle);
+    ctx.fillStyle='#998877';
+    ctx.beginPath();
+    for(let i=0;i<this.v.length;i++){const vv=this.v[i];const px=Math.cos(vv.a)*vv.r,py=Math.sin(vv.a)*vv.r;i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);}
+    ctx.closePath();ctx.fill();
+    ctx.globalAlpha=1;ctx.restore();
   }
 }
 
@@ -981,6 +1111,7 @@ function skipIntro(){gameState='menu';}
 function updateIntro(){
   introT++;
   for(const s of stars)s.update();
+  for(const r of bgRocks)r.update();
   if(introT>=300)gameState='menu';
 }
 
@@ -1102,10 +1233,11 @@ let screenShake=0,flashAlpha=0,vigAlpha=0,enrageFlash=0,bossEnraged=false;
 const bossesSpawnedArcade=new Set();
 
 function initStars(){
-  stars=[];
+  stars=[];bgRocks=[];
   for(let i=0;i<100;i++)stars.push(new Star(0));
   for(let i=0;i<60;i++)stars.push(new Star(1));
   for(let i=0;i<30;i++)stars.push(new Star(2));
+  for(let i=0;i<30;i++)bgRocks.push(new BgRock(true));
 }
 
 function startGame(mode,idx){
@@ -1340,9 +1472,11 @@ function triggerLevelComplete(){
 
 // ── Update ─────────────────────────────────────────────────────────────────────
 function update(){
+  _updateMusic();
   if(gameState==='intro'){updateIntro();return;}
   if(gameState==='level_complete'){
     for(const s of stars)s.update();
+    for(const r of bgRocks)r.update();
     lvCompleteTimer--;
     if(lvCompleteTimer<=0){
       lvIdx++;level=lvIdx+1;
@@ -1361,6 +1495,7 @@ function update(){
   }
   if(gameState!=='playing')return;
   for(const s of stars)s.update();
+  for(const r of bgRocks)r.update();
   if(screenShake>0)screenShake*=0.82;
   if(flashAlpha>0)flashAlpha=Math.max(0,flashAlpha-15);
   if(enrageFlash>0)enrageFlash--;
@@ -1408,39 +1543,33 @@ function update(){
 }
 
 
-// ── Background planet ─────────────────────────────────────────────────────────
-let _planetX=GW*0.78,_planetY=GH*0.28;
-function drawPlanet(){
-  _planetX-=0.06;
-  if(_planetX<-170)_planetX=GW+170;
-  const x=_planetX,y=_planetY,r=120;
-  ctx.save();
-  // Atmosphere outer glow
-  ctx.globalAlpha=0.07;
-  ctx.fillStyle='#4488ff';
-  ctx.beginPath();ctx.arc(x,y,r+18,0,Math.PI*2);ctx.fill();
-  ctx.globalAlpha=1;
-  // Planet body gradient
-  const g=ctx.createRadialGradient(x-r*0.28,y-r*0.28,r*0.08,x,y,r);
-  g.addColorStop(0,'#2a4888');
-  g.addColorStop(0.5,'#162a54');
-  g.addColorStop(0.85,'#0e1c3a');
-  g.addColorStop(1,'#050810');
-  ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
-  // Cloud bands
-  ctx.globalAlpha=0.09;
-  [[0,-28,r*0.88,12],[0,14,r*0.78,10],[0,48,r*0.6,8]].forEach(([ox,oy,rr,th])=>{
-    ctx.fillStyle='#88aadd';
-    ctx.beginPath();ctx.ellipse(x+ox,y+oy,rr,th,0,0,Math.PI*2);ctx.fill();
-  });
-  ctx.globalAlpha=1;
-  // Rim shadow (dark crescent on left)
-  const rs=ctx.createRadialGradient(x+r*0.35,y,r*0.2,x,y,r);
-  rs.addColorStop(0,'rgba(0,0,0,0)');
-  rs.addColorStop(0.6,'rgba(0,0,0,0)');
-  rs.addColorStop(1,'rgba(0,0,0,0.72)');
-  ctx.fillStyle=rs;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
-  ctx.restore();
+// ── Background planets ─────────────────────────────────────────────────────────
+const _PLANETS=[
+  {x:GW*0.78,y:GH*0.28,r:120,vx:0.06,c0:'#2a4888',c1:'#0e1c3a',
+   bands:[[0,-28,0.88,12],[0,14,0.78,10],[0,48,0.60,8]]},
+  {x:GW*0.22,y:GH*0.78,r:48,vx:0.025,c0:'#884428',c1:'#100401',
+   bands:[[-6,-12,0.82,8],[4,14,0.72,6]]},
+  {x:GW*1.18,y:GH*0.16,r:72,vx:0.04,c0:'#226642',c1:'#020a05',
+   bands:[[0,-18,0.84,10],[0,22,0.72,8]]},
+];
+function drawPlanets(){
+  for(const p of _PLANETS){
+    p.x-=p.vx;if(p.x<-p.r-20)p.x=GW+p.r+20;
+    const{x,y,r,c0,c1,bands}=p;
+    ctx.save();
+    ctx.globalAlpha=0.06;ctx.fillStyle='#5599ff';
+    ctx.beginPath();ctx.arc(x,y,r+16,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+    const g=ctx.createRadialGradient(x-r*0.28,y-r*0.28,r*0.08,x,y,r);
+    g.addColorStop(0,c0);g.addColorStop(0.55,c1);g.addColorStop(1,'#020304');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+    ctx.globalAlpha=0.09;
+    for(const[ox,oy,rr,th]of bands){ctx.fillStyle='#88aadd';ctx.beginPath();ctx.ellipse(x+ox,y+oy,r*rr,th,0,0,Math.PI*2);ctx.fill();}
+    ctx.globalAlpha=1;
+    const rs=ctx.createRadialGradient(x+r*0.35,y,r*0.2,x,y,r);
+    rs.addColorStop(0,'rgba(0,0,0,0)');rs.addColorStop(0.6,'rgba(0,0,0,0)');rs.addColorStop(1,'rgba(0,0,0,0.72)');
+    ctx.fillStyle=rs;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
 }
 // ── Draw ───────────────────────────────────────────────────────────────────────
 function draw(){
@@ -1459,7 +1588,8 @@ function draw(){
   _nb4.addColorStop(0,rgba(28,6,8,0.32));_nb4.addColorStop(1,'rgba(0,0,0,0)');
   ctx.fillStyle=_nb4;ctx.fillRect(0,0,GW,GH);
   for(const s of stars)s.draw();
-  drawPlanet();
+  for(const r of bgRocks)r.draw();
+  drawPlanets();
 
   if(gameState==='intro'){drawIntro();return;}
   if(gameState==='menu'){drawMenu();return;}
