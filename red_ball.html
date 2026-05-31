@@ -81,8 +81,90 @@ function roundRect(x,y,w,h,r){
 function rgba(r,g,b,a){return`rgba(${r},${g},${b},${a})`;}
 
 // ── Level data ────────────────────────────────────────────────────────────────
+
+// ── Themes ────────────────────────────────────────────────────────────────────
+const THEMES={
+  grass:  {b:'#623e20',t:'#4e9438',s:'#3c8230',e:'#000000',mb:'#c88c3a',ms:'#9e6c26'},
+  stone:  {b:'#4c4c5e',t:'#828290',s:'#9e9eae',e:'#303038',mb:'#7e7e90',ms:'#505060'},
+  ice:    {b:'#6090b8',t:'#b0d8f8',s:'#d8f0ff',e:'#307098',mb:'#86bce4',ms:'#4880a0'},
+  lava:   {b:'#1c0800',t:'#581400',s:'#882600',e:'#380000',mb:'#6c2a00',ms:'#4c1800'},
+  wood:   {b:'#362010',t:'#63320e',s:'#7a4518',e:'#1c0a00',mb:'#8a5028',ms:'#603818'},
+  metal:  {b:'#282838',t:'#484860',s:'#64647c',e:'#14141c',mb:'#4e4e68',ms:'#2c2c40'},
+  crystal:{b:'#0a1218',t:'#1a3e68',s:'#286090',e:'#0c1828',mb:'#285580',ms:'#162e52'},
+  cloud:  {b:'#b0cce8',t:'#e8f4ff',s:'#ffffff',e:'#88aac8',mb:'#d8ecff',ms:'#a8c4e0'},
+};
+
+function drawDecorEl(d){
+  const x=d.x-camX,y=d.y,s=d.s||1;
+  if(x<-200||x>GW+200)return;
+  ctx.save();
+  if(d.t==='tree'){
+    ctx.fillStyle='#4a2a10';ctx.fillRect(x-5*s,y-40*s,10*s,40*s);
+    ctx.fillStyle='#265e1c';ctx.beginPath();ctx.arc(x,y-56*s,22*s,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#1e4e14';
+    ctx.beginPath();ctx.arc(x-14*s,y-44*s,14*s,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(x+12*s,y-46*s,14*s,0,Math.PI*2);ctx.fill();
+  } else if(d.t==='pine'){
+    ctx.fillStyle='#3a3228';ctx.fillRect(x-4*s,y,8*s,14*s);
+    ctx.fillStyle='#2a4a10';
+    ctx.beginPath();ctx.moveTo(x,y-92*s);ctx.lineTo(x-28*s,y);ctx.lineTo(x+28*s,y);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#365818';
+    ctx.beginPath();ctx.moveTo(x,y-68*s);ctx.lineTo(x-22*s,y-18*s);ctx.lineTo(x+22*s,y-18*s);ctx.closePath();ctx.fill();
+  } else if(d.t==='rock'){
+    ctx.fillStyle='#666070';
+    ctx.beginPath();ctx.ellipse(x,y-10*s,26*s,15*s,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#7e7a88';
+    ctx.beginPath();ctx.ellipse(x-5*s,y-17*s,15*s,10*s,-0.3,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#54505c';
+    ctx.beginPath();ctx.ellipse(x+8*s,y-6*s,14*s,9*s,0.2,0,Math.PI*2);ctx.fill();
+  } else if(d.t==='crystal'){
+    const cs=['#3880e0','#4ea0f0','#5858c8','#3e68d8'];
+    [[0,62,10],[-14,46,8],[13,52,8],[22,36,7],[-20,30,5]].forEach(([ox,h,w],i)=>{
+      ctx.fillStyle=cs[i%4];ctx.globalAlpha=0.72;
+      ctx.beginPath();ctx.moveTo(x+ox*s,y);ctx.lineTo(x+(ox-w)*s,y-h*s);ctx.lineTo(x+(ox+w)*s,y-h*s);ctx.closePath();ctx.fill();
+    });
+    ctx.globalAlpha=1;
+  } else if(d.t==='pillar'){
+    ctx.fillStyle='#8a7e6e';ctx.fillRect(x-10*s,y-82*s,20*s,82*s);
+    ctx.fillStyle='#b4a890';ctx.fillRect(x-13*s,y-84*s,26*s,8*s);ctx.fillRect(x-13*s,y-6*s,26*s,8*s);
+    ctx.fillStyle='#d0c4b0';ctx.fillRect(x-10*s,y-78*s,8*s,4*s);
+  } else if(d.t==='deadtree'){
+    ctx.strokeStyle='#3a3640';ctx.lineWidth=5*s;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-4*s,y-72*s);ctx.stroke();
+    ctx.lineWidth=3*s;
+    ctx.beginPath();ctx.moveTo(x-4*s,y-50*s);ctx.lineTo(x-26*s,y-34*s);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x-4*s,y-59*s);ctx.lineTo(x+19*s,y-42*s);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x-4*s,y-68*s);ctx.lineTo(x-14*s,y-76*s);ctx.stroke();
+  } else if(d.t==='mushroom'){
+    ctx.fillStyle='#a07850';ctx.fillRect(x-5*s,y-38*s,10*s,38*s);
+    ctx.fillStyle='#c02e06';ctx.beginPath();ctx.arc(x,y-38*s,34*s,Math.PI,0);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#e86030';
+    [[0,-50,5],[-16,-42,4],[14,-42,4]].forEach(([ox,oy,r])=>{
+      ctx.beginPath();ctx.arc(x+ox*s,y+oy*s,r*s,0,Math.PI*2);ctx.fill();
+    });
+    ctx.fillStyle='#e0c890';ctx.beginPath();ctx.ellipse(x,y-38*s,34*s,8*s,0,0,Math.PI*2);ctx.fill();
+  } else if(d.t==='icepillar'){
+    const ig=ctx.createLinearGradient(x-9*s,0,x+9*s,0);
+    ig.addColorStop(0,'#88c0e8');ig.addColorStop(0.5,'#d0f0ff');ig.addColorStop(1,'#88c0e8');
+    ctx.fillStyle=ig;ctx.fillRect(x-9*s,y-74*s,18*s,74*s);
+    ctx.fillStyle='rgba(255,255,255,0.45)';ctx.fillRect(x-4*s,y-72*s,5*s,64*s);
+    ctx.fillStyle='#b8e8ff';
+    ctx.beginPath();ctx.moveTo(x,y-92*s);ctx.lineTo(x-9*s,y-74*s);ctx.lineTo(x+9*s,y-74*s);ctx.closePath();ctx.fill();
+  } else if(d.t==='bgcloud'){
+    ctx.fillStyle='rgba(255,255,255,0.18)';
+    ctx.beginPath();ctx.arc(x,y,38*s,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(x+32*s,y+8*s,28*s,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(x-28*s,y+10*s,22*s,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(x+14*s,y-12*s,22*s,0,Math.PI*2);ctx.fill();
+  }
+  ctx.restore();
+}
+function drawDecor(){
+  for(const d of (LEVELS[lv].decor||[]))drawDecorEl(d);
+}
+
 const LEVELS=[
-{name:'Green Hills',bg:[112,170,228],ww:3200,start:[70,470],flag:[3100,478],
+{name:'Green Hills',theme:'grass',bg:[112,170,228],ww:3200,start:[70,470],flag:[3100,478],
  plats:[
   {x:0,y:500,w:700,h:100},{x:780,y:500,w:500,h:100},{x:1380,y:500,w:500,h:100},
   {x:1980,y:500,w:400,h:100},{x:2480,y:500,w:720,h:100},
@@ -102,8 +184,9 @@ const LEVELS=[
   {x:1560,y:345},{x:2100,y:385},{x:2620,y:385},{x:3010,y:385},
  ],
  spikes:[],
+ decor:[{t:'tree',x:200,y:500,s:1},{t:'tree',x:900,y:500,s:1.1},{t:'tree',x:1600,y:500,s:0.9},{t:'tree',x:2400,y:500,s:1.2},{t:'tree',x:3000,y:500,s:1}],
 },
-{name:'Blue Bridges',bg:[90,140,210],ww:3800,start:[70,470],flag:[3680,478],
+{name:'Blue Bridges',theme:'grass',bg:[90,140,210],ww:3800,start:[70,470],flag:[3680,478],
  plats:[
   {x:0,y:500,w:500,h:100},{x:600,y:500,w:300,h:100},{x:1000,y:500,w:300,h:100},
   {x:1400,y:500,w:300,h:100},{x:1800,y:500,w:500,h:100},{x:2400,y:500,w:300,h:100},
@@ -130,8 +213,9 @@ const LEVELS=[
   {x:1630,y:305},{x:2060,y:305},{x:2310,y:345},{x:2660,y:365},{x:3210,y:305},{x:3510,y:345},
  ],
  spikes:[{x:1350,y:500,n:2}],
+ decor:[{t:'pine',x:300,y:500,s:1},{t:'pine',x:850,y:500,s:0.9},{t:'pine',x:1500,y:500,s:1.1},{t:'pine',x:2300,y:500,s:1},{t:'pine',x:3400,y:500,s:0.9}],
 },
-{name:'Rocky Heights',bg:[80,120,175],ww:4200,start:[70,470],flag:[4080,478],
+{name:'Rocky Heights',theme:'stone',bg:[80,120,175],ww:4200,start:[70,470],flag:[4080,478],
  plats:[
   {x:0,y:500,w:600,h:100},{x:700,y:500,w:400,h:100},{x:1200,y:500,w:300,h:100},
   {x:1600,y:500,w:400,h:100},{x:2100,y:500,w:300,h:100},{x:2600,y:500,w:600,h:100},
@@ -163,8 +247,9 @@ const LEVELS=[
   {x:3010,y:345},{x:3210,y:305},{x:3410,y:345},{x:3810,y:345},{x:4010,y:385},
  ],
  spikes:[{x:700,y:500,n:2},{x:1900,y:500,n:3},{x:2800,y:500,n:2}],
+ decor:[{t:'rock',x:350,y:500,s:1.2},{t:'rock',x:900,y:500,s:1},{t:'rock',x:1600,y:500,s:1.3},{t:'rock',x:2400,y:500,s:1.1},{t:'rock',x:3200,y:500,s:1.2}],
 },
-{name:'Danger Zone',bg:[75,55,90],ww:4600,start:[70,470],flag:[4480,478],
+{name:'Danger Zone',theme:'stone',bg:[75,55,90],ww:4600,start:[70,470],flag:[4480,478],
  plats:[
   {x:0,y:500,w:500,h:100},{x:600,y:500,w:300,h:100},{x:1100,y:500,w:300,h:100},
   {x:1600,y:500,w:300,h:100},{x:2100,y:500,w:400,h:100},{x:2700,y:500,w:300,h:100},
@@ -201,11 +286,12 @@ const LEVELS=[
   {x:4060,y:345},{x:4260,y:385},
  ],
  spikes:[
+ decor:[{t:'pillar',x:400,y:500,s:1},{t:'rock',x:900,y:500,s:1.2},{t:'pillar',x:1600,y:500,s:0.9},{t:'rock',x:2400,y:500,s:1.3},{t:'pillar',x:3200,y:500,s:1.1},{t:'rock',x:4000,y:500,s:1.2}],
   {x:550,y:500,n:2},{x:1000,y:500,n:3},{x:1600,y:500,n:2},
   {x:2300,y:500,n:3},{x:3000,y:500,n:3},{x:3700,y:500,n:2},
  ],
 },
-{name:'Final Castle',bg:[55,35,65],ww:5200,start:[70,470],flag:[5080,478],
+{name:'Final Castle',theme:'stone',bg:[55,35,65],ww:5200,start:[70,470],flag:[5080,478],
  plats:[
   {x:0,y:500,w:450,h:100},{x:550,y:500,w:300,h:100},{x:1050,y:500,w:300,h:100},
   {x:1550,y:500,w:300,h:100},{x:2100,y:500,w:300,h:100},{x:2700,y:500,w:300,h:100},
@@ -247,12 +333,13 @@ const LEVELS=[
   {x:3960,y:305},{x:4210,y:345},{x:4460,y:385},{x:4710,y:345},{x:4960,y:385},
  ],
  spikes:[
+ decor:[{t:'pillar',x:300,y:500,s:1.2},{t:'pillar',x:1000,y:500,s:1},{t:'pillar',x:2000,y:500,s:1.3},{t:'pillar',x:3200,y:500,s:1},{t:'pillar',x:4300,y:500,s:1.2},{t:'pillar',x:5100,y:500,s:0.9}],
   {x:500,y:500,n:2},{x:1000,y:500,n:3},{x:1500,y:500,n:2},{x:2050,y:500,n:3},
   {x:2650,y:500,n:3},{x:3250,y:500,n:3},{x:3850,y:500,n:2},{x:4450,y:500,n:2},
  ],
 },
 // ── Level 6 ──────────────────────────────────────────────────────────────────
-{name:'Crystal Caves',bg:[45,80,130],ww:3600,start:[70,470],flag:[3480,478],
+{name:'Crystal Caves',theme:'crystal',bg:[45,80,130],ww:3600,start:[70,470],flag:[3480,478],
  plats:[
   {x:0,y:500,w:540,h:100},{x:650,y:500,w:350,h:100},{x:1100,y:500,w:350,h:100},
   {x:1560,y:500,w:350,h:100},{x:2020,y:500,w:400,h:100},{x:2530,y:500,w:400,h:100},
@@ -285,9 +372,10 @@ const LEVELS=[
   {x:3010,y:340},{x:3240,y:380},{x:3430,y:340},
  ],
  spikes:[{x:610,y:500,n:2},{x:1490,y:500,n:2},{x:2460,y:500,n:3},{x:2990,y:500,n:2}],
+ decor:[{t:'crystal',x:200,y:500,s:1.2},{t:'crystal',x:700,y:500,s:1},{t:'crystal',x:1400,y:500,s:1.4},{t:'crystal',x:2100,y:500,s:1.1},{t:'crystal',x:2800,y:500,s:1.3},{t:'crystal',x:3400,y:500,s:1}],
 },
 // ── Level 7 ──────────────────────────────────────────────────────────────────
-{name:'Lava Fields',bg:[110,45,15],ww:4000,start:[70,470],flag:[3880,478],
+{name:'Lava Fields',theme:'lava',bg:[110,45,15],ww:4000,start:[70,470],flag:[3880,478],
  plats:[
   {x:0,y:500,w:500,h:100},{x:610,y:500,w:300,h:100},{x:1010,y:500,w:300,h:100},
   {x:1410,y:500,w:300,h:100},{x:1820,y:500,w:360,h:100},{x:2290,y:500,w:360,h:100},
@@ -324,13 +412,14 @@ const LEVELS=[
   {x:3700,y:320},{x:3840,y:360},
  ],
  spikes:[
+ decor:[{t:'rock',x:300,y:500,s:1.3},{t:'rock',x:800,y:500,s:1.5},{t:'rock',x:1500,y:500,s:1.2},{t:'rock',x:2300,y:500,s:1.4},{t:'rock',x:3200,y:500,s:1.1},{t:'rock',x:3700,y:500,s:1.5}],
   {x:560,y:500,n:3},{x:970,y:500,n:2},{x:1370,y:500,n:3},
   {x:1780,y:500,n:3},{x:2250,y:500,n:2},{x:2740,y:500,n:3},
   {x:3220,y:500,n:2},{x:3770,y:500,n:2},
  ],
 },
 // ── Level 8 ──────────────────────────────────────────────────────────────────
-{name:'Sky Islands',bg:[100,175,240],ww:4200,start:[70,470],flag:[4090,478],
+{name:'Sky Islands',theme:'cloud',bg:[100,175,240],ww:4200,start:[70,470],flag:[4090,478],
  plats:[
   {x:0,y:500,w:440,h:100},{x:1760,y:500,w:300,h:100},{x:2980,y:500,w:420,h:100},
   {x:3980,y:500,w:220,h:100},
@@ -362,9 +451,10 @@ const LEVELS=[
   {x:3590,y:300},{x:3780,y:340},{x:3950,y:380},
  ],
  spikes:[{x:430,y:500,n:3},{x:1750,y:500,n:2},{x:2970,y:500,n:3}],
+ decor:[{t:'bgcloud',x:250,y:260,s:1.6},{t:'bgcloud',x:900,y:310,s:2},{t:'bgcloud',x:1600,y:240,s:1.8},{t:'bgcloud',x:2300,y:280,s:2.2},{t:'bgcloud',x:3100,y:260,s:1.7},{t:'bgcloud',x:3900,y:300,s:1.5}],
 },
 // ── Level 9 ──────────────────────────────────────────────────────────────────
-{name:'Midnight Marsh',bg:[20,35,55],ww:4400,start:[70,470],flag:[4280,478],
+{name:'Midnight Marsh',theme:'wood',bg:[20,35,55],ww:4400,start:[70,470],flag:[4280,478],
  plats:[
   {x:0,y:500,w:480,h:100},{x:590,y:500,w:300,h:100},{x:1000,y:500,w:300,h:100},
   {x:1400,y:500,w:300,h:100},{x:1810,y:500,w:350,h:100},{x:2280,y:500,w:350,h:100},
@@ -404,12 +494,13 @@ const LEVELS=[
   {x:3690,y:320},{x:3890,y:360},{x:4110,y:380},{x:4270,y:340},
  ],
  spikes:[
+ decor:[{t:'deadtree',x:300,y:500,s:1},{t:'deadtree',x:900,y:500,s:1.1},{t:'deadtree',x:1700,y:500,s:0.9},{t:'deadtree',x:2600,y:500,s:1.2},{t:'deadtree',x:3600,y:500,s:1}],
   {x:550,y:500,n:2},{x:960,y:500,n:3},{x:1360,y:500,n:2},{x:1770,y:500,n:3},
   {x:2240,y:500,n:3},{x:2720,y:500,n:3},{x:3210,y:500,n:2},{x:3760,y:500,n:2},
  ],
 },
 // ── Level 10 ─────────────────────────────────────────────────────────────────
-{name:'Mystic Forest',bg:[20,60,30],ww:4600,start:[70,470],flag:[4490,478],
+{name:'Mystic Forest',theme:'wood',bg:[20,60,30],ww:4600,start:[70,470],flag:[4490,478],
  plats:[
   {x:0,y:500,w:460,h:100},{x:570,y:500,w:300,h:100},{x:980,y:500,w:300,h:100},
   {x:1390,y:500,w:300,h:100},{x:1800,y:500,w:350,h:100},{x:2270,y:500,w:350,h:100},
@@ -451,13 +542,14 @@ const LEVELS=[
   {x:3790,y:320},{x:3990,y:280},{x:4280,y:320},{x:4480,y:360},
  ],
  spikes:[
+ decor:[{t:'mushroom',x:200,y:500,s:1},{t:'tree',x:700,y:500,s:1.1},{t:'mushroom',x:1400,y:500,s:1.2},{t:'tree',x:2100,y:500,s:0.9},{t:'mushroom',x:2900,y:500,s:1.1},{t:'tree',x:3700,y:500,s:1},{t:'mushroom',x:4400,y:500,s:1.2}],
   {x:530,y:500,n:2},{x:940,y:500,n:3},{x:1350,y:500,n:2},{x:1760,y:500,n:3},
   {x:2230,y:500,n:3},{x:2720,y:500,n:3},{x:3220,y:500,n:3},{x:3720,y:500,n:3},
   {x:4210,y:500,n:2},
  ],
 },
 // ── Level 11 ─────────────────────────────────────────────────────────────────
-{name:'Ice Cliffs',bg:[170,210,235],ww:4800,start:[70,470],flag:[4690,478],
+{name:'Ice Cliffs',theme:'ice',bg:[170,210,235],ww:4800,start:[70,470],flag:[4690,478],
  plats:[
   {x:0,y:500,w:440,h:100},{x:560,y:500,w:280,h:100},{x:950,y:500,w:280,h:100},
   {x:1340,y:500,w:280,h:100},{x:1730,y:500,w:320,h:100},{x:2180,y:500,w:320,h:100},
@@ -502,13 +594,14 @@ const LEVELS=[
   {x:4570,y:315},{x:4690,y:355},
  ],
  spikes:[
+ decor:[{t:'icepillar',x:300,y:500,s:1},{t:'icepillar',x:900,y:500,s:1.2},{t:'icepillar',x:1600,y:500,s:0.9},{t:'icepillar',x:2500,y:500,s:1.1},{t:'icepillar',x:3400,y:500,s:1.3},{t:'icepillar',x:4300,y:500,s:1}],
   {x:520,y:500,n:3},{x:910,y:500,n:3},{x:1300,y:500,n:3},{x:1690,y:500,n:3},
   {x:2140,y:500,n:3},{x:2620,y:500,n:3},{x:3090,y:500,n:3},{x:3580,y:500,n:3},
   {x:4080,y:500,n:3},{x:4560,y:500,n:2},
  ],
 },
 // ── Level 12 ─────────────────────────────────────────────────────────────────
-{name:'Thunder Pass',bg:[55,55,80],ww:5000,start:[70,470],flag:[4890,478],
+{name:'Thunder Pass',theme:'stone',bg:[55,55,80],ww:5000,start:[70,470],flag:[4890,478],
  plats:[
   {x:0,y:500,w:420,h:100},{x:530,y:500,w:270,h:100},{x:910,y:500,w:270,h:100},
   {x:1290,y:500,w:270,h:100},{x:1680,y:500,w:310,h:100},{x:2120,y:500,w:310,h:100},
@@ -554,13 +647,14 @@ const LEVELS=[
   {x:4520,y:310},{x:4730,y:350},{x:4890,y:375},
  ],
  spikes:[
+ decor:[{t:'rock',x:350,y:500,s:1.2},{t:'pillar',x:900,y:500,s:1},{t:'rock',x:1600,y:500,s:1.4},{t:'pillar',x:2400,y:500,s:1.1},{t:'rock',x:3200,y:500,s:1.3},{t:'pillar',x:4100,y:500,s:1},{t:'rock',x:4800,y:500,s:1.2}],
   {x:495,y:500,n:3},{x:875,y:500,n:3},{x:1255,y:500,n:3},{x:1645,y:500,n:3},
   {x:2085,y:500,n:3},{x:2535,y:500,n:3},{x:2995,y:500,n:3},{x:3475,y:500,n:3},
   {x:3965,y:500,n:3},{x:4460,y:500,n:3},
  ],
 },
 // ── Level 13 ─────────────────────────────────────────────────────────────────
-{name:'Inferno Depths',bg:[75,10,5],ww:5000,start:[70,470],flag:[4880,478],
+{name:'Inferno Depths',theme:'lava',bg:[75,10,5],ww:5000,start:[70,470],flag:[4880,478],
  plats:[
   {x:0,y:500,w:400,h:100},{x:520,y:500,w:260,h:100},{x:900,y:500,w:260,h:100},
   {x:1280,y:500,w:260,h:100},{x:1680,y:500,w:300,h:100},{x:2120,y:500,w:300,h:100},
@@ -606,13 +700,14 @@ const LEVELS=[
   {x:4590,y:305},{x:4810,y:345},{x:4910,y:380},
  ],
  spikes:[
+ decor:[{t:'rock',x:300,y:500,s:1.4},{t:'rock',x:900,y:500,s:1.2},{t:'rock',x:1600,y:500,s:1.5},{t:'rock',x:2500,y:500,s:1.3},{t:'rock',x:3400,y:500,s:1.4},{t:'rock',x:4400,y:500,s:1.2}],
   {x:485,y:500,n:3},{x:865,y:500,n:3},{x:1245,y:500,n:3},{x:1645,y:500,n:3},
   {x:2085,y:500,n:3},{x:2545,y:500,n:3},{x:3025,y:500,n:3},{x:3525,y:500,n:3},
   {x:4025,y:500,n:3},{x:4525,y:500,n:3},
  ],
 },
 // ── Level 14 ─────────────────────────────────────────────────────────────────
-{name:'Haunted Ruins',bg:[38,18,52],ww:5200,start:[70,470],flag:[5090,478],
+{name:'Haunted Ruins',theme:'stone',bg:[38,18,52],ww:5200,start:[70,470],flag:[5090,478],
  plats:[
   {x:0,y:500,w:380,h:100},{x:500,y:500,w:250,h:100},{x:870,y:500,w:250,h:100},
   {x:1240,y:500,w:250,h:100},{x:1630,y:500,w:280,h:100},{x:2070,y:500,w:280,h:100},
@@ -660,13 +755,14 @@ const LEVELS=[
   {x:4540,y:305},{x:4830,y:345},{x:5020,y:375},
  ],
  spikes:[
+ decor:[{t:'deadtree',x:400,y:500,s:1},{t:'pillar',x:900,y:500,s:1},{t:'deadtree',x:1600,y:500,s:1.1},{t:'pillar',x:2500,y:500,s:0.9},{t:'deadtree',x:3300,y:500,s:1.2},{t:'pillar',x:4100,y:500,s:1.1},{t:'deadtree',x:4900,y:500,s:1}],
   {x:465,y:500,n:3},{x:835,y:500,n:3},{x:1205,y:500,n:3},{x:1595,y:500,n:3},
   {x:2035,y:500,n:3},{x:2485,y:500,n:3},{x:2945,y:500,n:3},{x:3445,y:500,n:3},
   {x:3955,y:500,n:3},{x:4475,y:500,n:3},{x:4945,y:500,n:3},
  ],
 },
 // ── Level 15 ─────────────────────────────────────────────────────────────────
-{name:'Shadow Realm',bg:[12,8,18],ww:5400,start:[70,470],flag:[5290,478],
+{name:'Shadow Realm',theme:'metal',bg:[12,8,18],ww:5400,start:[70,470],flag:[5290,478],
  plats:[
   {x:0,y:500,w:360,h:100},{x:480,y:500,w:240,h:100},{x:840,y:500,w:240,h:100},
   {x:1200,y:500,w:240,h:100},{x:1580,y:500,w:270,h:100},{x:2010,y:500,w:270,h:100},
@@ -714,13 +810,14 @@ const LEVELS=[
   {x:4470,y:305},{x:4790,y:345},{x:4980,y:375},{x:5200,y:340},
  ],
  spikes:[
+ decor:[{t:'pillar',x:350,y:500,s:1.1},{t:'crystal',x:900,y:500,s:1},{t:'pillar',x:1700,y:500,s:1.2},{t:'crystal',x:2600,y:500,s:1.1},{t:'pillar',x:3500,y:500,s:1.3},{t:'crystal',x:4400,y:500,s:1}],
   {x:445,y:500,n:3},{x:805,y:500,n:3},{x:1165,y:500,n:3},{x:1545,y:500,n:3},
   {x:1975,y:500,n:3},{x:2425,y:500,n:3},{x:2885,y:500,n:3},{x:3375,y:500,n:3},
   {x:3885,y:500,n:3},{x:4405,y:500,n:3},{x:4915,y:500,n:3},
  ],
 },
 // ── Level 16 ─────────────────────────────────────────────────────────────────
-{name:'Storm Wastes',bg:[45,50,65],ww:5400,start:[70,470],flag:[5290,478],
+{name:'Storm Wastes',theme:'stone',bg:[45,50,65],ww:5400,start:[70,470],flag:[5290,478],
  plats:[
   {x:0,y:500,w:350,h:100},{x:470,y:500,w:230,h:100},{x:820,y:500,w:230,h:100},
   {x:1170,y:500,w:230,h:100},{x:1560,y:500,w:260,h:100},{x:1990,y:500,w:260,h:100},
@@ -768,13 +865,14 @@ const LEVELS=[
   {x:4460,y:303},{x:4800,y:343},{x:5010,y:373},{x:5210,y:335},
  ],
  spikes:[
+ decor:[{t:'rock',x:400,y:500,s:1.3},{t:'rock',x:1100,y:500,s:1.5},{t:'deadtree',x:1800,y:500,s:1},{t:'rock',x:2700,y:500,s:1.4},{t:'deadtree',x:3600,y:500,s:1.1},{t:'rock',x:4500,y:500,s:1.3},{t:'rock',x:5200,y:500,s:1}],
   {x:435,y:500,n:3},{x:785,y:500,n:3},{x:1135,y:500,n:3},{x:1525,y:500,n:3},
   {x:1955,y:500,n:3},{x:2395,y:500,n:3},{x:2855,y:500,n:3},{x:3345,y:500,n:3},
   {x:3865,y:500,n:3},{x:4395,y:500,n:3},{x:4945,y:500,n:3},
  ],
 },
 // ── Level 17 ─────────────────────────────────────────────────────────────────
-{name:'Nether Passage',bg:[18,5,28],ww:5600,start:[70,470],flag:[5490,478],
+{name:'Nether Passage',theme:'crystal',bg:[18,5,28],ww:5600,start:[70,470],flag:[5490,478],
  plats:[
   {x:0,y:500,w:340,h:100},{x:460,y:500,w:220,h:100},{x:800,y:500,w:220,h:100},
   {x:1140,y:500,w:220,h:100},{x:1520,y:500,w:250,h:100},{x:1960,y:500,w:250,h:100},
@@ -824,13 +922,14 @@ const LEVELS=[
   {x:4470,y:300},{x:4870,y:340},{x:5040,y:373},{x:5310,y:335},
  ],
  spikes:[
+ decor:[{t:'crystal',x:300,y:500,s:1.3},{t:'crystal',x:900,y:500,s:1.5},{t:'crystal',x:1700,y:500,s:1.1},{t:'crystal',x:2500,y:500,s:1.4},{t:'crystal',x:3400,y:500,s:1.2},{t:'crystal',x:4400,y:500,s:1.6},{t:'crystal',x:5200,y:500,s:1.3}],
   {x:425,y:500,n:3},{x:765,y:500,n:3},{x:1105,y:500,n:3},{x:1485,y:500,n:3},
   {x:1925,y:500,n:3},{x:2375,y:500,n:3},{x:2835,y:500,n:3},{x:3325,y:500,n:3},
   {x:3845,y:500,n:3},{x:4405,y:500,n:3},{x:4975,y:500,n:3},{x:5345,y:500,n:2},
  ],
 },
 // ── Level 18 ─────────────────────────────────────────────────────────────────
-{name:'Void Rifts',bg:[6,5,18],ww:5600,start:[70,470],flag:[5490,478],
+{name:'Void Rifts',theme:'metal',bg:[6,5,18],ww:5600,start:[70,470],flag:[5490,478],
  plats:[
   {x:0,y:500,w:330,h:100},{x:450,y:500,w:210,h:100},{x:780,y:500,w:210,h:100},
   {x:1110,y:500,w:210,h:100},{x:1490,y:500,w:240,h:100},{x:1940,y:500,w:240,h:100},
@@ -880,13 +979,14 @@ const LEVELS=[
   {x:4510,y:297},{x:4960,y:337},{x:5110,y:370},{x:5390,y:333},
  ],
  spikes:[
+ decor:[{t:'pillar',x:400,y:500,s:1.1},{t:'crystal',x:1000,y:500,s:1.3},{t:'pillar',x:1900,y:500,s:1},{t:'crystal',x:2800,y:500,s:1.4},{t:'pillar',x:3700,y:500,s:1.2},{t:'crystal',x:4600,y:500,s:1.3},{t:'pillar',x:5300,y:500,s:1}],
   {x:415,y:500,n:3},{x:745,y:500,n:3},{x:1075,y:500,n:3},{x:1455,y:500,n:3},
   {x:1905,y:500,n:3},{x:2365,y:500,n:3},{x:2835,y:500,n:3},{x:3335,y:500,n:3},
   {x:3865,y:500,n:3},{x:4445,y:500,n:3},{x:5045,y:500,n:3},{x:5385,y:500,n:2},
  ],
 },
 // ── Level 19 ─────────────────────────────────────────────────────────────────
-{name:'Crimson Keep',bg:[55,5,5],ww:5800,start:[70,470],flag:[5690,478],
+{name:'Crimson Keep',theme:'lava',bg:[55,5,5],ww:5800,start:[70,470],flag:[5690,478],
  plats:[
   {x:0,y:500,w:320,h:100},{x:440,y:500,w:200,h:100},{x:760,y:500,w:200,h:100},
   {x:1080,y:500,w:200,h:100},{x:1460,y:500,w:230,h:100},{x:1910,y:500,w:230,h:100},
@@ -937,13 +1037,14 @@ const LEVELS=[
   {x:4560,y:293},{x:5020,y:333},{x:5150,y:368},{x:5470,y:330},
  ],
  spikes:[
+ decor:[{t:'rock',x:350,y:500,s:1.5},{t:'deadtree',x:900,y:500,s:1.1},{t:'rock',x:1700,y:500,s:1.4},{t:'pillar',x:2600,y:500,s:1.2},{t:'rock',x:3500,y:500,s:1.6},{t:'deadtree',x:4400,y:500,s:1.1},{t:'rock',x:5200,y:500,s:1.4}],
   {x:405,y:500,n:3},{x:725,y:500,n:3},{x:1045,y:500,n:3},{x:1425,y:500,n:3},
   {x:1875,y:500,n:3},{x:2345,y:500,n:3},{x:2835,y:500,n:3},{x:3355,y:500,n:3},
   {x:3905,y:500,n:3},{x:4495,y:500,n:3},{x:5085,y:500,n:3},{x:5485,y:500,n:2},
  ],
 },
 // ── Level 20 ─────────────────────────────────────────────────────────────────
-{name:'Final Gauntlet',bg:[8,3,12],ww:6000,start:[70,470],flag:[5890,478],
+{name:'Final Gauntlet',theme:'crystal',bg:[8,3,12],ww:6000,start:[70,470],flag:[5890,478],
  plats:[
   {x:0,y:500,w:310,h:100},{x:430,y:500,w:195,h:100},{x:745,y:500,w:195,h:100},
   {x:1060,y:500,w:195,h:100},{x:1435,y:500,w:220,h:100},{x:1885,y:500,w:220,h:100},
@@ -997,6 +1098,7 @@ const LEVELS=[
   {x:5770,y:360},{x:5910,y:385},
  ],
  spikes:[
+ decor:[{t:'crystal',x:400,y:500,s:1.5},{t:'pillar',x:1100,y:500,s:1.3},{t:'crystal',x:1900,y:500,s:1.7},{t:'pillar',x:2800,y:500,s:1.2},{t:'crystal',x:3700,y:500,s:1.6},{t:'pillar',x:4700,y:500,s:1.4},{t:'crystal',x:5500,y:500,s:1.8},{t:'pillar',x:5900,y:500,s:1.3}],
   {x:395,y:500,n:3},{x:710,y:500,n:3},{x:1025,y:500,n:3},{x:1400,y:500,n:3},
   {x:1850,y:500,n:3},{x:2325,y:500,n:3},{x:2825,y:500,n:3},{x:3365,y:500,n:3},
   {x:3945,y:500,n:3},{x:4565,y:500,n:3},{x:5165,y:500,n:3},{x:5705,y:500,n:3},
@@ -1303,22 +1405,24 @@ function drawSky(bg){
 }
 
 function drawPlats(){
+  const th=THEMES[LEVELS[lv].theme]||THEMES.grass;
   for(const p of plats){
     const px=p.x-camX;
     if(px>GW||px+p.w<0)continue;
-    ctx.fillStyle='#623e20';ctx.fillRect(px,p.y,p.w,p.h);
-    ctx.fillStyle='#4e9438';ctx.fillRect(px,p.y,p.w,14);
-    ctx.fillStyle='#3c8230';ctx.fillRect(px,p.y,p.w,6);
-    ctx.strokeStyle='#000';ctx.lineWidth=1;ctx.strokeRect(px,p.y,p.w,p.h);
+    ctx.fillStyle=th.b;ctx.fillRect(px,p.y,p.w,p.h);
+    ctx.fillStyle=th.t;ctx.fillRect(px,p.y,p.w,14);
+    ctx.fillStyle=th.s;ctx.fillRect(px,p.y,p.w,6);
+    ctx.strokeStyle=th.e;ctx.lineWidth=1;ctx.strokeRect(px,p.y,p.w,p.h);
   }
 }
 
 function drawMPlats(){
+  const th=THEMES[LEVELS[lv].theme]||THEMES.grass;
   for(const m of mplats){
     const mx=m.x-camX;
     if(mx>GW||mx+m.w<0)continue;
-    ctx.fillStyle='#c88c3a';roundRect(mx,m.y,m.w,m.h,5);ctx.fill();
-    ctx.strokeStyle='#9e6c26';ctx.lineWidth=2;ctx.stroke();
+    ctx.fillStyle=th.mb;roundRect(mx,m.y,m.w,m.h,5);ctx.fill();
+    ctx.strokeStyle=th.ms;ctx.lineWidth=2;ctx.stroke();
     // Arrow
     ctx.fillStyle='rgba(255,255,255,0.7)';
     ctx.beginPath();ctx.moveTo(mx+m.w/2-8,m.y+m.h/2+4);
@@ -1482,6 +1586,7 @@ function drawPause(){
 function drawPlay(){
   const ld=LEVELS[lv];
   drawSky(ld.bg);
+  drawDecor();
   drawPlats();drawMPlats();drawSpikes();drawStars();drawEnemies();drawFlag();drawParticles();drawBall();
   // Flash
   if(flashT>0){
