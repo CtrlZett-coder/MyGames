@@ -1192,6 +1192,14 @@ function updateIntro(){
   introT++;
   for(const s of stars)s.update();
   for(const r of bgRocks)r.update();
+  if(actx){
+    if(introT===1||introT===9||introT===16)playTone(260+introT*4,0.2,'sine',0.05);
+    if(introT===65||introT===72||introT===79)SND.shoot();
+    if(introT===82||introT===91||introT===100)SND.boom();
+    if(introT===110)[392,523.25,659.25].forEach((f,i)=>setTimeout(()=>playTone(f,0.4,'triangle',0.048),i*68));
+    if(introT===175)[1046.5,1318.5,1568,2093,2637].forEach((f,i)=>setTimeout(()=>playTone(f,0.55,'sine',0.030),i*55));
+    if(introT===220)playTone(880,0.7,'sine',0.034);
+  }
   if(introT>=300)gameState='menu';
 }
 
@@ -1289,7 +1297,7 @@ function drawIntro(){
   if(fadeA>0){ctx.fillStyle=`rgba(0,0,0,${fadeA})`;ctx.fillRect(0,0,GW,GH);}
 }
 // ── Game state ─────────────────────────────────────────────────────────────────
-let gameState='intro',gameMode='arcade',touchMode=false;
+let gameState='intro',gameMode='arcade',touchMode=('ontouchstart' in window||navigator.maxTouchPoints>0);
 let score=0,level=1,kills=0,killsLevel=10,spawnTimer=0,spawnDelay=90;
 let stars=[],player=null,enemies=[],powerups=[],explosions=[],bosses=[];
 let lvIdx=0,maxUnlocked=loadProgress();
@@ -1880,41 +1888,45 @@ function drawSettings(){
   ctx.strokeStyle='#1e3050';ctx.lineWidth=1;
   ctx.beginPath();ctx.moveTo(30,106);ctx.lineTo(GW-30,106);ctx.stroke();
 
-  // ── Two columns ────────────────────────────────────────────────────────
-  const c1=GW/4,c2=3*GW/4,colY=118;
+  // ── Controls layout ──────────────────────────────────────────────────────
+  const c1=GW/4,c2=touchMode?GW/2:3*GW/4,colY=118;
 
-  // Column headers
-  ctx.fillStyle='#00c8ff';ctx.font='bold 14px sans-serif';ctx.textAlign='center';
-  ctx.fillText('PC CONTROLS',c1,colY);
-  ctx.fillText('PHONE CONTROLS',c2,colY);
-  ctx.strokeStyle='#1e3050';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(GW/2,108);ctx.lineTo(GW/2,530);ctx.stroke();
-
-  // PC: key binding rows
-  const actions=[['up','↑  Up'],['down','↓  Down'],['left','←  Left'],['right','→  Right'],['fire','🔥  Fire']];
-  const rowH=52,rowY=colY+18;
-  actions.forEach(([a,label],i)=>{
-    const y=rowY+i*rowH;
-    const isRebinding=rebindAction===a;
-    ctx.fillStyle=isRebinding?'#ffcc44':'#667788';ctx.font='13px sans-serif';ctx.textAlign='left';
-    ctx.fillText(label,38,y+14);
-    const bw=90,bh=28,bx=c1+10,by=y;
-    btnRects['set_bind_'+a]={x:bx,y:by,w:bw,h:bh};
-    ctx.fillStyle=isRebinding?rgba(80,50,0,0.9):rgba(20,36,56,0.9);
-    roundRect(bx,by,bw,bh,5);ctx.fill();
-    ctx.strokeStyle=isRebinding?'#ffcc44':'#446688';ctx.lineWidth=isRebinding?2:1.5;
-    roundRect(bx,by,bw,bh,5);ctx.stroke();
-    ctx.fillStyle=isRebinding?'#ffcc44':'#aac8e0';
-    ctx.font=isRebinding?'bold 13px monospace':'13px monospace';ctx.textAlign='center';
-    ctx.fillText(isRebinding?'PRESS KEY...':keyName(bindings[a]),bx+bw/2,by+bh/2+5);
-  });
-  // Reset bindings button
-  const rbX=38,rbY=rowY+actions.length*rowH+2,rbW=c1*2-76,rbH=26;
-  btnRects['set_bind_reset']={x:rbX,y:rbY,w:rbW,h:rbH};
-  ctx.fillStyle=rgba(40,10,10,0.8);roundRect(rbX,rbY,rbW,rbH,5);ctx.fill();
-  ctx.strokeStyle='#553333';ctx.lineWidth=1.5;roundRect(rbX,rbY,rbW,rbH,5);ctx.stroke();
-  ctx.fillStyle='#aa6655';ctx.font='12px sans-serif';ctx.textAlign='center';
-  ctx.fillText('↺ Reset to defaults',rbX+rbW/2,rbY+rbH/2+5);
+  if(!touchMode){
+    // Column headers
+    ctx.fillStyle='#00c8ff';ctx.font='bold 14px sans-serif';ctx.textAlign='center';
+    ctx.fillText('PC CONTROLS',c1,colY);
+    ctx.fillText('PHONE CONTROLS',c2,colY);
+    ctx.strokeStyle='#1e3050';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(GW/2,108);ctx.lineTo(GW/2,530);ctx.stroke();
+    // PC: key binding rows
+    const actions=[['up','↑  Up'],['down','↓  Down'],['left','←  Left'],['right','→  Right'],['fire','🔥  Fire']];
+    const rowH=52,rowY=colY+18;
+    actions.forEach(([a,label],i)=>{
+      const y=rowY+i*rowH;
+      const isRebinding=rebindAction===a;
+      ctx.fillStyle=isRebinding?'#ffcc44':'#667788';ctx.font='13px sans-serif';ctx.textAlign='left';
+      ctx.fillText(label,38,y+14);
+      const bw=90,bh=28,bx=c1+10,by=y;
+      btnRects['set_bind_'+a]={x:bx,y:by,w:bw,h:bh};
+      ctx.fillStyle=isRebinding?rgba(80,50,0,0.9):rgba(20,36,56,0.9);
+      roundRect(bx,by,bw,bh,5);ctx.fill();
+      ctx.strokeStyle=isRebinding?'#ffcc44':'#446688';ctx.lineWidth=isRebinding?2:1.5;
+      roundRect(bx,by,bw,bh,5);ctx.stroke();
+      ctx.fillStyle=isRebinding?'#ffcc44':'#aac8e0';
+      ctx.font=isRebinding?'bold 13px monospace':'13px monospace';ctx.textAlign='center';
+      ctx.fillText(isRebinding?'PRESS KEY...':keyName(bindings[a]),bx+bw/2,by+bh/2+5);
+    });
+    // Reset bindings button
+    const rbX=38,rbY=rowY+actions.length*rowH+2,rbW=c1*2-76,rbH=26;
+    btnRects['set_bind_reset']={x:rbX,y:rbY,w:rbW,h:rbH};
+    ctx.fillStyle=rgba(40,10,10,0.8);roundRect(rbX,rbY,rbW,rbH,5);ctx.fill();
+    ctx.strokeStyle='#553333';ctx.lineWidth=1.5;roundRect(rbX,rbY,rbW,rbH,5);ctx.stroke();
+    ctx.fillStyle='#aa6655';ctx.font='12px sans-serif';ctx.textAlign='center';
+    ctx.fillText('↺ Reset to defaults',rbX+rbW/2,rbY+rbH/2+5);
+  }else{
+    ctx.fillStyle='#00c8ff';ctx.font='bold 16px sans-serif';ctx.textAlign='center';
+    ctx.fillText('PHONE CONTROLS',GW/2,colY);
+  }
 
   // Phone column: joystick size
   const jlvl=Math.round((joyScale-0.5)/0.1);
@@ -1922,10 +1934,10 @@ function drawSettings(){
   const jsW=16,jsGap=3,jtotalW=jsegs*jsW+(jsegs-1)*jsGap;
   const jbtnW=28,jbtnGap=6;
   const jtW=jbtnW+jbtnGap+jtotalW+jbtnGap+jbtnW;
-  const jbx0=Math.round(GW/2+(GW/2-jtW)/2);
+  const jbx0=touchMode?Math.round((GW-jtW)/2):Math.round(GW/2+(GW/2-jtW)/2);
   const jbY=colY+14;
   ctx.fillStyle='#aaaaaa';ctx.font='bold 13px sans-serif';ctx.textAlign='left';
-  ctx.fillText('Joystick size',GW/2+18,jbY-2);
+  ctx.fillText('Joystick size',jbx0,jbY-2);
   btnRects['set_joy_down']={x:jbx0,y:jbY,w:jbtnW,h:22};
   ctx.fillStyle='#1a2a3a';roundRect(jbx0,jbY,jbtnW,22,4);ctx.fill();
   ctx.strokeStyle='#446688';ctx.lineWidth=1.5;roundRect(jbx0,jbY,jbtnW,22,4);ctx.stroke();
@@ -1958,7 +1970,8 @@ function drawSettings(){
   ctx.strokeStyle='#1e3050';ctx.lineWidth=1;
   ctx.beginPath();ctx.moveTo(30,534);ctx.lineTo(GW-30,534);ctx.stroke();
   ctx.fillStyle='#445566';ctx.font='12px monospace';ctx.textAlign='center';
-  ctx.fillText('Unlock all levels — keyboard: lavelall   |   phone: tap title × 7',GW/2,549);
+  if(touchMode)ctx.fillText('Разблокировать все уровни: нажми заголовок × 7',GW/2,549);
+  else ctx.fillText('Unlock all levels — keyboard: lavelall   |   phone: tap title × 7',GW/2,549);
   // Wipe all data button
   if(wipeConfirm){
     ctx.fillStyle='#553322';ctx.font='bold 13px sans-serif';
@@ -2017,7 +2030,8 @@ function drawMenu(){
   ctx.strokeStyle='#224466';ctx.lineWidth=1.5;roundRect(GW-106,9,92,28,6);ctx.stroke();
   ctx.fillStyle='#88ccff';ctx.font='14px sans-serif';ctx.textAlign='center';
   ctx.fillText('⚙ SETTINGS',GW-60,27);
-  const btns=[['ARCADE MODE','arcade'],['LEVELS MODE','levels'],['PHONE MODE','phone']];
+  const _isTouchDev='ontouchstart' in window||navigator.maxTouchPoints>0;
+  const btns=_isTouchDev?[['ARCADE MODE','arcade'],['LEVELS MODE','levels']]:[['ARCADE MODE','arcade'],['LEVELS MODE','levels'],['PHONE MODE','phone']];
   btns.forEach(([label,key],i)=>{
     const x=GW/2-120,y=GH/2+40+i*58,w=240,h=44;
     btnRects['m_'+key]={x,y,w,h};
@@ -2063,10 +2077,12 @@ function drawMenu(){
     ctx.fillText('ОТМЕНА',GW/2+66,GH/2+266);
   }
 
-  ctx.fillStyle='#334455';ctx.font='13px sans-serif';ctx.textAlign='center';
-  ctx.fillText('Phone Mode = show on-screen joystick',GW/2,GH-22);
-  ctx.fillStyle='#2a3a45';ctx.font='12px sans-serif';
-  ctx.fillText('Удерживай DEL 3с — сбросить все данные',GW/2,GH-6);
+  if(!touchMode){
+    ctx.fillStyle='#334455';ctx.font='13px sans-serif';ctx.textAlign='center';
+    ctx.fillText('Phone Mode = show on-screen joystick',GW/2,GH-22);
+    ctx.fillStyle='#2a3a45';ctx.font='12px sans-serif';
+    ctx.fillText('Удерживай DEL 3с — сбросить все данные',GW/2,GH-6);
+  }
 }
 
 function drawLevelSelect(){
