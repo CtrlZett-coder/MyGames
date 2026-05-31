@@ -35,6 +35,8 @@ function resize(){
 }
 resize();
 window.addEventListener('resize',resize);
+document.addEventListener('visibilitychange',()=>{if(document.hidden){_mStop();_prevGS='';}});
+window.addEventListener('pagehide',()=>{_mStop();_prevGS='';})
 
 const rnd=(a,b)=>Math.random()*(b-a)+a;
 const rndInt=(a,b)=>Math.floor(rnd(a,b+1));
@@ -93,8 +95,8 @@ const SND={
 let _mState='off',_mTimer=null,_mNodes=[];
 function _mStop(){
   if(_mTimer){clearTimeout(_mTimer);_mTimer=null;}
-  const t=actx?actx.currentTime+0.2:0;
-  for(const n of _mNodes){try{n.stop(t);}catch(e){}}
+  const t=actx?actx.currentTime+0.06:0;
+  for(const n of _mNodes){try{n.stop(t);n.disconnect();}catch(e){}}
   _mNodes=[];_mState='off';
 }
 function _mAddN(n){_mNodes.push(n);return n;}
@@ -1063,10 +1065,35 @@ class FinalBoss{
 let joyScale=parseFloat(localStorage.getItem('ss_joy')||'1.0');
 function saveJoyScale(){try{localStorage.setItem('ss_joy',joyScale.toFixed(1));}catch(e){}}
 let JOY_BASE_R=80,JOY_NUB_R=28,JOY_MAX_R=55;
-const JOY_DEAD=12,FIRE_R=54;
+const JOY_DEAD=12,_FIRE_R_BASE=54;
 function applyJoyScale(){JOY_BASE_R=Math.round(80*joyScale);JOY_NUB_R=Math.round(28*joyScale);JOY_MAX_R=Math.round(55*joyScale);}
 applyJoyScale();
-const firePos={x:GW-95,y:GH-95};
+
+// ── Touch layout customization ─────────────────────────────────────────────────
+let joyStatic=localStorage.getItem('ss_joySt')==='1';
+let _joyPX=parseFloat(localStorage.getItem('ss_joyPX')||'0');
+let _joyPY=parseFloat(localStorage.getItem('ss_joyPY')||'0');
+let _fireSz=parseFloat(localStorage.getItem('ss_fireSz')||'1.0');
+let _firePX=parseFloat(localStorage.getItem('ss_firePX')||'0');
+let _firePY=parseFloat(localStorage.getItem('ss_firePY')||'0');
+function getJoyPos(){return{x:_joyPX||Math.round(GW*0.13),y:_joyPY||Math.round(GH*0.78)};}
+function getFirePos(){return{x:_firePX||Math.round(GW*0.87),y:_firePY||Math.round(GH*0.78)};}
+function getFireR(){return Math.round(_FIRE_R_BASE*_fireSz);}
+function saveTouchLayout(){
+  try{
+    localStorage.setItem('ss_joySt',joyStatic?'1':'0');
+    if(_joyPX)localStorage.setItem('ss_joyPX',Math.round(_joyPX));else localStorage.removeItem('ss_joyPX');
+    if(_joyPY)localStorage.setItem('ss_joyPY',Math.round(_joyPY));else localStorage.removeItem('ss_joyPY');
+    localStorage.setItem('ss_fireSz',_fireSz.toFixed(1));
+    if(_firePX)localStorage.setItem('ss_firePX',Math.round(_firePX));else localStorage.removeItem('ss_firePX');
+    if(_firePY)localStorage.setItem('ss_firePY',Math.round(_firePY));else localStorage.removeItem('ss_firePY');
+  }catch(e){}
+}
+function resetTouchLayout(){
+  joyStatic=false;_joyPX=0;_joyPY=0;_fireSz=1.0;_firePX=0;_firePY=0;
+  try{['ss_joySt','ss_joyPX','ss_joyPY','ss_fireSz','ss_firePX','ss_firePY'].forEach(k=>localStorage.removeItem(k));}catch(e){}
+}
+
 const pauseRect={x:GW/2-30,y:GH-70,w:60,h:36};
 let joyFid=null,joyBase=null,joyNub=null,fireFid=null,pauseFid=null;
 function joyDirs(){
@@ -1085,21 +1112,32 @@ function joyDirs(){
 }
 function touchKeys(){const j=joyDirs();return{left:!!j.left,right:!!j.right,up:!!j.up,down:!!j.down,fire:fireFid!==null};}
 function touchDown(id,px,py){
-  if(Math.hypot(px-firePos.x,py-firePos.y)<=FIRE_R){fireFid=id;return'fire';}
-  if(px<GW/2&&joyFid===null){joyFid=id;joyBase={x:px,y:py};joyNub={x:px,y:py};return'joy';}
+  const fp=getFirePos(),fr=getFireR();
+  if(Math.hypot(px-fp.x,py-fp.y)<=fr){fireFid=id;return'fire';}
+  if(joyStatic){
+    const jp=getJoyPos();
+    if(joyFid===null){joyFid=id;joyBase={x:jp.x,y:jp.y};joyNub={x:px,y:py};return'joy';}
+  }else{
+    if(px<GW*0.6&&joyFid===null){joyFid=id;joyBase={x:px,y:py};joyNub={x:px,y:py};return'joy';}
+  }
   return null;
 }
 function touchUp(id){if(id===joyFid){joyFid=null;joyBase=null;joyNub=null;}if(id===fireFid)fireFid=null;if(id===pauseFid)pauseFid=null;}
 function touchMove(id,px,py){
   if(id===joyFid&&joyBase){
-    const dx=px-joyBase.x,dy=py-joyBase.y,d=Math.hypot(dx,dy);
-    if(d>JOY_MAX_R){const s=JOY_MAX_R/d;joyNub={x:joyBase.x+dx*s,y:joyBase.y+dy*s};}
-    else joyNub={x:px,y:py};
+    if(joyStatic){joyNub={x:px,y:py};}
+    else{
+      const dx=px-joyBase.x,dy=py-joyBase.y,d=Math.hypot(dx,dy);
+      if(d>JOY_MAX_R){const s=JOY_MAX_R/d;joyNub={x:joyBase.x+dx*s,y:joyBase.y+dy*s};}
+      else joyNub={x:px,y:py};
+    }
   }
-  if(id===fireFid&&Math.hypot(px-firePos.x,py-firePos.y)>FIRE_R+10)fireFid=null;
+  const fp=getFirePos(),fr=getFireR();
+  if(id===fireFid&&Math.hypot(px-fp.x,py-fp.y)>fr+10)fireFid=null;
 }
 function clearTouch(){joyFid=null;joyBase=null;joyNub=null;fireFid=null;pauseFid=null;}
 function drawTouch(){
+  const jp=getJoyPos();
   if(joyBase){
     const{x:cx,y:cy}=joyBase;
     ctx.beginPath();ctx.arc(cx,cy,JOY_BASE_R,0,Math.PI*2);
@@ -1112,17 +1150,122 @@ function drawTouch(){
     ctx.fillStyle=rgba(80,130,210,0.82);ctx.fill();
     ctx.strokeStyle=rgba(180,220,255,0.9);ctx.lineWidth=3;ctx.stroke();
   }else{
-    ctx.beginPath();ctx.arc(95,GH-95,JOY_BASE_R,0,Math.PI*2);
-    ctx.fillStyle=rgba(55,80,130,0.09);ctx.fill();
-    ctx.strokeStyle=rgba(140,190,255,0.18);ctx.lineWidth=2;ctx.stroke();
+    ctx.beginPath();ctx.arc(jp.x,jp.y,JOY_BASE_R,0,Math.PI*2);
+    ctx.fillStyle=rgba(55,80,130,joyStatic?0.18:0.09);ctx.fill();
+    ctx.strokeStyle=rgba(140,190,255,joyStatic?0.35:0.18);ctx.lineWidth=2;ctx.stroke();
+    if(joyStatic){
+      ctx.beginPath();ctx.arc(jp.x,jp.y,JOY_NUB_R,0,Math.PI*2);
+      ctx.fillStyle=rgba(80,130,210,0.22);ctx.fill();
+    }
   }
+  const fp=getFirePos(),fr=getFireR();
   const fon=fireFid!==null;
-  ctx.beginPath();ctx.arc(firePos.x,firePos.y,FIRE_R,0,Math.PI*2);
+  ctx.beginPath();ctx.arc(fp.x,fp.y,fr,0,Math.PI*2);
   ctx.fillStyle=rgba(130,25,25,fon?0.78:0.31);ctx.fill();
   ctx.strokeStyle=rgba(255,90,90,fon?0.9:0.55);ctx.lineWidth=3;ctx.stroke();
-  ctx.beginPath();ctx.arc(firePos.x,firePos.y,FIRE_R-14,0,Math.PI*2);
+  ctx.beginPath();ctx.arc(fp.x,fp.y,fr-14,0,Math.PI*2);
   ctx.fillStyle=rgba(255,50,50,fon?0.72:0.43);ctx.fill();
 }
+
+// ── Layout editor ──────────────────────────────────────────────────────────────
+let _layDrag=null;
+function drawLayout(){
+  ctx.fillStyle='#050814';ctx.fillRect(0,0,GW,GH);
+  for(const s of stars)s.draw();
+  for(const r of bgRocks)r.draw();
+  ctx.fillStyle=rgba(0,0,0,0.48);ctx.fillRect(0,0,GW,GH);
+  ctx.fillStyle='#00c8ff';ctx.font='bold 18px sans-serif';ctx.textAlign='center';
+  ctx.shadowColor='#00c8ff';ctx.shadowBlur=8;
+  ctx.fillText('РАСПОЛОЖЕНИЕ УПРАВЛЕНИЯ',GW/2,26);ctx.shadowBlur=0;
+  ctx.fillStyle='#556677';ctx.font='12px sans-serif';
+  ctx.fillText('Перетащи джойстик и кнопку огня на нужное место',GW/2,44);
+  btnRects={};
+  const jp=getJoyPos(),fr=getFireR(),fp=getFirePos();
+  const jSel=_layDrag==='joy',fSel=_layDrag==='fire';
+  // Joystick
+  ctx.beginPath();ctx.arc(jp.x,jp.y,JOY_BASE_R,0,Math.PI*2);
+  ctx.fillStyle=rgba(55,80,130,jSel?0.5:0.28);ctx.fill();
+  ctx.strokeStyle=jSel?'#00c8ff':rgba(140,190,255,0.55);ctx.lineWidth=jSel?3:2;ctx.stroke();
+  ctx.beginPath();ctx.arc(jp.x,jp.y,JOY_NUB_R,0,Math.PI*2);
+  ctx.fillStyle=rgba(80,130,210,0.7);ctx.fill();
+  ctx.fillStyle='#aaccee';ctx.font='bold 11px sans-serif';ctx.textAlign='center';
+  ctx.fillText('JOY',jp.x,jp.y+4);
+  // Fire button
+  ctx.beginPath();ctx.arc(fp.x,fp.y,fr,0,Math.PI*2);
+  ctx.fillStyle=rgba(130,25,25,fSel?0.65:0.38);ctx.fill();
+  ctx.strokeStyle=fSel?'#ff5533':rgba(255,90,90,0.6);ctx.lineWidth=fSel?3:2;ctx.stroke();
+  ctx.beginPath();ctx.arc(fp.x,fp.y,fr-14,0,Math.PI*2);
+  ctx.fillStyle=rgba(200,40,40,0.5);ctx.fill();
+  ctx.fillStyle='#ffaaaa';ctx.font='bold 11px sans-serif';ctx.textAlign='center';
+  ctx.fillText('FIRE',fp.x,fp.y+4);
+  // Joy: static/floating toggle
+  const jtW=148,jtH=30,jtX=jp.x-jtW/2,jtY=clamp(jp.y-JOY_BASE_R-40,55,GH-90);
+  btnRects['lay_joy_mode']={x:jtX,y:jtY,w:jtW,h:jtH};
+  ctx.fillStyle=joyStatic?rgba(0,100,170,0.88):rgba(20,40,80,0.78);
+  roundRect(jtX,jtY,jtW,jtH,8);ctx.fill();
+  ctx.strokeStyle=joyStatic?'#00c8ff':'#446688';ctx.lineWidth=1.5;
+  roundRect(jtX,jtY,jtW,jtH,8);ctx.stroke();
+  ctx.fillStyle='#cce4ff';ctx.font='bold 13px sans-serif';ctx.textAlign='center';
+  ctx.fillText(joyStatic?'◉ СТАТИЧНЫЙ':'○ ПЛАВАЮЩИЙ',jp.x,jtY+jtH/2+5);
+  // Joy size buttons
+  const szH=28,szW=28;
+  const jmX=clamp(jp.x-JOY_BASE_R-szW-6,4,GW-szW-4),jmY=jp.y-szH/2;
+  const jpX=clamp(jp.x+JOY_BASE_R+6,4,GW-szW-4),jpY=jp.y-szH/2;
+  btnRects['lay_joy_sz_m']={x:jmX,y:jmY,w:szW,h:szH};
+  btnRects['lay_joy_sz_p']={x:jpX,y:jpY,w:szW,h:szH};
+  [[jmX,jmY,'−'],[jpX,jpY,'+']].forEach(([bx,by,lbl])=>{
+    ctx.fillStyle=rgba(20,40,80,0.8);roundRect(bx,by,szW,szH,6);ctx.fill();
+    ctx.strokeStyle='#446688';ctx.lineWidth=1.5;roundRect(bx,by,szW,szH,6);ctx.stroke();
+    ctx.fillStyle='#aaccee';ctx.font='bold 18px sans-serif';ctx.textAlign='center';
+    ctx.fillText(lbl,bx+szW/2,by+szH/2+6);
+  });
+  // Fire size buttons
+  const fmX=clamp(fp.x-fr-szW-6,4,GW-szW-4),fmY=fp.y-szH/2;
+  const fpX=clamp(fp.x+fr+6,4,GW-szW-4),fpY=fp.y-szH/2;
+  btnRects['lay_fire_sz_m']={x:fmX,y:fmY,w:szW,h:szH};
+  btnRects['lay_fire_sz_p']={x:fpX,y:fpY,w:szW,h:szH};
+  [[fmX,fmY,'−'],[fpX,fpY,'+']].forEach(([bx,by,lbl])=>{
+    ctx.fillStyle=rgba(20,40,80,0.8);roundRect(bx,by,szW,szH,6);ctx.fill();
+    ctx.strokeStyle='#553333';ctx.lineWidth=1.5;roundRect(bx,by,szW,szH,6);ctx.stroke();
+    ctx.fillStyle='#ffcccc';ctx.font='bold 18px sans-serif';ctx.textAlign='center';
+    ctx.fillText(lbl,bx+szW/2,by+szH/2+6);
+  });
+  // Bottom buttons
+  btnRects['lay_done']={x:GW/2-70,y:GH-48,w:140,h:34};
+  ctx.fillStyle=rgba(0,110,55,0.9);roundRect(GW/2-70,GH-48,140,34,10);ctx.fill();
+  ctx.strokeStyle='#00cc66';ctx.lineWidth=2;roundRect(GW/2-70,GH-48,140,34,10);ctx.stroke();
+  ctx.fillStyle='#fff';ctx.font='bold 15px sans-serif';ctx.textAlign='center';
+  ctx.fillText('✓ ГОТОВО',GW/2,GH-25);
+  btnRects['lay_reset']={x:GW/2+85,y:GH-48,w:90,h:34};
+  ctx.fillStyle=rgba(60,15,15,0.85);roundRect(GW/2+85,GH-48,90,34,8);ctx.fill();
+  ctx.strokeStyle='#553333';ctx.lineWidth=1.5;roundRect(GW/2+85,GH-48,90,34,8);ctx.stroke();
+  ctx.fillStyle='#ff9977';ctx.font='13px sans-serif';ctx.textAlign='center';
+  ctx.fillText('↺ СБРОС',GW/2+130,GH-25);
+}
+function _layInputDown(x,y){
+  const jp=getJoyPos(),fp=getFirePos(),fr=getFireR();
+  if(Math.hypot(x-jp.x,y-jp.y)<=JOY_BASE_R+8){_layDrag='joy';return;}
+  if(Math.hypot(x-fp.x,y-fp.y)<=fr+8){_layDrag='fire';return;}
+  const k=hitBtn(x,y);
+  if(k==='lay_joy_mode'){joyStatic=!joyStatic;SND.uiClick();}
+  else if(k==='lay_joy_sz_m'){joyScale=Math.max(0.5,+(joyScale-0.1).toFixed(1));applyJoyScale();saveJoyScale();SND.uiClick();}
+  else if(k==='lay_joy_sz_p'){joyScale=Math.min(2.0,+(joyScale+0.1).toFixed(1));applyJoyScale();saveJoyScale();SND.uiClick();}
+  else if(k==='lay_fire_sz_m'){_fireSz=Math.max(0.5,+(_fireSz-0.1).toFixed(1));SND.uiClick();}
+  else if(k==='lay_fire_sz_p'){_fireSz=Math.min(2.0,+(_fireSz+0.1).toFixed(1));SND.uiClick();}
+  else if(k==='lay_done'){saveTouchLayout();gameState='settings';SND.uiClick();}
+  else if(k==='lay_reset'){resetTouchLayout();applyJoyScale();SND.uiClick();}
+}
+function _layInputMove(x,y){
+  if(_layDrag==='joy'){
+    _joyPX=clamp(x,JOY_BASE_R+4,GW-JOY_BASE_R-4);
+    _joyPY=clamp(y,JOY_BASE_R+4,GH-JOY_BASE_R-4);
+  }else if(_layDrag==='fire'){
+    const fr=getFireR();
+    _firePX=clamp(x,fr+4,GW-fr-4);
+    _firePY=clamp(y,fr+4,GH-fr-4);
+  }
+}
+function _layInputUp(){_layDrag=null;}
 function roundRect(x,y,w,h,r){
   ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);
   ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);ctx.lineTo(x+r,y+h);
@@ -1562,6 +1705,7 @@ function triggerLevelComplete(){
 function update(){
   _updateMusic();
   if(gameState==='intro'){updateIntro();return;}
+  if(gameState==='layout'){for(const s of stars)s.update();for(const r of bgRocks)r.update();return;}
   if(gameState==='level_complete'){
     for(const s of stars)s.update();
     for(const r of bgRocks)r.update();
@@ -1683,6 +1827,7 @@ function draw(){
   if(gameState==='menu'){drawMenu();return;}
   if(gameState==='level_select'){drawLevelSelect();return;}
   if(gameState==='settings'){drawSettings();return;}
+  if(gameState==='layout'){drawLayout();return;}
 
   // Slow tint
   if(player&&player.slowActive){ctx.fillStyle=rgba(60,30,160,0.08);ctx.fillRect(0,0,GW,GH);}
@@ -1972,6 +2117,15 @@ function drawSettings(){
   ctx.fillStyle='#445566';ctx.font='12px monospace';ctx.textAlign='center';
   if(touchMode)ctx.fillText('Разблокировать все уровни: нажми заголовок × 7',GW/2,549);
   else ctx.fillText('Unlock all levels — keyboard: lavelall   |   phone: tap title × 7',GW/2,549);
+  // Layout editor button (phone only)
+  if(touchMode){
+    btnRects['set_layout']={x:GW/2-110,y:534,w:220,h:30};
+    ctx.fillStyle=rgba(0,60,110,0.85);roundRect(GW/2-110,534,220,30,8);ctx.fill();
+    ctx.strokeStyle='#336688';ctx.lineWidth=1.5;roundRect(GW/2-110,534,220,30,8);ctx.stroke();
+    ctx.fillStyle='#88ccff';ctx.font='bold 14px sans-serif';ctx.textAlign='center';
+    ctx.fillText('📐 Расположение управления',GW/2,554);
+  }
+
   // Wipe all data button
   if(wipeConfirm){
     ctx.fillStyle='#553322';ctx.font='bold 13px sans-serif';
@@ -2095,7 +2249,10 @@ function drawLevelSelect(){
   ctx.fillText('< BACK',54,29);
   for(let i=0;i<20;i++){
     const col=i%5,row=Math.floor(i/5);
-    const x=80+col*154,y=72+row*110,w=128,h=88;
+    const cW=128,cH=88,gX=26,gY=22;
+    const gTW=4*(cW+gX)+cW,gTH=3*(cH+gY)+cH;
+    const sx=Math.round(GW/2-gTW/2),sy=Math.round((GH+50)/2-gTH/2);
+    const x=sx+col*(cW+gX),y=sy+row*(cH+gY),w=cW,h=cH;
     btnRects['ls_'+i]={x,y,w,h};
     const unlocked=i<=maxUnlocked,sel=lsCursor===i;
     ctx.fillStyle=unlocked?(sel?rgba(0,120,200,0.9):rgba(20,50,90,0.8)):rgba(20,20,30,0.8);
@@ -2176,6 +2333,7 @@ function handleBtn(key){
   SND.uiClick();
   if(key==='m_settings'){gameState='settings';return;}
   if(key==='set_back'){rebindAction=null;wipeConfirm=false;gameState='menu';return;}
+  if(key==='set_layout'){gameState='layout';_layDrag=null;return;}
   if(key==='set_wipe'){wipeConfirm=true;SND.uiClick();return;}
   if(key==='set_wipe_no'){wipeConfirm=false;SND.uiClick();return;}
   if(key==='set_wipe_yes'){wipeConfirm=false;wipeAllData();return;}
@@ -2238,15 +2396,18 @@ canvas.addEventListener('mousedown',e=>{
   initAudio();
   const{x,y}=canvasPos(e.clientX,e.clientY);
   if(gameState==='intro'){skipIntro();return;}
+  if(gameState==='layout'){_layInputDown(x,y);return;}
   if(gameState==='playing'){
     if(hitBtn(x,y)==='hud_pause'){gameState='paused';clearTouch();return;}
     if(touchMode)touchDown(-1,x,y);
   }else{handleBtn(hitBtn(x,y));}
 });
-canvas.addEventListener('mouseup',()=>touchUp(-1));
+canvas.addEventListener('mouseup',e=>{touchUp(-1);if(gameState==='layout')_layInputUp();});
 canvas.addEventListener('mousemove',e=>{
-  if(e.buttons&&gameState==='playing'&&touchMode){
-    const{x,y}=canvasPos(e.clientX,e.clientY);touchMove(-1,x,y);
+  if(e.buttons){
+    const{x,y}=canvasPos(e.clientX,e.clientY);
+    if(gameState==='layout'){_layInputMove(x,y);return;}
+    if(gameState==='playing'&&touchMode){touchMove(-1,x,y);}
   }
 });
 canvas.addEventListener('touchstart',e=>{
@@ -2254,6 +2415,7 @@ canvas.addEventListener('touchstart',e=>{
   for(const t of e.changedTouches){
     const{x,y}=canvasPos(t.clientX,t.clientY);
     if(gameState==='intro'){skipIntro();break;}
+    if(gameState==='layout'){_layInputDown(x,y);break;}
     if(gameState==='playing'){
       if(hitBtn(x,y)==='hud_pause'){gameState='paused';clearTouch();break;}
       if(touchMode)touchDown(t.identifier,x,y);
@@ -2262,12 +2424,14 @@ canvas.addEventListener('touchstart',e=>{
 },{passive:false});
 canvas.addEventListener('touchend',e=>{
   e.preventDefault();
-  for(const t of e.changedTouches)touchUp(t.identifier);
+  for(const t of e.changedTouches){touchUp(t.identifier);if(gameState==='layout')_layInputUp();}
 },{passive:false});
 canvas.addEventListener('touchmove',e=>{
   e.preventDefault();
   for(const t of e.changedTouches){
-    const{x,y}=canvasPos(t.clientX,t.clientY);touchMove(t.identifier,x,y);
+    const{x,y}=canvasPos(t.clientX,t.clientY);
+    if(gameState==='layout'){_layInputMove(x,y);}
+    else touchMove(t.identifier,x,y);
   }
 },{passive:false});
 window.addEventListener('keydown',e=>{
@@ -2283,6 +2447,7 @@ window.addEventListener('keydown',e=>{
     else if(gameState==='paused'){gameState='playing';clearTouch();}
     else if(gameState==='level_select'){gameState='menu';}
     else if(gameState==='settings'){gameState='menu';}
+    else if(gameState==='layout'){saveTouchLayout();gameState='settings';}
     else if(gameState==='game_over'||gameState==='victory'){gameState='menu';}
   }
   if(e.key&&e.key.length===1){
