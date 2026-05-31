@@ -161,86 +161,89 @@ function _menuLoop(t0){
 }
 function startMenuMusic(){if(!actx||_mState==='menu')return;_mStop();_mState='menu';_menuLoop(actx.currentTime+0.12);}
 
-// ── Game: cosmic space, E minor, 108 BPM ───────────────────────────────────────
-const _G1BT=60/108;
-const _G1KICK=[1,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0];
-const _G1HAT= [0,0,0,1,0,0,1,0,0,0,0,1,0,0,0,1];
-const _G1BAS=[82.41,82.41,82.41,98,82.41,82.41,98,110,82.41,82.41,82.41,98,110,110,98,82.41];
-const _G1ARP=[493.88,587.33,659.25,587.33,493.88,440,392,440,493.88,587.33,659.25,493.88,440,392,440,493.88];
-const _G1CH=[[164.81,246.94,329.63],[130.81,164.81,196],[98,123.47,146.83],[110,164.81,220]];
+// ── Ambient primitives ─────────────────────────────────────────────────────────
+function _mOscAmb(freq,t0,dur,type,vol,det){
+  if(!actx||!masterGain)return;
+  const o=actx.createOscillator(),g=actx.createGain();
+  o.type=type||'sine';o.frequency.value=freq;if(det)o.detune.value=det;
+  const atk=Math.min(1.4,dur*0.18),rel=Math.min(1.6,dur*0.22);
+  g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(vol,t0+atk);
+  g.gain.setValueAtTime(vol,t0+dur-rel);g.gain.linearRampToValueAtTime(0,t0+dur);
+  o.connect(g);g.connect(masterGain);o.start(t0);o.stop(t0+dur+0.1);_mAddN(o);
+}
+function _ambPad(freqs,t0,dur,vol){
+  for(const f of freqs){
+    _mOscAmb(f,t0,dur,'sine',vol*0.45,0);
+    _mOscAmb(f,t0,dur,'sine',vol*0.28,+9);
+    _mOscAmb(f,t0,dur,'sine',vol*0.18,-9);
+    _mOscAmb(f*2,t0,dur,'sine',vol*0.12,+4);
+  }
+}
+function _ambBass(freq,t0,dur,vol){
+  if(!actx||!masterGain)return;
+  const o=actx.createOscillator(),flt=actx.createBiquadFilter(),g=actx.createGain();
+  o.type='sine';o.frequency.value=freq;
+  flt.type='lowpass';flt.frequency.value=220;
+  const atk=Math.min(1.2,dur*0.18),rel=Math.min(1.4,dur*0.22);
+  g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(vol,t0+atk);
+  g.gain.setValueAtTime(vol,t0+dur-rel);g.gain.linearRampToValueAtTime(0,t0+dur);
+  o.connect(flt);flt.connect(g);g.connect(masterGain);o.start(t0);o.stop(t0+dur+0.1);_mAddN(o);
+}
+function _ambNote(freq,t0,dur,vol){
+  _mOscAmb(freq,t0,dur,'sine',vol,0);_mOscAmb(freq,t0,dur,'sine',vol*0.55,+6);
+}
+function _ambPulse(freq,t0,dur,vol){
+  if(!actx||!masterGain)return;
+  const o=actx.createOscillator(),g=actx.createGain();
+  o.type='sine';o.frequency.setValueAtTime(freq*1.5,t0);o.frequency.exponentialRampToValueAtTime(freq,t0+0.18);
+  g.gain.setValueAtTime(vol,t0);g.gain.exponentialRampToValueAtTime(0.001,t0+dur);
+  o.connect(g);g.connect(masterGain);o.start(t0);o.stop(t0+dur+0.05);_mAddN(o);
+}
+
+// ── Game: cosmic float, E minor, no percussion ─────────────────────────────────
+const _G1CH=[[164.81,196,246.94],[130.81,164.81,196],[98,123.47,146.83],[110,164.81,220]];
+const _G1MEL=[329.63,0,392,0,440,0,392,329.63,293.66,0,329.63,0,261.63,0,293.66,0];
 function _gameLoop(t0){
-  if(_mState!=='game')return;const loop=16*_G1BT;
-  for(let c=0;c<4;c++) _mPad(_G1CH[c],t0+c*4*_G1BT,4*_G1BT*0.95,0.042);
-  for(let i=0;i<16;i++){const t=t0+i*_G1BT;
-    if(_G1KICK[i])_mKick(t,0.20);if(_G1HAT[i])_mHat(t,0.08);
-    _mBass(_G1BAS[i],t,_G1BT*0.88,0.13,320);
-    _mOsc(_G1ARP[i],t,_G1BT*0.45,'sine',0.038,0);_mOsc(_G1ARP[i],t,_G1BT*0.45,'triangle',0.022,+7);
-  }
-  _mTimer=setTimeout(()=>{if(_mState==='game')_gameLoop(t0+loop);},(loop-0.5)*1000);
+  if(_mState!=='game')return;const loop=32;
+  for(let c=0;c<4;c++){const ct=t0+c*8;_ambPad(_G1CH[c],ct,8,0.055);_ambBass(_G1CH[c][0]/2,ct,8,0.07);}
+  for(let i=0;i<16;i++){if(_G1MEL[i])_ambNote(_G1MEL[i],t0+i*2,1.6,0.028);}
+  _mTimer=setTimeout(()=>{if(_mState==='game')_gameLoop(t0+loop);},(loop-1.5)*1000);
 }
-function startGameMusic(){if(!actx||_mState==='game')return;_mStop();_mState='game';_gameLoop(actx.currentTime+0.1);}
+function startGameMusic(){if(!actx||_mState==='game')return;_mStop();_mState='game';_gameLoop(actx.currentTime+0.12);}
 
-// ── Tense: Marauder, 130 BPM ───────────────────────────────────────────────────
-const _TBT=60/130;
-const _TKICK=[1,0,0,1,0,0,1,0,1,0,0,1,0,1,0,0];
-const _THAT= [0,1,0,0,1,0,0,1,0,1,0,0,1,0,0,1];
-const _TSNR= [0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0];
-const _TBAS=[82.41,82.41,82.41,73.42,82.41,73.42,82.41,73.42,82.41,82.41,73.42,82.41,73.42,73.42,82.41,73.42];
-const _TLEA=[196,0,246.94,220,196,0,220,0,196,0,246.94,220,220,196,0,246.94];
+// ── Tense: Marauder, dark pads + bass pulses ───────────────────────────────────
+const _T2CH=[[164.81,196,293.66],[146.83,174.61,220],[110,130.81,164.81],[123.47,164.81,220]];
 function _tenseLoop(t0){
-  if(_mState!=='tense')return;const loop=16*_TBT;
-  _mPad([164.81,220,293.66],t0,8*_TBT*0.95,0.038);_mPad([146.83,196,246.94],t0+8*_TBT,8*_TBT*0.95,0.038);
-  for(let i=0;i<16;i++){const t=t0+i*_TBT;
-    if(_TKICK[i])_mKick(t,0.27);if(_THAT[i])_mHat(t,0.11);if(_TSNR[i])_mSnare(t,0.22);
-    _mBass(_TBAS[i],t,_TBT*0.82,0.18,420);if(_TLEA[i])_mOsc(_TLEA[i],t,_TBT*0.36,'sawtooth',0.042,0);
-  }
-  _mTimer=setTimeout(()=>{if(_mState==='tense')_tenseLoop(t0+loop);},(loop-0.5)*1000);
+  if(_mState!=='tense')return;const loop=24;
+  for(let c=0;c<4;c++){const ct=t0+c*6;_ambPad(_T2CH[c],ct,6,0.06);_ambBass(_T2CH[c][0]/2,ct,6,0.08);
+    for(let p=0;p<3;p++)_ambPulse(_T2CH[c][0]/2,ct+p*2,1.4,0.09);}
+  _mTimer=setTimeout(()=>{if(_mState==='tense')_tenseLoop(t0+loop);},(loop-1.5)*1000);
 }
-function startTenseMusic(){if(!actx||_mState==='tense')return;_mStop();_mState='tense';_tenseLoop(actx.currentTime+0.1);}
+function startTenseMusic(){if(!actx||_mState==='tense')return;_mStop();_mState='tense';_tenseLoop(actx.currentTime+0.12);}
 
-// ── Epic: Dreadnought, 155 BPM, heavy double kick ──────────────────────────────
-const _EBT=60/155;
-const _EKICK=[1,0,1,0,1,0,0,1,1,0,1,0,1,0,1,0];
-const _EHAT= [0,1,0,1,0,1,0,0,0,1,0,1,0,1,0,1];
-const _ESNR= [0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,1];
-const _EBAS=[82.41,82.41,73.42,82.41,73.42,73.42,82.41,73.42,82.41,82.41,73.42,69.30,73.42,73.42,82.41,73.42];
-const _ELEA=[246.94,0,293.66,246.94,220,0,246.94,0,293.66,329.63,246.94,220,0,196,220,246.94];
+// ── Epic: Dreadnought, dissonant clusters ──────────────────────────────────────
+const _E2CH=[[164.81,185.00,246.94],[130.81,138.59,207.65],[98,103.83,164.81],[110,155.56,233.08]];
 function _epicLoop(t0){
-  if(_mState!=='epic')return;const loop=16*_EBT;
-  _mPad([164.81,220,261.63],t0,8*_EBT*0.90,0.050);_mPad([130.81,164.81,220],t0+8*_EBT,8*_EBT*0.90,0.050);
-  for(let i=0;i<16;i++){const t=t0+i*_EBT;
-    if(_EKICK[i])_mKick(t,0.32);if(_EHAT[i])_mHat(t,0.13);if(_ESNR[i])_mSnare(t,0.28);
-    _mBass(_EBAS[i],t,_EBT*0.75,0.22,500);
-    if(_ELEA[i]){_mOsc(_ELEA[i],t,_EBT*0.30,'sawtooth',0.055,0);_mOsc(_ELEA[i],t,_EBT*0.30,'sawtooth',0.035,+18);}
-  }
-  _mTimer=setTimeout(()=>{if(_mState==='epic')_epicLoop(t0+loop);},(loop-0.5)*1000);
+  if(_mState!=='epic')return;const loop=20;
+  for(let c=0;c<4;c++){const ct=t0+c*5;_ambPad(_E2CH[c],ct,5,0.065);_ambBass(_E2CH[c][0]/2,ct,5,0.09);
+    for(let p=0;p<3;p++)_ambPulse(_E2CH[c][0]/2,ct+p*1.5,1.2,0.12);}
+  _mTimer=setTimeout(()=>{if(_mState==='epic')_epicLoop(t0+loop);},(loop-1.5)*1000);
 }
-function startEpicMusic(){if(!actx||_mState==='epic')return;_mStop();_mState='epic';_epicLoop(actx.currentTime+0.1);}
+function startEpicMusic(){if(!actx||_mState==='epic')return;_mStop();_mState='epic';_epicLoop(actx.currentTime+0.12);}
 
-// ── Final: Crimson Overlord, 175 BPM — ЖЕСТЬ ──────────────────────────────────
-const _FBT=60/175;
-const _FKICK=[1,0,1,1,0,1,0,1,1,1,0,1,0,1,1,0];
-const _FHAT= [1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0];
-const _FSNR= [0,0,0,0,1,0,0,1,0,0,0,0,1,0,1,0];
-const _FBAS=[82.41,73.42,82.41,73.42,69.30,73.42,82.41,73.42,82.41,73.42,69.30,73.42,82.41,73.42,69.30,73.42];
-const _FLEA=[329.63,0,392,0,440,369.99,440,0,493.88,0,440,369.99,329.63,0,392,440];
+// ── Final: Crimson Overlord, maximum dissonance ────────────────────────────────
+const _F2CH=[[164.81,174.61,233.08,311.13],[138.59,146.83,207.65,277.18],[103.83,116.54,174.61,233.08],[110,123.47,185.00,246.94]];
 function _finalLoop(t0){
-  if(_mState!=='final')return;const loop=16*_FBT;
-  _mPad([164.81,233.08,311.13],t0,8*_FBT*0.88,0.055);
-  _mPad([138.59,185.00,246.94],t0+8*_FBT,8*_FBT*0.88,0.055);
-  for(let i=0;i<16;i++){const t=t0+i*_FBT;
-    if(_FKICK[i])_mKick(t,0.36);if(_FHAT[i])_mHat(t,0.16);if(_FSNR[i])_mSnare(t,0.32);
-    _mBass(_FBAS[i],t,_FBT*0.70,0.26,600);
-    if(_FLEA[i]){
-      _mOsc(_FLEA[i],t,_FBT*0.26,'sawtooth',0.07,0);      // main lead
-      _mOsc(_FLEA[i],t,_FBT*0.26,'sawtooth',0.05,+25);    // detune layer
-      _mOsc(_FLEA[i]/2,t,_FBT*0.30,'sawtooth',0.055,-15); // octave down
-      _mOsc(_FLEA[i]*2,t,_FBT*0.18,'square',0.025,0);     // screaming octave up
-    }
-  }
-  _mTimer=setTimeout(()=>{if(_mState==='final')_finalLoop(t0+loop);},(loop-0.4)*1000);
+  if(_mState!=='final')return;const loop=16;
+  for(let c=0;c<4;c++){const ct=t0+c*4;
+    _ambPad(_F2CH[c],ct,4,0.07);
+    _ambPad(_F2CH[c].map(f=>f*1.007),ct,4,0.04);
+    _ambBass(_F2CH[c][0]/2,ct,4,0.10);
+    _mOscAmb(_F2CH[c][0]*8,ct,3.5,'sine',0.018,0);
+    for(let p=0;p<5;p++)_ambPulse(_F2CH[c][0]/2,ct+p*0.75,0.9,0.15);}
+  _mTimer=setTimeout(()=>{if(_mState==='final')_finalLoop(t0+loop);},(loop-1.5)*1000);
 }
-function startFinalMusic(){if(!actx||_mState==='final')return;_mStop();_mState='final';_finalLoop(actx.currentTime+0.1);}
+function startFinalMusic(){if(!actx||_mState==='final')return;_mStop();_mState='final';_finalLoop(actx.currentTime+0.12);}
 
 function stopMusic(){_mStop();}
 let _prevGS='';
