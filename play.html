@@ -96,25 +96,26 @@ const LEVELS=[
   [{fighter:2,scout:1},30,1600,[]],
   [{},0,0,['mini','mini','mini']],
   [{fighter:4,scout:2,heavy:1},25,2000,[]],
-  [{fighter:3,scout:2,heavy:1},28,2400,[]],
-  [{fighter:3,scout:2,heavy:2},32,2900,[]],
-  [{fighter:3,scout:2,heavy:2},38,3500,['mini']],
-  [{fighter:3,scout:2,heavy:2},30,4000,['dread']],
-  [{fighter:3,scout:2,heavy:3},32,4500,['mini','dread']],
-  [{fighter:2,scout:3,heavy:3},35,5000,['dread']],
-  [{fighter:2,scout:3,heavy:3},38,5500,['mini','dread']],
-  [{fighter:2,scout:3,heavy:3},40,6000,['dread','dread']],
-  [{fighter:2,scout:3,heavy:4},40,7000,['mini','dread','mini']],
-  [{fighter:2,scout:3,heavy:4},42,8000,['dread','mini','dread']],
-  [{fighter:1,scout:3,heavy:4},45,9000,['dread','dread','mini']],
-  [{fighter:1,scout:3,heavy:4},50,10000,['mini','dread','dread']],
-  [{fighter:1,scout:3,heavy:5},50,12000,['dread','mini','dread','mini']],
+  [{fighter:3,scout:2,heavy:1,mine:2},28,2400,[]],
+  [{fighter:3,scout:2,heavy:2,mine:2,gunship:1},32,2900,[]],
+  [{fighter:3,scout:2,heavy:2,mine:3},38,3500,['mini']],
+  [{fighter:3,scout:2,heavy:2,gunship:2},30,4000,['dread']],
+  [{fighter:3,scout:2,heavy:3,mine:3,gunship:1},32,4500,['mini','dread']],
+  [{fighter:2,scout:3,heavy:3,gunship:2},35,5000,['dread']],
+  [{fighter:2,scout:3,heavy:3,mine:4,gunship:2},38,5500,['mini','dread']],
+  [{fighter:2,scout:3,heavy:3,gunship:3},40,6000,['dread','dread']],
+  [{fighter:2,scout:3,heavy:4,mine:4,gunship:2},40,7000,['mini','dread','mini']],
+  [{fighter:2,scout:3,heavy:4,gunship:3},42,8000,['dread','mini','dread']],
+  [{fighter:1,scout:3,heavy:4,mine:5,gunship:2},45,9000,['dread','dread','mini']],
+  [{fighter:1,scout:3,heavy:4,gunship:3},50,10000,['mini','dread','dread']],
+  [{fighter:1,scout:3,heavy:5,mine:5,gunship:3},50,12000,['dread','mini','dread','mini']],
   [{},0,0,['FINAL']],
 ];
 const ARCADE_WEIGHTS={
   1:{fighter:8,scout:2},
   2:{fighter:6,scout:3,heavy:1},
-  3:{fighter:5,scout:3,heavy:2},
+  3:{fighter:4,scout:3,heavy:2,mine:1},
+  4:{fighter:3,scout:3,heavy:2,mine:2,gunship:1},
 };
 
 function saveProgress(n){try{localStorage.setItem('ss_unlocked',n);}catch(e){}}
@@ -277,6 +278,110 @@ class Asteroid{
     ctx.restore();
   }
   get rect(){return{x:this.x-this.r*0.8,y:this.y-this.r*0.8,w:this.r*1.6,h:this.r*1.6};}
+}
+
+// ── Mine (drifts right-to-left, explodes into 8 bullets when shot) ────────────
+class Mine{
+  constructor(){
+    this.x=GW+18;this.y=rnd(60,GH-60);
+    this.speed=rnd(0.5,1.2);this.vy=rnd(-0.25,0.25);
+    this.angle=0;this.pulseT=rnd(0,Math.PI*2);
+    this.hp=1;this.maxHp=1;this.score=80;
+    this.dead=false;this.W=28;this.H=28;
+    this.bullets=[];this.dropChance=0;
+  }
+  update(ts){
+    ts=ts||1;
+    this.x-=this.speed*ts;this.y+=this.vy*ts;
+    this.angle+=0.02*ts;this.pulseT+=0.07*ts;
+    if(this.y<30||this.y>GH-30)this.vy*=-1;
+    if(this.x<-30)this.dead=true;
+  }
+  takeHit(){
+    this.hp--;
+    if(this.hp<=0){for(let i=0;i<8;i++)freeEBullets.push(new EnemyBullet(this.x,this.y,i/8*360));return true;}
+    return false;
+  }
+  shouldDrop(){return false;}
+  draw(){
+    const x=Math.round(this.x),y=Math.round(this.y);
+    const pulse=0.7+0.3*Math.sin(this.pulseT);
+    ctx.save();ctx.translate(x,y);
+    ctx.shadowColor='#ff4400';ctx.shadowBlur=Math.round(14*pulse);
+    ctx.fillStyle='#6a1800';ctx.beginPath();ctx.arc(0,0,11,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#cc3300';ctx.beginPath();ctx.arc(0,0,7,0,Math.PI*2);ctx.fill();
+    ctx.rotate(this.angle);
+    for(let i=0;i<6;i++){
+      const a=i/6*Math.PI*2;ctx.save();ctx.rotate(a);
+      ctx.fillStyle=`rgb(255,${Math.round(100*pulse)},0)`;
+      ctx.beginPath();ctx.moveTo(0,-11);ctx.lineTo(-3,-18);ctx.lineTo(3,-18);ctx.closePath();ctx.fill();
+      ctx.restore();
+    }
+    ctx.shadowBlur=0;
+    ctx.fillStyle=`rgb(255,${Math.round(180*pulse)},0)`;
+    ctx.beginPath();ctx.arc(0,0,4,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+  get rect(){return{x:this.x-14,y:this.y-14,w:28,h:28};}
+}
+
+// ── Gunship (slow & armored, 3-burst fire, green engines) ─────────────────────
+class Gunship{
+  constructor(){
+    this.x=GW+65;this.y=rnd(65,GH-65);
+    this.speed=rnd(1.0,1.8);this.vy=rnd(-0.4,0.4);
+    this.hp=5;this.maxHp=5;this.W=64;this.H=44;
+    this.score=400;this.dropChance=0.55;
+    this.dead=false;
+    this.shootTimer=rndInt(60,100);this.burstLeft=0;this.burstTimer=0;
+    this.bullets=[];
+  }
+  update(ts){
+    ts=ts||1;
+    this.x-=this.speed*ts;this.y+=this.vy*ts;
+    if(this.y<55||this.y>GH-55)this.vy*=-1;
+    if(this.x<-this.W-20)this.dead=true;
+    if(this.burstLeft>0){
+      this.burstTimer-=ts;
+      if(this.burstTimer<=0){
+        this.bullets.push(new EnemyBullet(this.x-this.W/2,this.y,180));
+        this.burstLeft--;this.burstTimer=9;
+      }
+    }else{
+      this.shootTimer-=ts;
+      if(this.shootTimer<=0){this.shootTimer=rndInt(80,130);this.burstLeft=3;this.burstTimer=0;}
+    }
+    this.bullets=this.bullets.filter(b=>{b.update();return !b.dead;});
+  }
+  takeHit(){this.hp--;return this.hp<=0;}
+  shouldDrop(){return Math.random()<this.dropChance;}
+  draw(){
+    const x=Math.round(this.x),y=Math.round(this.y);
+    ctx.save();ctx.translate(x,y);
+    ctx.fillStyle='#1a3a1a';ctx.fillRect(-28,-22,46,8);ctx.fillRect(-28,14,46,8);
+    ctx.fillStyle='#777';
+    ctx.fillRect(-30,-25,9,4);ctx.fillRect(-18,-25,9,4);
+    ctx.fillRect(-30,21,9,4);ctx.fillRect(-18,21,9,4);
+    ctx.fillStyle='#2a5a2a';
+    ctx.beginPath();ctx.moveTo(-32,-14);ctx.lineTo(32,-9);ctx.lineTo(32,9);ctx.lineTo(-32,14);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#1e4a1e';
+    ctx.beginPath();ctx.moveTo(-12,-11);ctx.lineTo(24,-7);ctx.lineTo(24,7);ctx.lineTo(-12,11);ctx.closePath();ctx.fill();
+    const fl=rndInt(8,16);
+    ctx.shadowColor='#00ff44';ctx.shadowBlur=15;
+    ctx.fillStyle='#00cc44';
+    ctx.beginPath();ctx.moveTo(-32,-6);ctx.lineTo(-32-fl,-2);ctx.lineTo(-32,2);ctx.closePath();ctx.fill();
+    ctx.beginPath();ctx.moveTo(-32,6);ctx.lineTo(-32-fl,2);ctx.lineTo(-32,-2);ctx.closePath();ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.shadowColor='#88ffaa';ctx.shadowBlur=8;
+    ctx.fillStyle='#88ffaa';ctx.beginPath();ctx.arc(18,0,7,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#335533';ctx.beginPath();ctx.arc(18,0,4,0,Math.PI*2);ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.fillStyle='#1a1a1a';ctx.fillRect(-30,-32,60,7);
+    ctx.fillStyle='#32c832';ctx.fillRect(-30,-32,Math.max(0,60*this.hp/this.maxHp),7);
+    ctx.restore();
+    for(const b of this.bullets)b.draw();
+  }
+  get rect(){return{x:this.x-this.W/2,y:this.y-this.H/2,w:this.W,h:this.H};}
 }
 
 // ── Power-up (4 types matching Python, move left) ─────────────────────────────
@@ -981,6 +1086,7 @@ let lvPhase='enemies',lvEnemiesLeft=0,lvBossQueue=[],lvNextBossTimer=0,lvFinalDe
 let lvIntroTimer=0,lvCompleteTimer=0;
 let introT=0;
 let asteroids=[],asteroidTimer=0;
+let freeEBullets=[];
 let warnText='',warnTimer=0;
 let cheatBuf='',cheatMsg='',cheatTimer=0;
 let titleTapCount=0,titleTapTime=0;
@@ -1006,7 +1112,7 @@ function startGame(mode,idx){
   idx=idx===undefined?0:idx;
   initAudio();gameMode=mode;lvIdx=idx;level=idx+1;
   score=0;kills=0;killsLevel=10;spawnTimer=0;spawnDelay=90;
-  player=new Player();enemies=[];powerups=[];explosions=[];bosses=[];asteroids=[];asteroidTimer=0;
+  player=new Player();enemies=[];powerups=[];explosions=[];bosses=[];asteroids=[];asteroidTimer=0;freeEBullets=[];
   bossEnraged=false;bossesSpawnedArcade.clear();
   warnText='';warnTimer=0;screenShake=0;flashAlpha=0;vigAlpha=0;enrageFlash=0;
   if(mode==='levels'){
@@ -1021,22 +1127,28 @@ function startGame(mode,idx){
   gameState='playing';
 }
 
+function spawnEnemy(kind){
+  if(kind==='mine')enemies.push(new Mine());
+  else if(kind==='gunship')enemies.push(new Gunship());
+  else enemies.push(new Enemy(kind));
+}
+
 // ── Arcade enemy spawn ─────────────────────────────────────────────────────────
 function spawnEnemyArcade(){
-  const lv=Math.min(level,3),w=ARCADE_WEIGHTS[lv];
+  const lv=Math.min(level,4),w=ARCADE_WEIGHTS[lv]||ARCADE_WEIGHTS[3];
   const ks=Object.keys(w),vs=Object.values(w);
   const tot=vs.reduce((a,b)=>a+b,0);
   let r=Math.random()*tot;
-  for(let i=0;i<ks.length;i++){r-=vs[i];if(r<=0){enemies.push(new Enemy(ks[i]));return;}}
-  enemies.push(new Enemy(ks[0]));
+  for(let i=0;i<ks.length;i++){r-=vs[i];if(r<=0){spawnEnemy(ks[i]);return;}}
+  spawnEnemy(ks[0]);
 }
 function spawnEnemyLevel(){
   const w=LEVELS[lvIdx][0],ks=Object.keys(w);
   if(!ks.length)return;
   const vs=Object.values(w),tot=vs.reduce((a,b)=>a+b,0);
   let r=Math.random()*tot;
-  for(let i=0;i<ks.length;i++){r-=vs[i];if(r<=0){enemies.push(new Enemy(ks[i]));return;}}
-  enemies.push(new Enemy(ks[0]));
+  for(let i=0;i<ks.length;i++){r-=vs[i];if(r<=0){spawnEnemy(ks[i]);return;}}
+  spawnEnemy(ks[0]);
 }
 function checkArcadeBoss(){
   if(bosses.length)return;
@@ -1125,9 +1237,20 @@ function doCollisions(){
   for(const e of enemies){
     if(e.dead)continue;
     if(rectsOverlap(e.rect,pr)){
+      if(e instanceof Mine)e.takeHit(); // triggers 8-bullet explosion
       e.dead=true;explosions.push(new Explosion(e.x,e.y,true));SND.boom();
       const dmg=player.takeDamage();
       if(dmg==='hit'){explosions.push(new Explosion(player.x,player.y));screenShake=8;}
+    }
+  }
+  // Mine explosion bullets vs player
+  for(const eb of freeEBullets){
+    if(eb.dead)continue;
+    if(rectsOverlap(eb.rect,pr)){
+      eb.dead=true;
+      const dmg=player.takeDamage();
+      if(dmg==='hit'){explosions.push(new Explosion(player.x,player.y));screenShake=5;flashAlpha=35;}
+      else if(dmg==='shield'){screenShake=3;}
     }
   }
   // Asteroids vs player bullets
@@ -1226,7 +1349,7 @@ function update(){
       if(lvIdx>=LEVELS.length){gameState='victory';SND.victory();return;}
       score=0;
       if(player){player.health=Math.min(player.health+1,player.maxHp);player.invFrames=120;}
-      enemies.length=0;bosses.length=0;powerups.length=0;
+      enemies.length=0;bosses.length=0;powerups.length=0;freeEBullets.length=0;asteroids.length=0;
       const ld=LEVELS[lvIdx];
       lvEnemiesLeft=ld[1];lvBossQueue=[...ld[3]];
       lvNextBossTimer=0;lvFinalDelayTimer=0;lvIntroTimer=140;
@@ -1280,6 +1403,7 @@ function update(){
   }
   for(const a of asteroids)a.update(player&&player.slowActive?0.4:1);
   asteroids=asteroids.filter(a=>!a.dead);
+  freeEBullets=freeEBullets.filter(b=>{b.update();return !b.dead;});
   explosions=explosions.filter(e=>{e.update();return !e.dead;});
 }
 
@@ -1321,13 +1445,19 @@ function drawPlanet(){
 // ── Draw ───────────────────────────────────────────────────────────────────────
 function draw(){
   ctx.fillStyle='#000510';ctx.fillRect(0,0,GW,GH);
-  // Subtle space nebula depth
+  // Space nebula depth layers
   const _nb1=ctx.createRadialGradient(GW*0.68,GH*0.35,10,GW*0.68,GH*0.35,310);
   _nb1.addColorStop(0,rgba(18,8,52,0.55));_nb1.addColorStop(1,'rgba(0,0,0,0)');
   ctx.fillStyle=_nb1;ctx.fillRect(0,0,GW,GH);
   const _nb2=ctx.createRadialGradient(GW*0.22,GH*0.75,5,GW*0.22,GH*0.75,190);
   _nb2.addColorStop(0,rgba(6,22,42,0.45));_nb2.addColorStop(1,'rgba(0,0,0,0)');
   ctx.fillStyle=_nb2;ctx.fillRect(0,0,GW,GH);
+  const _nb3=ctx.createRadialGradient(GW*0.45,GH*0.15,5,GW*0.45,GH*0.15,220);
+  _nb3.addColorStop(0,rgba(4,28,14,0.38));_nb3.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=_nb3;ctx.fillRect(0,0,GW,GH);
+  const _nb4=ctx.createRadialGradient(GW*0.85,GH*0.82,5,GW*0.85,GH*0.82,170);
+  _nb4.addColorStop(0,rgba(28,6,8,0.32));_nb4.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=_nb4;ctx.fillRect(0,0,GW,GH);
   for(const s of stars)s.draw();
   drawPlanet();
 
@@ -1345,6 +1475,7 @@ function draw(){
   ctx.save();ctx.translate(Math.round(sx),Math.round(sy));
 
   for(const a of asteroids)a.draw();
+  for(const eb of freeEBullets)eb.draw();
   for(const e of enemies)e.draw();
   for(const b of bosses)if(!b.dead)b.draw();
   for(const p of powerups)p.draw();
