@@ -1473,10 +1473,23 @@ let warnText='',warnTimer=0;
 let cheatBuf='',cheatMsg='',cheatTimer=0;
 let titleTapCount=0,titleTapTime=0;
 let menuDelHold=0,wipeConfirm=false;
-function wipeAllData(){
-  try{['ss_unlocked','ss_vol','ss_keys','ss_joy'].forEach(k=>localStorage.removeItem(k));}catch(e){}
-  maxUnlocked=0;masterVolume=0.7;bindings={...DEFAULT_BINDINGS};joyScale=1.0;applyJoyScale();
+function wipeProgressData(){
+  try{localStorage.removeItem('ss_unlocked');}catch(e){}
+  maxUnlocked=0;
+  cheatMsg='✓ ПРОГРЕСС СБРОШЕН';cheatTimer=200;
+}
+function wipeSettingsData(){
+  try{['ss_vol','ss_sfx','ss_keys','ss_joy','ss_joySt','ss_joyPX','ss_joyPY','ss_fireSz','ss_firePX','ss_firePY'].forEach(k=>localStorage.removeItem(k));}catch(e){}
+  masterVolume=0.7;sfxVolume=0.7;
   if(masterGain)masterGain.gain.value=0.7;
+  if(sfxGain)sfxGain.gain.value=0.7;
+  bindings={...DEFAULT_BINDINGS};saveBindings();
+  joyScale=1.0;applyJoyScale();
+  joyStatic=false;_joyPX=0;_joyPY=0;_fireSz=1.0;_firePX=0;_firePY=0;
+  cheatMsg='✓ НАСТРОЙКИ СБРОШЕНЫ';cheatTimer=200;
+}
+function wipeAllData(){
+  wipeProgressData();wipeSettingsData();
   cheatMsg='✓ ВСЕ ДАННЫЕ СБРОШЕНЫ';cheatTimer=200;
 }
 let menuSel=0,lsCursor=0,btnRects={};
@@ -2104,7 +2117,7 @@ function drawSettings(){
   // Wipe all data button
   if(wipeConfirm){
     ctx.fillStyle='#553322';ctx.font='bold 13px sans-serif';
-    ctx.fillText('Сбросить ВСЕ данные?',GW/2,571);
+    ctx.fillText('Сбросить настройки?',GW/2,571);
     const yw=578,yw2=578;
     const byw=560;
     btnRects['set_wipe_yes']={x:GW/2-120,y:byw,w:108,h:28};
@@ -2120,7 +2133,7 @@ function drawSettings(){
     ctx.fillStyle='rgba(40,10,10,0.7)';roundRect(GW/2-110,560,220,28,6);ctx.fill();
     ctx.strokeStyle='#663322';ctx.lineWidth=1.5;roundRect(GW/2-110,560,220,28,6);ctx.stroke();
     ctx.fillStyle='#885544';ctx.font='13px sans-serif';
-    ctx.fillText('🗑 Сбросить все данные',GW/2,578);
+    ctx.fillText('🗑 Сбросить настройки',GW/2,578);
   }
 }
 function drawLevelIntro(){
@@ -2196,7 +2209,7 @@ function drawMenu(){
     // Confirmation row
     ctx.fillStyle=rgba(0,0,0,0.75);ctx.fillRect(0,GH/2+220,GW,48);
     ctx.fillStyle='#ff8888';ctx.font='bold 15px sans-serif';ctx.textAlign='center';
-    ctx.fillText('Сбросить ВСЕ данные?',GW/2,GH/2+240);
+    ctx.fillText('Сбросить прогресс?',GW/2,GH/2+240);
     btnRects['m_wipe_yes']={x:GW/2-120,y:GH/2+247,w:108,h:28};
     btnRects['m_wipe_no'] ={x:GW/2+12, y:GH/2+247,w:108,h:28};
     ctx.fillStyle='rgba(160,30,30,0.9)';roundRect(GW/2-120,GH/2+247,108,28,6);ctx.fill();
@@ -2311,7 +2324,7 @@ function handleBtn(key){
   if(key==='set_layout'){gameState='layout';_layDrag=null;return;}
   if(key==='set_wipe'){wipeConfirm=true;SND.uiClick();return;}
   if(key==='set_wipe_no'){wipeConfirm=false;SND.uiClick();return;}
-  if(key==='set_wipe_yes'){wipeConfirm=false;wipeAllData();return;}
+  if(key==='set_wipe_yes'){wipeConfirm=false;wipeSettingsData();return;}
   for(const a of['up','down','left','right','fire']){
     if(key==='set_bind_'+a){
       rebindAction=(rebindAction===a?null:a);SND.uiClick();return;
@@ -2320,7 +2333,7 @@ function handleBtn(key){
   if(key==='set_bind_reset'){bindings={...DEFAULT_BINDINGS};saveBindings();SND.uiClick();return;}
   if(key==='m_wipe'){wipeConfirm=true;SND.uiClick();return;}
   if(key==='m_wipe_no'){wipeConfirm=false;SND.uiClick();return;}
-  if(key==='m_wipe_yes'){wipeConfirm=false;wipeAllData();return;}
+  if(key==='m_wipe_yes'){wipeConfirm=false;wipeProgressData();return;}
   if(key==='m_title'){
     const now=Date.now();
     if(now-titleTapTime>3000)titleTapCount=0;
