@@ -46,15 +46,19 @@ function rectsOverlap(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h
 function range(a,b,s=1){const r=[];for(let i=a;i<b;i+=s)r.push(i);return r;}
 
 // ── Audio ──────────────────────────────────────────────────────────────────────
-let actx=null,masterGain=null;
+let actx=null,masterGain=null,sfxGain=null;
 let masterVolume=parseFloat(localStorage.getItem('ss_vol')||'0.7');
+let sfxVolume=parseFloat(localStorage.getItem('ss_sfx')||'0.7');
 function saveMasterVolume(){try{localStorage.setItem('ss_vol',masterVolume.toFixed(2));}catch(e){}}
+function saveSfxVolume(){try{localStorage.setItem('ss_sfx',sfxVolume.toFixed(2));}catch(e){}}
 function initAudio(){
   if(actx)return;
   try{
     actx=new(window.AudioContext||window.webkitAudioContext)();
     masterGain=actx.createGain();masterGain.gain.value=masterVolume;
     masterGain.connect(actx.destination);
+    sfxGain=actx.createGain();sfxGain.gain.value=sfxVolume;
+    sfxGain.connect(actx.destination);
   }catch(e){}
 }
 function playTone(freq,dur,type,vol){
@@ -64,7 +68,7 @@ function playTone(freq,dur,type,vol){
     o.type=type;o.frequency.value=freq;
     g.gain.setValueAtTime(vol,actx.currentTime);
     g.gain.exponentialRampToValueAtTime(0.001,actx.currentTime+dur);
-    o.connect(g);g.connect(masterGain||actx.destination);o.start();o.stop(actx.currentTime+dur);
+    o.connect(g);g.connect(sfxGain||masterGain||actx.destination);o.start();o.stop(actx.currentTime+dur);
   }catch(e){}
 }
 function playNoise(dur,vol){
@@ -74,7 +78,7 @@ function playNoise(dur,vol){
     const d=buf.getChannelData(0);
     for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.exp(-8*i/d.length);
     const src=actx.createBufferSource(),g=actx.createGain();
-    g.gain.value=vol;src.buffer=buf;src.connect(g);g.connect(masterGain||actx.destination);src.start();
+    g.gain.value=vol;src.buffer=buf;src.connect(g);g.connect(sfxGain||masterGain||actx.destination);src.start();
   }catch(e){}
 }
 const SND={
@@ -1168,7 +1172,18 @@ function drawTouch(){
 }
 
 // ── Layout editor ──────────────────────────────────────────────────────────────
-let _layDrag=null;
+let _layDrag=null,_layRSt=null; // resize start state
+let _setSlider=null; // 'vol' or 'sfx' while dragging a settings slider
+function _sliderGeom(){
+  const w=Math.min(420,GW-100);
+  return{x:Math.round(GW/2-w/2),w};
+}
+function _setSliderVal(x){
+  const{x:sx,w:sw}=_sliderGeom();
+  const v=clamp((x-sx)/sw,0,1);
+  if(_setSlider==='vol'){masterVolume=parseFloat(v.toFixed(2));if(masterGain)masterGain.gain.value=masterVolume;saveMasterVolume();}
+  else if(_setSlider==='sfx'){sfxVolume=parseFloat(v.toFixed(2));if(sfxGain)sfxGain.gain.value=sfxVolume;saveSfxVolume();}
+}
 function drawLayout(){
   ctx.fillStyle='#050814';ctx.fillRect(0,0,GW,GH);
   for(const s of stars)s.draw();
@@ -1178,28 +1193,44 @@ function drawLayout(){
   ctx.shadowColor='#00c8ff';ctx.shadowBlur=8;
   ctx.fillText('РАСПОЛОЖЕНИЕ УПРАВЛЕНИЯ',GW/2,26);ctx.shadowBlur=0;
   ctx.fillStyle='#556677';ctx.font='12px sans-serif';
-  ctx.fillText('Перетащи джойстик и кнопку огня на нужное место',GW/2,44);
+  ctx.fillText('Перемести • Потяни за край чтобы изменить размер',GW/2,44);
   btnRects={};
   const jp=getJoyPos(),fr=getFireR(),fp=getFirePos();
-  const jSel=_layDrag==='joy',fSel=_layDrag==='fire';
-  // Joystick
+  const jDrag=_layDrag==='joy'||_layDrag==='joy_resize';
+  const fDrag=_layDrag==='fire'||_layDrag==='fire_resize';
+  // Joystick — outer ring (resize handle)
   ctx.beginPath();ctx.arc(jp.x,jp.y,JOY_BASE_R,0,Math.PI*2);
-  ctx.fillStyle=rgba(55,80,130,jSel?0.5:0.28);ctx.fill();
-  ctx.strokeStyle=jSel?'#00c8ff':rgba(140,190,255,0.55);ctx.lineWidth=jSel?3:2;ctx.stroke();
+  ctx.fillStyle=rgba(55,80,130,jDrag?0.5:0.28);ctx.fill();
+  ctx.strokeStyle=_layDrag==='joy_resize'?'#ffcc00':jDrag?'#00c8ff':rgba(140,190,255,0.55);
+  ctx.lineWidth=_layDrag==='joy_resize'?4:jDrag?3:2;ctx.stroke();
+  // resize handle dots on edge
+  if(!jDrag){
+    [0,Math.PI/2,Math.PI,Math.PI*1.5].forEach(a=>{
+      ctx.beginPath();ctx.arc(jp.x+Math.cos(a)*JOY_BASE_R,jp.y+Math.sin(a)*JOY_BASE_R,5,0,Math.PI*2);
+      ctx.fillStyle=rgba(180,220,255,0.7);ctx.fill();
+    });
+  }
   ctx.beginPath();ctx.arc(jp.x,jp.y,JOY_NUB_R,0,Math.PI*2);
   ctx.fillStyle=rgba(80,130,210,0.7);ctx.fill();
   ctx.fillStyle='#aaccee';ctx.font='bold 11px sans-serif';ctx.textAlign='center';
   ctx.fillText('JOY',jp.x,jp.y+4);
-  // Fire button
+  // Fire button — outer ring (resize handle)
   ctx.beginPath();ctx.arc(fp.x,fp.y,fr,0,Math.PI*2);
-  ctx.fillStyle=rgba(130,25,25,fSel?0.65:0.38);ctx.fill();
-  ctx.strokeStyle=fSel?'#ff5533':rgba(255,90,90,0.6);ctx.lineWidth=fSel?3:2;ctx.stroke();
+  ctx.fillStyle=rgba(130,25,25,fDrag?0.65:0.38);ctx.fill();
+  ctx.strokeStyle=_layDrag==='fire_resize'?'#ffcc00':fDrag?'#ff5533':rgba(255,90,90,0.6);
+  ctx.lineWidth=_layDrag==='fire_resize'?4:fDrag?3:2;ctx.stroke();
+  if(!fDrag){
+    [Math.PI/4,Math.PI*3/4,Math.PI*5/4,Math.PI*7/4].forEach(a=>{
+      ctx.beginPath();ctx.arc(fp.x+Math.cos(a)*fr,fp.y+Math.sin(a)*fr,5,0,Math.PI*2);
+      ctx.fillStyle=rgba(255,160,120,0.7);ctx.fill();
+    });
+  }
   ctx.beginPath();ctx.arc(fp.x,fp.y,fr-14,0,Math.PI*2);
   ctx.fillStyle=rgba(200,40,40,0.5);ctx.fill();
   ctx.fillStyle='#ffaaaa';ctx.font='bold 11px sans-serif';ctx.textAlign='center';
   ctx.fillText('FIRE',fp.x,fp.y+4);
   // Joy: static/floating toggle
-  const jtW=148,jtH=30,jtX=jp.x-jtW/2,jtY=clamp(jp.y-JOY_BASE_R-40,55,GH-90);
+  const jtW=148,jtH=30,jtX=jp.x-jtW/2,jtY=clamp(jp.y-JOY_BASE_R-44,55,GH-90);
   btnRects['lay_joy_mode']={x:jtX,y:jtY,w:jtW,h:jtH};
   ctx.fillStyle=joyStatic?rgba(0,100,170,0.88):rgba(20,40,80,0.78);
   roundRect(jtX,jtY,jtW,jtH,8);ctx.fill();
@@ -1207,29 +1238,6 @@ function drawLayout(){
   roundRect(jtX,jtY,jtW,jtH,8);ctx.stroke();
   ctx.fillStyle='#cce4ff';ctx.font='bold 13px sans-serif';ctx.textAlign='center';
   ctx.fillText(joyStatic?'◉ СТАТИЧНЫЙ':'○ ПЛАВАЮЩИЙ',jp.x,jtY+jtH/2+5);
-  // Joy size buttons
-  const szH=28,szW=28;
-  const jmX=clamp(jp.x-JOY_BASE_R-szW-6,4,GW-szW-4),jmY=jp.y-szH/2;
-  const jpX=clamp(jp.x+JOY_BASE_R+6,4,GW-szW-4),jpY=jp.y-szH/2;
-  btnRects['lay_joy_sz_m']={x:jmX,y:jmY,w:szW,h:szH};
-  btnRects['lay_joy_sz_p']={x:jpX,y:jpY,w:szW,h:szH};
-  [[jmX,jmY,'−'],[jpX,jpY,'+']].forEach(([bx,by,lbl])=>{
-    ctx.fillStyle=rgba(20,40,80,0.8);roundRect(bx,by,szW,szH,6);ctx.fill();
-    ctx.strokeStyle='#446688';ctx.lineWidth=1.5;roundRect(bx,by,szW,szH,6);ctx.stroke();
-    ctx.fillStyle='#aaccee';ctx.font='bold 18px sans-serif';ctx.textAlign='center';
-    ctx.fillText(lbl,bx+szW/2,by+szH/2+6);
-  });
-  // Fire size buttons
-  const fmX=clamp(fp.x-fr-szW-6,4,GW-szW-4),fmY=fp.y-szH/2;
-  const fpX=clamp(fp.x+fr+6,4,GW-szW-4),fpY=fp.y-szH/2;
-  btnRects['lay_fire_sz_m']={x:fmX,y:fmY,w:szW,h:szH};
-  btnRects['lay_fire_sz_p']={x:fpX,y:fpY,w:szW,h:szH};
-  [[fmX,fmY,'−'],[fpX,fpY,'+']].forEach(([bx,by,lbl])=>{
-    ctx.fillStyle=rgba(20,40,80,0.8);roundRect(bx,by,szW,szH,6);ctx.fill();
-    ctx.strokeStyle='#553333';ctx.lineWidth=1.5;roundRect(bx,by,szW,szH,6);ctx.stroke();
-    ctx.fillStyle='#ffcccc';ctx.font='bold 18px sans-serif';ctx.textAlign='center';
-    ctx.fillText(lbl,bx+szW/2,by+szH/2+6);
-  });
   // Bottom buttons
   btnRects['lay_done']={x:GW/2-70,y:GH-48,w:140,h:34};
   ctx.fillStyle=rgba(0,110,55,0.9);roundRect(GW/2-70,GH-48,140,34,10);ctx.fill();
@@ -1244,14 +1252,19 @@ function drawLayout(){
 }
 function _layInputDown(x,y){
   const jp=getJoyPos(),fp=getFirePos(),fr=getFireR();
-  if(Math.hypot(x-jp.x,y-jp.y)<=JOY_BASE_R+8){_layDrag='joy';return;}
-  if(Math.hypot(x-fp.x,y-fp.y)<=fr+8){_layDrag='fire';return;}
+  const jd=Math.hypot(x-jp.x,y-jp.y),fd=Math.hypot(x-fp.x,y-fp.y);
+  if(jd<=JOY_BASE_R+14){
+    if(jd>JOY_BASE_R-18){_layDrag='joy_resize';_layRSt={d:jd,sc:joyScale,cx:jp.x,cy:jp.y};}
+    else{_layDrag='joy';}
+    return;
+  }
+  if(fd<=fr+14){
+    if(fd>fr-18){_layDrag='fire_resize';_layRSt={d:fd,sc:_fireSz,cx:fp.x,cy:fp.y};}
+    else{_layDrag='fire';}
+    return;
+  }
   const k=hitBtn(x,y);
   if(k==='lay_joy_mode'){joyStatic=!joyStatic;SND.uiClick();}
-  else if(k==='lay_joy_sz_m'){joyScale=Math.max(0.5,+(joyScale-0.1).toFixed(1));applyJoyScale();saveJoyScale();SND.uiClick();}
-  else if(k==='lay_joy_sz_p'){joyScale=Math.min(2.0,+(joyScale+0.1).toFixed(1));applyJoyScale();saveJoyScale();SND.uiClick();}
-  else if(k==='lay_fire_sz_m'){_fireSz=Math.max(0.5,+(_fireSz-0.1).toFixed(1));SND.uiClick();}
-  else if(k==='lay_fire_sz_p'){_fireSz=Math.min(2.0,+(_fireSz+0.1).toFixed(1));SND.uiClick();}
   else if(k==='lay_done'){saveTouchLayout();gameState='settings';SND.uiClick();}
   else if(k==='lay_reset'){resetTouchLayout();applyJoyScale();SND.uiClick();}
 }
@@ -1263,9 +1276,16 @@ function _layInputMove(x,y){
     const fr=getFireR();
     _firePX=clamp(x,fr+4,GW-fr-4);
     _firePY=clamp(y,fr+4,GH-fr-4);
+  }else if(_layDrag==='joy_resize'&&_layRSt){
+    const d=Math.hypot(x-_layRSt.cx,y-_layRSt.cy);
+    joyScale=clamp(parseFloat((_layRSt.sc*(d/_layRSt.d)).toFixed(2)),0.4,2.2);
+    applyJoyScale();
+  }else if(_layDrag==='fire_resize'&&_layRSt){
+    const d=Math.hypot(x-_layRSt.cx,y-_layRSt.cy);
+    _fireSz=clamp(parseFloat((_layRSt.sc*(d/_layRSt.d)).toFixed(2)),0.4,2.2);
   }
 }
-function _layInputUp(){_layDrag=null;}
+function _layInputUp(){_layDrag=null;_layRSt=null;}
 function roundRect(x,y,w,h,r){
   ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);
   ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);ctx.lineTo(x+r,y+h);
@@ -2001,49 +2021,49 @@ function drawSettings(){
   ctx.fillStyle=rebindAction?'#ff9966':'#00c8ff';ctx.font='14px sans-serif';ctx.textAlign='center';
   ctx.fillText(rebindAction?'✕ CANCEL':'< BACK',54,29);
 
-  // ── Volume ─────────────────────────────────────────────────────────────
-  const lvl=Math.round(masterVolume*10);
-  const segW=28,segH=26,segGap=4,segs=10;
-  const totalBarW=segs*segW+(segs-1)*segGap;
-  const btnW=34,btnGap=8;
-  const totalW=btnW+btnGap+totalBarW+btnGap+btnW;
-  const bx0=Math.round((GW-totalW)/2);
-  const barY=68;
-  ctx.fillStyle='#aaaaaa';ctx.font='bold 14px sans-serif';ctx.textAlign='left';
-  ctx.fillText('🔊 VOLUME',bx0,barY-4);
-  btnRects['set_vol_down']={x:bx0,y:barY,w:btnW,h:segH};
-  ctx.fillStyle='#1a2a3a';roundRect(bx0,barY,btnW,segH,5);ctx.fill();
-  ctx.strokeStyle='#446688';ctx.lineWidth=1.5;roundRect(bx0,barY,btnW,segH,5);ctx.stroke();
-  ctx.fillStyle='#aac8e0';ctx.font='bold 18px sans-serif';ctx.textAlign='center';ctx.fillText('−',bx0+btnW/2,barY+segH-4);
-  const seg0=bx0+btnW+btnGap;
-  for(let i=0;i<segs;i++){
-    const sx=seg0+i*(segW+segGap);
-    ctx.fillStyle=i<lvl?'#00c8ff':'#1a2a3a';roundRect(sx,barY,segW,segH,3);ctx.fill();
-    ctx.strokeStyle=i<lvl?'#0090b8':'#2a3a4a';ctx.lineWidth=1;roundRect(sx,barY,segW,segH,3);ctx.stroke();
-  }
-  const plusX=seg0+totalBarW+btnGap;
-  btnRects['set_vol_up']={x:plusX,y:barY,w:btnW,h:segH};
-  ctx.fillStyle='#1a2a3a';roundRect(plusX,barY,btnW,segH,5);ctx.fill();
-  ctx.strokeStyle='#446688';ctx.lineWidth=1.5;roundRect(plusX,barY,btnW,segH,5);ctx.stroke();
-  ctx.fillStyle='#aac8e0';ctx.font='bold 18px sans-serif';ctx.textAlign='center';ctx.fillText('+',plusX+btnW/2,barY+segH-4);
-  ctx.fillStyle='#667788';ctx.font='13px monospace';ctx.textAlign='left';
-  ctx.fillText(Math.round(masterVolume*100)+'%',plusX+btnW+8,barY+segH-4);
+  // ── Volume sliders ──────────────────────────────────────────────────────
+  const _slW=Math.min(420,GW-100),_slH=20,_slR=_slH/2;
+  const _slX=Math.round(GW/2-_slW/2);
+  const _slY1=72,_slY2=116;
+  // Music slider
+  ctx.fillStyle='#aaaaaa';ctx.font='bold 13px sans-serif';ctx.textAlign='left';
+  ctx.fillText('🎵 МУЗЫКА',_slX,_slY1-4);
+  ctx.fillStyle='#334455';ctx.font='13px monospace';ctx.textAlign='right';
+  ctx.fillText(Math.round(masterVolume*100)+'%',_slX+_slW,_slY1-4);
+  ctx.fillStyle='#1a2a3a';roundRect(_slX,_slY1,_slW,_slH,_slR);ctx.fill();
+  ctx.strokeStyle='#2a3a4a';ctx.lineWidth=1;roundRect(_slX,_slY1,_slW,_slH,_slR);ctx.stroke();
+  const _mv=Math.round(masterVolume*_slW);
+  if(_mv>0){ctx.fillStyle='#0090b8';roundRect(_slX,_slY1,_mv,_slH,_slR);ctx.fill();}
+  const _mkx=_slX+_mv;
+  ctx.beginPath();ctx.arc(_mkx,_slY1+_slR,_slR+4,0,Math.PI*2);
+  ctx.fillStyle='#fff';ctx.fill();ctx.strokeStyle='#00c8ff';ctx.lineWidth=2.5;ctx.stroke();
+  btnRects['set_vol_sl']={x:_slX-8,y:_slY1-6,w:_slW+16,h:_slH+12};
+  // SFX slider
+  ctx.fillStyle='#aaaaaa';ctx.font='bold 13px sans-serif';ctx.textAlign='left';
+  ctx.fillText('🔫 ЭФФЕКТЫ',_slX,_slY2-4);
+  ctx.fillStyle='#334455';ctx.font='13px monospace';ctx.textAlign='right';
+  ctx.fillText(Math.round(sfxVolume*100)+'%',_slX+_slW,_slY2-4);
+  ctx.fillStyle='#1a2a3a';roundRect(_slX,_slY2,_slW,_slH,_slR);ctx.fill();
+  ctx.strokeStyle='#2a3a4a';ctx.lineWidth=1;roundRect(_slX,_slY2,_slW,_slH,_slR);ctx.stroke();
+  const _sv=Math.round(sfxVolume*_slW);
+  if(_sv>0){ctx.fillStyle='#b06800';roundRect(_slX,_slY2,_sv,_slH,_slR);ctx.fill();}
+  const _skx=_slX+_sv;
+  ctx.beginPath();ctx.arc(_skx,_slY2+_slR,_slR+4,0,Math.PI*2);
+  ctx.fillStyle='#fff';ctx.fill();ctx.strokeStyle='#ff9900';ctx.lineWidth=2.5;ctx.stroke();
+  btnRects['set_sfx_sl']={x:_slX-8,y:_slY2-6,w:_slW+16,h:_slH+12};
 
   // Divider
   ctx.strokeStyle='#1e3050';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(30,106);ctx.lineTo(GW-30,106);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(30,148);ctx.lineTo(GW-30,148);ctx.stroke();
 
-  // ── Controls layout ──────────────────────────────────────────────────────
-  const c1=GW/4,c2=touchMode?GW/2:3*GW/4,colY=118;
-
+  // ── Controls ─────────────────────────────────────────────────────────────
   if(!touchMode){
-    // Column headers
+    const c1=GW/4,colY=162;
     ctx.fillStyle='#00c8ff';ctx.font='bold 14px sans-serif';ctx.textAlign='center';
     ctx.fillText('PC CONTROLS',c1,colY);
-    ctx.fillText('PHONE CONTROLS',c2,colY);
+    ctx.fillText('PHONE CONTROLS',3*GW/4,colY);
     ctx.strokeStyle='#1e3050';ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(GW/2,108);ctx.lineTo(GW/2,530);ctx.stroke();
-    // PC: key binding rows
+    ctx.beginPath();ctx.moveTo(GW/2,152);ctx.lineTo(GW/2,530);ctx.stroke();
     const actions=[['up','↑  Up'],['down','↓  Down'],['left','←  Left'],['right','→  Right'],['fire','🔥  Fire']];
     const rowH=52,rowY=colY+18;
     actions.forEach(([a,label],i)=>{
@@ -2061,69 +2081,24 @@ function drawSettings(){
       ctx.font=isRebinding?'bold 13px monospace':'13px monospace';ctx.textAlign='center';
       ctx.fillText(isRebinding?'PRESS KEY...':keyName(bindings[a]),bx+bw/2,by+bh/2+5);
     });
-    // Reset bindings button
     const rbX=38,rbY=rowY+actions.length*rowH+2,rbW=c1*2-76,rbH=26;
     btnRects['set_bind_reset']={x:rbX,y:rbY,w:rbW,h:rbH};
     ctx.fillStyle=rgba(40,10,10,0.8);roundRect(rbX,rbY,rbW,rbH,5);ctx.fill();
     ctx.strokeStyle='#553333';ctx.lineWidth=1.5;roundRect(rbX,rbY,rbW,rbH,5);ctx.stroke();
     ctx.fillStyle='#aa6655';ctx.font='12px sans-serif';ctx.textAlign='center';
     ctx.fillText('↺ Reset to defaults',rbX+rbW/2,rbY+rbH/2+5);
-  }else{
-    ctx.fillStyle='#00c8ff';ctx.font='bold 16px sans-serif';ctx.textAlign='center';
-    ctx.fillText('PHONE CONTROLS',GW/2,colY);
+    ctx.strokeStyle='#1e3050';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(30,534);ctx.lineTo(GW-30,534);ctx.stroke();
+    ctx.fillStyle='#445566';ctx.font='12px monospace';ctx.textAlign='center';
+    ctx.fillText('Unlock all levels — keyboard: lavelall   |   phone: tap title × 7',GW/2,549);
   }
-
-  // Phone column: joystick size
-  const jlvl=Math.round((joyScale-0.5)/0.1);
-  const jsegs=Math.round((2.0-0.5)/0.1)+1; // 16 levels 0.5..2.0
-  const jsW=16,jsGap=3,jtotalW=jsegs*jsW+(jsegs-1)*jsGap;
-  const jbtnW=28,jbtnGap=6;
-  const jtW=jbtnW+jbtnGap+jtotalW+jbtnGap+jbtnW;
-  const jbx0=touchMode?Math.round((GW-jtW)/2):Math.round(GW/2+(GW/2-jtW)/2);
-  const jbY=colY+14;
-  ctx.fillStyle='#aaaaaa';ctx.font='bold 13px sans-serif';ctx.textAlign='left';
-  ctx.fillText('Joystick size',jbx0,jbY-2);
-  btnRects['set_joy_down']={x:jbx0,y:jbY,w:jbtnW,h:22};
-  ctx.fillStyle='#1a2a3a';roundRect(jbx0,jbY,jbtnW,22,4);ctx.fill();
-  ctx.strokeStyle='#446688';ctx.lineWidth=1.5;roundRect(jbx0,jbY,jbtnW,22,4);ctx.stroke();
-  ctx.fillStyle='#aac8e0';ctx.font='bold 16px sans-serif';ctx.textAlign='center';ctx.fillText('−',jbx0+jbtnW/2,jbY+16);
-  const jseg0=jbx0+jbtnW+jbtnGap;
-  for(let i=0;i<jsegs;i++){
-    const sx=jseg0+i*(jsW+jsGap);
-    ctx.fillStyle=i<=jlvl?'#28a868':'#1a2a3a';roundRect(sx,jbY,jsW,22,2);ctx.fill();
-    ctx.strokeStyle=i<=jlvl?'#1e8050':'#2a3a4a';ctx.lineWidth=1;roundRect(sx,jbY,jsW,22,2);ctx.stroke();
-  }
-  const jplusX=jseg0+jtotalW+jbtnGap;
-  btnRects['set_joy_up']={x:jplusX,y:jbY,w:jbtnW,h:22};
-  ctx.fillStyle='#1a2a3a';roundRect(jplusX,jbY,jbtnW,22,4);ctx.fill();
-  ctx.strokeStyle='#446688';ctx.lineWidth=1.5;roundRect(jplusX,jbY,jbtnW,22,4);ctx.stroke();
-  ctx.fillStyle='#aac8e0';ctx.font='bold 16px sans-serif';ctx.textAlign='center';ctx.fillText('+',jplusX+jbtnW/2,jbY+16);
-  ctx.fillStyle='#667788';ctx.font='13px monospace';ctx.textAlign='left';
-  ctx.fillText(Math.round(joyScale*100)+'%',jplusX+jbtnW+6,jbY+15);
-
-  // Phone control hints
-  const ph=[['Move','Joystick (left half of screen)'],['Fire','Button (bottom right)'],['Pause','Button (top center)']];
-  ph.forEach(([a,k],i)=>{
-    const y=colY+70+i*52;
-    ctx.fillStyle='#556677';ctx.font='13px sans-serif';ctx.textAlign='center';
-    ctx.fillText(a,c2,y);
-    ctx.fillStyle='#cce0f0';ctx.font='13px sans-serif';
-    ctx.fillText(k,c2,y+18);
-  });
-
-  // Bottom divider & cheat hints
-  ctx.strokeStyle='#1e3050';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(30,534);ctx.lineTo(GW-30,534);ctx.stroke();
-  ctx.fillStyle='#445566';ctx.font='12px monospace';ctx.textAlign='center';
-  if(touchMode)ctx.fillText('Разблокировать все уровни: нажми заголовок × 7',GW/2,549);
-  else ctx.fillText('Unlock all levels — keyboard: lavelall   |   phone: tap title × 7',GW/2,549);
   // Layout editor button (phone only)
   if(touchMode){
-    btnRects['set_layout']={x:GW/2-110,y:534,w:220,h:30};
-    ctx.fillStyle=rgba(0,60,110,0.85);roundRect(GW/2-110,534,220,30,8);ctx.fill();
-    ctx.strokeStyle='#336688';ctx.lineWidth=1.5;roundRect(GW/2-110,534,220,30,8);ctx.stroke();
-    ctx.fillStyle='#88ccff';ctx.font='bold 14px sans-serif';ctx.textAlign='center';
-    ctx.fillText('📐 Расположение управления',GW/2,554);
+    btnRects['set_layout']={x:GW/2-110,y:170,w:220,h:36};
+    ctx.fillStyle=rgba(0,60,110,0.88);roundRect(GW/2-110,170,220,36,10);ctx.fill();
+    ctx.strokeStyle='#336688';ctx.lineWidth=1.5;roundRect(GW/2-110,170,220,36,10);ctx.stroke();
+    ctx.fillStyle='#88ccff';ctx.font='bold 15px sans-serif';ctx.textAlign='center';
+    ctx.fillText('📐 Расположение управления',GW/2,193);
   }
 
   // Wipe all data button
@@ -2337,28 +2312,12 @@ function handleBtn(key){
   if(key==='set_wipe'){wipeConfirm=true;SND.uiClick();return;}
   if(key==='set_wipe_no'){wipeConfirm=false;SND.uiClick();return;}
   if(key==='set_wipe_yes'){wipeConfirm=false;wipeAllData();return;}
-  if(key==='set_joy_down'){
-    joyScale=Math.max(0.5,+(joyScale-0.1).toFixed(1));applyJoyScale();saveJoyScale();SND.uiClick();return;
-  }
-  if(key==='set_joy_up'){
-    joyScale=Math.min(2.0,+(joyScale+0.1).toFixed(1));applyJoyScale();saveJoyScale();SND.uiClick();return;
-  }
   for(const a of['up','down','left','right','fire']){
     if(key==='set_bind_'+a){
       rebindAction=(rebindAction===a?null:a);SND.uiClick();return;
     }
   }
   if(key==='set_bind_reset'){bindings={...DEFAULT_BINDINGS};saveBindings();SND.uiClick();return;}
-  if(key==='set_vol_down'){
-    masterVolume=Math.max(0,+(masterVolume-0.1).toFixed(2));
-    if(masterGain)masterGain.gain.value=masterVolume;
-    saveMasterVolume();SND.uiClick();return;
-  }
-  if(key==='set_vol_up'){
-    masterVolume=Math.min(1,+(masterVolume+0.1).toFixed(2));
-    if(masterGain)masterGain.gain.value=masterVolume;
-    saveMasterVolume();SND.uiClick();return;
-  }
   if(key==='m_wipe'){wipeConfirm=true;SND.uiClick();return;}
   if(key==='m_wipe_no'){wipeConfirm=false;SND.uiClick();return;}
   if(key==='m_wipe_yes'){wipeConfirm=false;wipeAllData();return;}
@@ -2397,15 +2356,22 @@ canvas.addEventListener('mousedown',e=>{
   const{x,y}=canvasPos(e.clientX,e.clientY);
   if(gameState==='intro'){skipIntro();return;}
   if(gameState==='layout'){_layInputDown(x,y);return;}
+  if(gameState==='settings'){
+    const h=hitBtn(x,y);
+    if(h==='set_vol_sl'){_setSlider='vol';_setSliderVal(x);return;}
+    if(h==='set_sfx_sl'){_setSlider='sfx';_setSliderVal(x);return;}
+    handleBtn(h);return;
+  }
   if(gameState==='playing'){
     if(hitBtn(x,y)==='hud_pause'){gameState='paused';clearTouch();return;}
     if(touchMode)touchDown(-1,x,y);
   }else{handleBtn(hitBtn(x,y));}
 });
-canvas.addEventListener('mouseup',e=>{touchUp(-1);if(gameState==='layout')_layInputUp();});
+canvas.addEventListener('mouseup',e=>{_setSlider=null;touchUp(-1);if(gameState==='layout')_layInputUp();});
 canvas.addEventListener('mousemove',e=>{
   if(e.buttons){
     const{x,y}=canvasPos(e.clientX,e.clientY);
+    if(_setSlider){_setSliderVal(x);return;}
     if(gameState==='layout'){_layInputMove(x,y);return;}
     if(gameState==='playing'&&touchMode){touchMove(-1,x,y);}
   }
@@ -2416,6 +2382,12 @@ canvas.addEventListener('touchstart',e=>{
     const{x,y}=canvasPos(t.clientX,t.clientY);
     if(gameState==='intro'){skipIntro();break;}
     if(gameState==='layout'){_layInputDown(x,y);break;}
+    if(gameState==='settings'){
+      const h=hitBtn(x,y);
+      if(h==='set_vol_sl'){_setSlider='vol';_setSliderVal(x);break;}
+      if(h==='set_sfx_sl'){_setSlider='sfx';_setSliderVal(x);break;}
+      handleBtn(h);break;
+    }
     if(gameState==='playing'){
       if(hitBtn(x,y)==='hud_pause'){gameState='paused';clearTouch();break;}
       if(touchMode)touchDown(t.identifier,x,y);
@@ -2424,13 +2396,15 @@ canvas.addEventListener('touchstart',e=>{
 },{passive:false});
 canvas.addEventListener('touchend',e=>{
   e.preventDefault();
+  _setSlider=null;
   for(const t of e.changedTouches){touchUp(t.identifier);if(gameState==='layout')_layInputUp();}
 },{passive:false});
 canvas.addEventListener('touchmove',e=>{
   e.preventDefault();
   for(const t of e.changedTouches){
     const{x,y}=canvasPos(t.clientX,t.clientY);
-    if(gameState==='layout'){_layInputMove(x,y);}
+    if(_setSlider){_setSliderVal(x);break;}
+    if(gameState==='layout'){_layInputMove(x,y);break;}
     else touchMove(t.identifier,x,y);
   }
 },{passive:false});
