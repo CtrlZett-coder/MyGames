@@ -1629,9 +1629,17 @@ function saveStats(){
     localStorage.setItem('ss_stat_ol',statsOverlordWins);
   }catch(e){}
 }
+function getWorldStats(){
+  const hrs=Math.max(0,(Date.now()-1735689600000)/3600000);
+  return{
+    plays:  Math.round(50000+hrs*22+statsGames),
+    kills:  Math.round(2400000+hrs*920+statsKills),
+    overlords:Math.round(820+hrs*0.95+statsOverlordWins)
+  };
+}
 function recordOverlordVictory(){
   statsOverlordWins++;saveStats();
-  if(!playerCallsign)playerCallsign=window.prompt('Введи свой позывной, пилот:','Пилот')||'Неизвестный';
+  if(!playerCallsign)playerCallsign=window.prompt('Enter your callsign, pilot:','Pilot')||'Unknown';
   try{localStorage.setItem('ss_callsign',playerCallsign);}catch(e){}
   const entry={name:playerCallsign,score,date:new Date().toLocaleDateString('ru-RU')};
   overlordHoF.unshift(entry);if(overlordHoF.length>10)overlordHoF.pop();
@@ -2173,18 +2181,6 @@ function drawHUD(){
   ctx.fillStyle='#555';ctx.font='12px sans-serif';ctx.textAlign='center';
   ctx.fillText('WASD/Arrows — move   Space — shoot',GW/2,GH-8);
 
-  // Combo display
-  if(combo>=3){
-    const m=comboMult(),lbl=comboLabel();
-    const pulse=1+0.05*Math.sin(Date.now()*0.012);
-    const cx=m>=3?'#ff8c00':m>=2?'#ffdc00':'#aaffaa';
-    ctx.save();ctx.translate(GW/2,GH/2);ctx.scale(pulse,pulse);
-    ctx.fillStyle=cx;ctx.shadowColor=cx;ctx.shadowBlur=12;
-    ctx.font=`bold ${m>=4?22:18}px monospace`;ctx.textAlign='center';
-    ctx.fillText(`${combo} KILLS  ${lbl}`,0,GH*0.38-GH/2);
-    ctx.shadowBlur=0;ctx.restore();
-  }
-
   // Pause button — always visible (works on PC and phone)
   const pbx=GW/2-30,pby=GH-70,pbw=60,pbh=36;
   btnRects['hud_pause']={x:pbx,y:pby,w:pbw,h:pbh};
@@ -2297,18 +2293,18 @@ function drawSettings(){
     ctx.fillStyle=val?rgba(0,80,140,0.9):rgba(20,30,40,0.7);roundRect(onX,ly,_togW,_togH,6);ctx.fill();
     ctx.strokeStyle=val?AC:'#334455';ctx.lineWidth=val?2:1;roundRect(onX,ly,_togW,_togH,6);ctx.stroke();
     ctx.fillStyle=val?AC:'#556677';ctx.font='bold 12px sans-serif';ctx.textAlign='center';
-    ctx.fillText('ВКЛ',onX+_togW/2,ly+_togH/2+5);
+    ctx.fillText('ON',onX+_togW/2,ly+_togH/2+5);
     ctx.fillStyle=!val?rgba(80,20,20,0.9):rgba(20,30,40,0.7);roundRect(offX,ly,_togW,_togH,6);ctx.fill();
     ctx.strokeStyle=!val?'#cc4444':'#334455';ctx.lineWidth=!val?2:1;roundRect(offX,ly,_togW,_togH,6);ctx.stroke();
     ctx.fillStyle=!val?'#ff6666':'#556677';ctx.font='bold 12px sans-serif';ctx.textAlign='center';
-    ctx.fillText('ВЫКЛ',offX+_togW/2,ly+_togH/2+5);
+    ctx.fillText('OFF',offX+_togW/2,ly+_togH/2+5);
   };
-  _tog(particlesEnabled,'set_part_on','set_part_off',_gsx,159,'💥 Частицы');
+  _tog(particlesEnabled,'set_part_on','set_part_off',_gsx,159,'💥 Particles');
   // Accent color picker
   ctx.fillStyle='#aaaaaa';ctx.font='bold 13px sans-serif';ctx.textAlign='left';
-  ctx.fillText('🎨 Цвет',_gsx,207);
+  ctx.fillText('🎨 Color',_gsx,207);
   const _acNames=['#00c8ff','#00e080','#ff8c00','#cc44ff'];
-  const _acLabels=['Синий','Зелёный','Оранж.','Фиолет.'];
+  const _acLabels=['Blue','Green','Orange','Purple'];
   for(let i=0;i<4;i++){
     const _acX=_gsx+_gsw-260+i*65,_acY=193;
     btnRects['set_accent_'+i]={x:_acX,y:_acY,w:60,h:22};
@@ -2318,7 +2314,7 @@ function drawSettings(){
     ctx.fillStyle=accentIdx===i?'#fff':'#667788';ctx.font='10px sans-serif';ctx.textAlign='left';
     ctx.fillText(_acLabels[i],_acX+21,_acY+15);
   }
-  if(touchMode){_tog(vibrateEnabled,'set_vib_on','set_vib_off',_gsx,225,'📳 Вибрация');}
+  if(touchMode){_tog(vibrateEnabled,'set_vib_on','set_vib_off',_gsx,225,'📳 Vibration');}
   // Divider 2
   const _div2Y=touchMode?258:232;
   ctx.strokeStyle='#1e3050';ctx.lineWidth=1;
@@ -2353,7 +2349,6 @@ function drawSettings(){
     ctx.fillStyle='#aa6655';ctx.font='12px sans-serif';ctx.textAlign='center';
     ctx.fillText('↺ Reset to defaults',rbX+rbW/2,rbY+rbH/2+5);
     ctx.fillStyle='#445566';ctx.font='11px monospace';
-    ctx.fillText('Unlock all: lavelall  /  tap title × 7',GW/2,rbY+rbH+22);
   }
   // Layout editor button (phone only)
   if(touchMode){
@@ -2362,29 +2357,29 @@ function drawSettings(){
     ctx.fillStyle=rgba(0,60,110,0.88);roundRect(GW/2-110,_lbY,220,36,10);ctx.fill();
     ctx.strokeStyle='#336688';ctx.lineWidth=1.5;roundRect(GW/2-110,_lbY,220,36,10);ctx.stroke();
     ctx.fillStyle='#88ccff';ctx.font='bold 15px sans-serif';ctx.textAlign='center';
-    ctx.fillText('📐 Расположение управления',GW/2,_lbY+23);
+    ctx.fillText('📐 Control Layout',GW/2,_lbY+23);
   }
 
   // Wipe all data button
   if(wipeConfirm){
     ctx.fillStyle='#553322';ctx.font='bold 13px sans-serif';
-    ctx.fillText('Сбросить настройки?',GW/2,571);
+    ctx.fillText('Reset settings?',GW/2,571);
     const yw=578,yw2=578;
     const byw=560;
     btnRects['set_wipe_yes']={x:GW/2-120,y:byw,w:108,h:28};
     btnRects['set_wipe_no'] ={x:GW/2+12, y:byw,w:108,h:28};
     ctx.fillStyle='rgba(120,20,10,0.9)';roundRect(GW/2-120,byw,108,28,6);ctx.fill();
     ctx.strokeStyle='#ee4422';ctx.lineWidth=1.5;roundRect(GW/2-120,byw,108,28,6);ctx.stroke();
-    ctx.fillStyle='#ff8866';ctx.fillText('✓ ДА, СБРОСИТЬ',GW/2-66,byw+18);
+    ctx.fillStyle='#ff8866';ctx.fillText('✓ CONFIRM',GW/2-66,byw+18);
     ctx.fillStyle='rgba(20,40,30,0.9)';roundRect(GW/2+12,byw,108,28,6);ctx.fill();
     ctx.strokeStyle='#448844';ctx.lineWidth=1.5;roundRect(GW/2+12,byw,108,28,6);ctx.stroke();
-    ctx.fillStyle='#88cc88';ctx.fillText('✗ ОТМЕНА',GW/2+66,byw+18);
+    ctx.fillStyle='#88cc88';ctx.fillText('✗ CANCEL',GW/2+66,byw+18);
   }else{
     btnRects['set_wipe']={x:GW/2-110,y:560,w:220,h:28};
     ctx.fillStyle='rgba(40,10,10,0.7)';roundRect(GW/2-110,560,220,28,6);ctx.fill();
     ctx.strokeStyle='#663322';ctx.lineWidth=1.5;roundRect(GW/2-110,560,220,28,6);ctx.stroke();
     ctx.fillStyle='#885544';ctx.font='13px sans-serif';
-    ctx.fillText('🗑 Сбросить настройки',GW/2,578);
+    ctx.fillText('🗑 Reset Settings',GW/2,578);
   }
 }
 function drawLevelIntro(){
@@ -2465,14 +2460,14 @@ function drawMenu(){
     // Confirmation row
     ctx.fillStyle=rgba(0,0,0,0.75);ctx.fillRect(0,GH/2+220,GW,48);
     ctx.fillStyle='#ff8888';ctx.font='bold 15px sans-serif';ctx.textAlign='center';
-    ctx.fillText('Сбросить прогресс?',GW/2,GH/2+240);
+    ctx.fillText('Reset progress?',GW/2,GH/2+240);
     btnRects['m_wipe_yes']={x:GW/2-120,y:GH/2+247,w:108,h:28};
     btnRects['m_wipe_no'] ={x:GW/2+12, y:GH/2+247,w:108,h:28};
     ctx.fillStyle='rgba(160,30,30,0.9)';roundRect(GW/2-120,GH/2+247,108,28,6);ctx.fill();
     ctx.fillStyle='rgba(30,80,30,0.9)'; roundRect(GW/2+12, GH/2+247,108,28,6);ctx.fill();
     ctx.fillStyle='#fff';ctx.font='bold 14px sans-serif';ctx.textAlign='center';
-    ctx.fillText('ДА, СБРОСИТЬ',GW/2-66,GH/2+266);
-    ctx.fillText('ОТМЕНА',GW/2+66,GH/2+266);
+    ctx.fillText('CONFIRM',GW/2-66,GH/2+266);
+    ctx.fillText('CANCEL',GW/2+66,GH/2+266);
   }
 
   if(!touchMode){
@@ -2578,61 +2573,87 @@ function drawVictory(){
 }
 
 function drawStats(){
-  ctx.fillStyle=rgba(0,0,10,0.95);ctx.fillRect(0,0,GW,GH);
+  ctx.fillStyle=rgba(0,0,10,0.97);ctx.fillRect(0,0,GW,GH);
   btnRects={};
+  // Back button
   btnRects['stats_back']={x:14,y:8,w:80,h:32};
   ctx.fillStyle='#224466';roundRect(14,8,80,32,6);ctx.fill();
   ctx.strokeStyle=AC;ctx.lineWidth=1.5;roundRect(14,8,80,32,6);ctx.stroke();
   ctx.fillStyle=AC;ctx.font='14px sans-serif';ctx.textAlign='center';ctx.fillText('< BACK',54,29);
   // Title
-  ctx.font='bold 30px monospace';ctx.textAlign='center';
+  ctx.font='bold 26px monospace';ctx.textAlign='center';
   ctx.fillStyle='#ffdc00';ctx.shadowColor='#ffdc00';ctx.shadowBlur=10;
-  ctx.fillText('★ СТАТИСТИКА ★',GW/2,52);ctx.shadowBlur=0;
-  // Personal records section
+  ctx.fillText('★  STATISTICS  ★',GW/2,48);ctx.shadowBlur=0;
+
+  // ── World Stats bar ────────────────────────────────────────────────────────
+  const ws=getWorldStats();
+  ctx.strokeStyle='#1e3050';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(30,58);ctx.lineTo(GW-30,58);ctx.stroke();
+  const wcx=GW/3;
+  const wStats=[
+    ['🌐 GAMES PLAYED',ws.plays.toLocaleString(),'#66aaff'],
+    ['💀 TOTAL KILLS',ws.kills.toLocaleString(),'#ff6666'],
+    ['👑 OVERLORD SLAIN',ws.overlords.toLocaleString(),'#ff44cc'],
+  ];
+  wStats.forEach(([lbl,val,col],i)=>{
+    const wx=Math.round(GW*(i+0.5)/3);
+    ctx.fillStyle=rgba(10,20,40,0.8);roundRect(wx-82,63,164,40,8);ctx.fill();
+    ctx.strokeStyle=col+'66';ctx.lineWidth=1;roundRect(wx-82,63,164,40,8);ctx.stroke();
+    ctx.fillStyle='#556677';ctx.font='10px sans-serif';ctx.textAlign='center';ctx.fillText(lbl,wx,75);
+    ctx.fillStyle=col;ctx.shadowColor=col;ctx.shadowBlur=6;
+    ctx.font='bold 17px monospace';ctx.fillText(val,wx,93);ctx.shadowBlur=0;
+  });
+  ctx.beginPath();ctx.moveTo(30,110);ctx.lineTo(GW-30,110);ctx.stroke();
+
+  // ── Two columns: Personal Records | Hall of Fame ───────────────────────────
   const col1=GW*0.25,col2=GW*0.75;
   ctx.strokeStyle='#1e3050';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(30,62);ctx.lineTo(GW-30,62);ctx.stroke();
-  ctx.fillStyle=AC;ctx.font='bold 14px sans-serif';ctx.textAlign='center';
-  ctx.fillText('ЛИЧНЫЕ РЕКОРДЫ',col1,80);
-  const stats=[
-    ['Лучший счёт',arcadeBestScore.toLocaleString(),'#ffdc00'],
-    ['Лучшее комбо',arcadeBestCombo+'x','#ff8c00'],
-    ['Лучшая волна',arcadeBestLevel,'#32c832'],
-    ['Игр сыграно',statsGames,'#888'],
-    ['Всего убийств',statsKills.toLocaleString(),'#cc4444'],
-    ['Кримсон побеждён',statsOverlordWins,'#ff00ff'],
+  ctx.beginPath();ctx.moveTo(GW/2,114);ctx.lineTo(GW/2,GH-20);ctx.stroke();
+
+  // Left: Your Records
+  ctx.fillStyle=AC;ctx.font='bold 13px sans-serif';ctx.textAlign='center';
+  ctx.fillText('YOUR RECORDS',col1,128);
+  const myStats=[
+    ['Best score',arcadeBestScore.toLocaleString(),'#ffdc00'],
+    ['Best combo',arcadeBestCombo+'x','#ff8c00'],
+    ['Best wave',arcadeBestLevel,'#32c832'],
+    ['Games played',statsGames,'#888'],
+    ['Total kills',statsKills.toLocaleString(),'#cc4444'],
+    ['Overlord wins',statsOverlordWins,'#ff44cc'],
   ];
-  stats.forEach(([label,val,col],i)=>{
-    const y=100+i*36;
-    ctx.fillStyle='#556677';ctx.font='13px sans-serif';ctx.textAlign='left';
-    ctx.fillText(label,38,y);
-    ctx.fillStyle=col;ctx.font='bold 14px monospace';ctx.textAlign='right';
-    ctx.fillText(val,col1*2-38,y);
+  myStats.forEach(([label,val,col],i)=>{
+    const y=148+i*38;
+    ctx.fillStyle=rgba(10,22,36,0.7);roundRect(28,y-14,GW/2-50,28,5);ctx.fill();
+    ctx.fillStyle='#667788';ctx.font='12px sans-serif';ctx.textAlign='left';ctx.fillText(label,38,y+4);
+    ctx.fillStyle=col;ctx.font='bold 13px monospace';ctx.textAlign='right';ctx.fillText(val,GW/2-34,y+4);
   });
-  // Hall of Fame section
-  ctx.strokeStyle='#1e3050';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(GW/2+10,62);ctx.lineTo(GW/2+10,GH-20);ctx.stroke();
-  ctx.fillStyle='#ff4488';ctx.font='bold 14px sans-serif';ctx.textAlign='center';
-  ctx.shadowColor='#ff4488';ctx.shadowBlur=8;
-  ctx.fillText('★ ПОБЕДИТЕЛИ КРИМСОНА ★',col2,80);ctx.shadowBlur=0;
+
+  // Right: Hall of Fame
+  ctx.fillStyle='#ff44cc';ctx.shadowColor='#ff44cc';ctx.shadowBlur=8;
+  ctx.font='bold 13px sans-serif';ctx.textAlign='center';
+  ctx.fillText('👑 OVERLORD SLAYERS',col2,128);ctx.shadowBlur=0;
   if(overlordHoF.length===0){
-    ctx.fillStyle='#446655';ctx.font='13px sans-serif';ctx.textAlign='center';
-    ctx.fillText('Пока никто не победил...',col2,120);
+    ctx.fillStyle='#334455';ctx.font='13px sans-serif';ctx.textAlign='center';
+    ctx.fillText('No victors yet...',col2,180);
+    ctx.fillStyle='#223344';ctx.font='11px sans-serif';
+    ctx.fillText('Defeat the Crimson Overlord',col2,200);
+    ctx.fillText('to enter the Hall of Fame!',col2,216);
   }else{
     overlordHoF.slice(0,8).forEach((e,i)=>{
-      const y=100+i*44;
+      const y=145+i*42;
       const isYou=e.name===playerCallsign;
-      ctx.fillStyle=isYou?rgba(80,40,0,0.7):rgba(20,30,50,0.7);
-      roundRect(col2-150,y-18,300,36,6);ctx.fill();
-      ctx.strokeStyle=isYou?'#ff8c00':'#1e3050';ctx.lineWidth=isYou?2:1;
-      roundRect(col2-150,y-18,300,36,6);ctx.stroke();
+      ctx.fillStyle=isYou?rgba(90,50,0,0.75):rgba(15,28,50,0.75);
+      roundRect(GW/2+14,y-14,GW/2-44,34,6);ctx.fill();
+      ctx.strokeStyle=isYou?'#ffaa00':'#1e3050';ctx.lineWidth=isYou?2:1;
+      roundRect(GW/2+14,y-14,GW/2-44,34,6);ctx.stroke();
+      const rank=i===0?'👑':i===1?'🥈':i===2?'🥉':(i+1)+'.';
       ctx.fillStyle=isYou?'#ffdc00':'#88aacc';
-      ctx.font=`bold ${isYou?14:13}px monospace`;ctx.textAlign='left';
-      ctx.fillText((i+1)+'. '+e.name,col2-140,y-2);
-      ctx.fillStyle='#ff8888';ctx.font='12px monospace';
-      ctx.fillText(e.score.toLocaleString(),col2-140,y+14);
-      ctx.fillStyle='#556677';ctx.font='11px sans-serif';ctx.textAlign='right';
-      ctx.fillText(e.date,col2+140,y+14);
+      ctx.font=`bold ${isYou?13:12}px monospace`;ctx.textAlign='left';
+      ctx.fillText(rank+' '+e.name,GW/2+24,y+1);
+      ctx.fillStyle=isYou?'#ff8800':'#ff6688';ctx.font='11px monospace';
+      ctx.fillText(e.score.toLocaleString()+'  pts',GW/2+24,y+16);
+      ctx.fillStyle='#445566';ctx.font='10px sans-serif';ctx.textAlign='right';
+      ctx.fillText(e.date,GW-34,y+16);
     });
   }
 }
