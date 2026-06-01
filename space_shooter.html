@@ -51,6 +51,14 @@ let masterVolume=parseFloat(localStorage.getItem('ss_vol')||'0.7');
 let sfxVolume=parseFloat(localStorage.getItem('ss_sfx')||'0.7');
 function saveMasterVolume(){try{localStorage.setItem('ss_vol',masterVolume.toFixed(2));}catch(e){}}
 function saveSfxVolume(){try{localStorage.setItem('ss_sfx',sfxVolume.toFixed(2));}catch(e){}}
+let particlesEnabled=localStorage.getItem('ss_particles')!=='0';
+let vibrateEnabled=localStorage.getItem('ss_vibrate')!=='0';
+let accentIdx=parseInt(localStorage.getItem('ss_accent')||'0');
+const ACCENTS=['#00c8ff','#00e080','#ff8c00','#cc44ff'];
+let AC=ACCENTS[accentIdx]||ACCENTS[0];
+function saveGameSettings(){try{localStorage.setItem('ss_particles',particlesEnabled?'1':'0');localStorage.setItem('ss_vibrate',vibrateEnabled?'1':'0');localStorage.setItem('ss_accent',String(accentIdx));}catch(e){}}
+function setAccent(i){accentIdx=Math.max(0,Math.min(3,i));AC=ACCENTS[accentIdx];saveGameSettings();}
+function vibrate(ms){if(vibrateEnabled&&navigator.vibrate)try{navigator.vibrate(ms);}catch(e){}}
 function initAudio(){
   if(actx)return;
   try{
@@ -420,7 +428,7 @@ class Explosion{
     }
     ctx.shadowBlur=3;
     const fade=1-t;
-    for(const sp of this.sparks){
+    if(particlesEnabled)for(const sp of this.sparks){
       ctx.globalAlpha=fade*0.9;ctx.fillStyle=sp.c;
       ctx.beginPath();ctx.arc(this.x+Math.cos(sp.a)*sp.spd*this.frame,this.y+Math.sin(sp.a)*sp.spd*this.frame,sp.r*(1-t*0.5),0,Math.PI*2);ctx.fill();
     }
@@ -603,7 +611,7 @@ class Gunship{
 // ── Power-up (4 types matching Python, move left) ─────────────────────────────
 const PU_CFG={
   double:{color:'#ffdc00',label:'2x'},
-  shield:{color:'#00c8ff',label:'SHD'},
+  shield:{color:AC,label:'SHD'},
   slow:  {color:'#a01edc',label:'SLW'},
   life:  {color:'#dc5064',label:'+HP'},
 };
@@ -688,10 +696,10 @@ class Player{
     if(this.invFrames>0&&Math.floor(this.invFrames/5)%2===0)return;
     const x=Math.round(this.x),y=Math.round(this.y);
     if(this.hasShield){
-      ctx.shadowColor='#00c8ff';ctx.shadowBlur=22;
-      ctx.globalAlpha=0.22;ctx.fillStyle='#00c8ff';
+      ctx.shadowColor=AC;ctx.shadowBlur=22;
+      ctx.globalAlpha=0.22;ctx.fillStyle=AC;
       ctx.beginPath();ctx.arc(x,y,38,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
-      ctx.strokeStyle='#00c8ff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,38,0,Math.PI*2);ctx.stroke();
+      ctx.strokeStyle=AC;ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,38,0,Math.PI*2);ctx.stroke();
       ctx.shadowBlur=0;
     }
     // Wings
@@ -699,7 +707,7 @@ class Player{
     ctx.beginPath();ctx.moveTo(x-22,y-10);ctx.lineTo(x-5,y-26);ctx.lineTo(x+12,y-6);ctx.closePath();ctx.fill();
     ctx.beginPath();ctx.moveTo(x-22,y+10);ctx.lineTo(x-5,y+26);ctx.lineTo(x+12,y+6);ctx.closePath();ctx.fill();
     // Body (triangle pointing right)
-    ctx.fillStyle=this.doubleTimer>0?'#ffdc00':'#00c8ff';
+    ctx.fillStyle=this.doubleTimer>0?'#ffdc00':AC;
     ctx.beginPath();ctx.moveTo(x-28,y+12);ctx.lineTo(x+32,y);ctx.lineTo(x-28,y-12);ctx.closePath();ctx.fill();
     ctx.strokeStyle='#00a0d2';ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(x-28,y+12);ctx.lineTo(x+32,y);ctx.lineTo(x-28,y-12);ctx.closePath();ctx.stroke();
@@ -712,9 +720,9 @@ class Player{
     ctx.beginPath();ctx.moveTo(x-28,y-2);ctx.lineTo(x-28-(fl>>1),y);ctx.lineTo(x-28,y+2);ctx.closePath();ctx.fill();
     ctx.shadowBlur=0;
     // Cockpit with glow
-    ctx.shadowColor='#00c8ff';ctx.shadowBlur=14;
+    ctx.shadowColor=AC;ctx.shadowBlur=14;
     ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x+12,y,6,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#00c8ff';ctx.beginPath();ctx.arc(x+12,y,4,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=AC;ctx.beginPath();ctx.arc(x+12,y,4,0,Math.PI*2);ctx.fill();
     ctx.shadowBlur=0;
     if(this.doubleTimer>0){
       ctx.strokeStyle=rgba(255,220,0,0.4);ctx.lineWidth=1;ctx.setLineDash([4,4]);
@@ -1189,8 +1197,8 @@ function drawLayout(){
   for(const s of stars)s.draw();
   for(const r of bgRocks)r.draw();
   ctx.fillStyle=rgba(0,0,0,0.48);ctx.fillRect(0,0,GW,GH);
-  ctx.fillStyle='#00c8ff';ctx.font='bold 18px sans-serif';ctx.textAlign='center';
-  ctx.shadowColor='#00c8ff';ctx.shadowBlur=8;
+  ctx.fillStyle=AC;ctx.font='bold 18px sans-serif';ctx.textAlign='center';
+  ctx.shadowColor=AC;ctx.shadowBlur=8;
   ctx.fillText('РАСПОЛОЖЕНИЕ УПРАВЛЕНИЯ',GW/2,26);ctx.shadowBlur=0;
   ctx.fillStyle='#556677';ctx.font='12px sans-serif';
   ctx.fillText('Перемести • Потяни за край чтобы изменить размер',GW/2,44);
@@ -1201,7 +1209,7 @@ function drawLayout(){
   // Joystick — outer ring (resize handle)
   ctx.beginPath();ctx.arc(jp.x,jp.y,JOY_BASE_R,0,Math.PI*2);
   ctx.fillStyle=rgba(55,80,130,jDrag?0.5:0.28);ctx.fill();
-  ctx.strokeStyle=_layDrag==='joy_resize'?'#ffcc00':jDrag?'#00c8ff':rgba(140,190,255,0.55);
+  ctx.strokeStyle=_layDrag==='joy_resize'?'#ffcc00':jDrag?AC:rgba(140,190,255,0.55);
   ctx.lineWidth=_layDrag==='joy_resize'?4:jDrag?3:2;ctx.stroke();
   // resize handle dots on edge
   if(!jDrag){
@@ -1234,7 +1242,7 @@ function drawLayout(){
   btnRects['lay_joy_mode']={x:jtX,y:jtY,w:jtW,h:jtH};
   ctx.fillStyle=joyStatic?rgba(0,100,170,0.88):rgba(20,40,80,0.78);
   roundRect(jtX,jtY,jtW,jtH,8);ctx.fill();
-  ctx.strokeStyle=joyStatic?'#00c8ff':'#446688';ctx.lineWidth=1.5;
+  ctx.strokeStyle=joyStatic?AC:'#446688';ctx.lineWidth=1.5;
   roundRect(jtX,jtY,jtW,jtH,8);ctx.stroke();
   ctx.fillStyle='#cce4ff';ctx.font='bold 13px sans-serif';ctx.textAlign='center';
   ctx.fillText(joyStatic?'◉ СТАТИЧНЫЙ':'○ ПЛАВАЮЩИЙ',jp.x,jtY+jtH/2+5);
@@ -1334,7 +1342,7 @@ function _drawPlayerAt(cx,cy){
   ctx.fillStyle='#3264ff';
   ctx.beginPath();ctx.moveTo(-22,-10);ctx.lineTo(-5,-26);ctx.lineTo(12,-6);ctx.closePath();ctx.fill();
   ctx.beginPath();ctx.moveTo(-22,10);ctx.lineTo(-5,26);ctx.lineTo(12,6);ctx.closePath();ctx.fill();
-  ctx.fillStyle='#00c8ff';
+  ctx.fillStyle=AC;
   ctx.beginPath();ctx.moveTo(-28,12);ctx.lineTo(32,0);ctx.lineTo(-28,-12);ctx.closePath();ctx.fill();
   const fl=14+Math.sin(introT*0.35)*5;
   ctx.shadowColor='#ff8c00';ctx.shadowBlur=20;
@@ -1343,9 +1351,9 @@ function _drawPlayerAt(cx,cy){
   ctx.shadowBlur=8;ctx.fillStyle='#ffdc00';
   ctx.beginPath();ctx.moveTo(-28,-2);ctx.lineTo(-28-(fl>>1),0);ctx.lineTo(-28,2);ctx.closePath();ctx.fill();
   ctx.shadowBlur=0;
-  ctx.shadowColor='#00c8ff';ctx.shadowBlur=14;
+  ctx.shadowColor=AC;ctx.shadowBlur=14;
   ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(12,0,6,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#00c8ff';ctx.beginPath();ctx.arc(12,0,4,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle=AC;ctx.beginPath();ctx.arc(12,0,4,0,Math.PI*2);ctx.fill();
   ctx.shadowBlur=0;ctx.restore();
 }
 
@@ -1410,7 +1418,7 @@ function drawIntro(){
     const ease=prog*(2-prog);
     const px=-60+ease*290;
     const py=GH/2+Math.sin(t*0.04)*25;
-    ctx.shadowColor='#00c8ff';ctx.shadowBlur=16;
+    ctx.shadowColor=AC;ctx.shadowBlur=16;
     _drawPlayerAt(px,py);
     ctx.shadowBlur=0;
   }
@@ -1423,7 +1431,7 @@ function drawIntro(){
     ctx.translate(GW/2,GH/2-58);
     ctx.scale(0.3+ease*0.7,0.3+ease*0.7);
     ctx.font='bold 82px monospace';ctx.textAlign='center';
-    ctx.fillStyle='#00c8ff';ctx.shadowColor='#00c8ff';ctx.shadowBlur=30;
+    ctx.fillStyle=AC;ctx.shadowColor=AC;ctx.shadowBlur=30;
     ctx.fillText('SPACE',0,0);
     ctx.fillStyle='#ffffff';ctx.shadowColor='#ffffff';ctx.shadowBlur=14;
     ctx.fillText('SHOOTER',0,84);
@@ -1591,7 +1599,7 @@ function doCollisions(){
           const cnt=boss instanceof MiniBoss?3:5;
           for(let i=0;i<cnt;i++)
             explosions.push(new Explosion(boss.x+Math.random()*110-55,boss.y+Math.random()*80-40,true));
-          SND.bossDie();flashAlpha=120;screenShake=15;
+          SND.bossDie();flashAlpha=120;screenShake=15;vibrate([60,30,60]);
           for(let i=0;i<boss.dropCount;i++)
             powerups.push(new PowerUp(boss.x+Math.random()*130-65,boss.y+Math.random()*90-45));
           if(gameMode==='arcade'){kills+=boss instanceof MiniBoss?3:6;}
@@ -1612,7 +1620,7 @@ function doCollisions(){
       if(rectsOverlap(eb.rect,pr)){
         eb.dead=true;
         const dmg=player.takeDamage();
-        if(dmg==='hit'){explosions.push(new Explosion(player.x,player.y));screenShake=6;flashAlpha=40;}
+        if(dmg==='hit'){explosions.push(new Explosion(player.x,player.y));screenShake=6;flashAlpha=40;vibrate(25);}
         else if(dmg==='shield'){screenShake=4;}
       }
     }
@@ -1921,7 +1929,7 @@ function drawHUD(){
   ctx.fillStyle='#888';ctx.font='12px monospace';ctx.textAlign='right';
   ctx.fillText('Lives:',GW-154,18);
   for(let i=0;i<player.maxHp;i++){
-    const col=i<player.health?(player.hasShield?'#00c8ff':'#dc3232'):'#282828';
+    const col=i<player.health?(player.hasShield?AC:'#dc3232'):'#282828';
     const cx=GW-140+i*28,cy=22;
     ctx.fillStyle=col;
     ctx.beginPath();ctx.moveTo(cx-12,cy+6);ctx.lineTo(cx+14,cy);ctx.lineTo(cx-12,cy-6);ctx.closePath();ctx.fill();
@@ -1942,7 +1950,7 @@ function drawHUD(){
     if(scoreTgt>0){
       const bw=180,bx=GW/2-90,by=8;
       ctx.fillStyle='#282828';ctx.fillRect(bx,by,bw,14);
-      ctx.fillStyle='#00c8ff';ctx.fillRect(bx,by,Math.min(bw,bw*score/scoreTgt),14);
+      ctx.fillStyle=AC;ctx.fillRect(bx,by,Math.min(bw,bw*score/scoreTgt),14);
       ctx.strokeStyle='#969696';ctx.lineWidth=1;ctx.strokeRect(bx,by,bw,14);
       ctx.fillStyle='#fff';ctx.font='12px monospace';ctx.textAlign='center';
       ctx.fillText(score+'/'+scoreTgt,GW/2,by+25);
@@ -1953,7 +1961,7 @@ function drawHUD(){
   let px0=10,py0=GH-58;
   const pus=[];
   if(player.doubleTimer>0)pus.push(['2x SHOT','#ffdc00',player.doubleTimer,600]);
-  if(player.hasShield)pus.push(['SHIELD','#00c8ff',1,1]);
+  if(player.hasShield)pus.push(['SHIELD',AC,1,1]);
   if(player.slowTimer>0)pus.push(['SLOW','#a01edc',player.slowTimer,300]);
   for(const[label,col,rem,tot]of pus){
     const pw=90;
@@ -2024,14 +2032,14 @@ function drawCheatMsg(){
 }
 function drawSettings(){
   ctx.font='bold 30px monospace';ctx.textAlign='center';
-  ctx.fillStyle='#00c8ff';ctx.shadowColor='#00c8ff';ctx.shadowBlur=10;
+  ctx.fillStyle=AC;ctx.shadowColor=AC;ctx.shadowBlur=10;
   ctx.fillText('SETTINGS',GW/2,46);ctx.shadowBlur=0;
   btnRects={};
   // Back button
   btnRects['set_back']={x:14,y:8,w:80,h:32};
   ctx.fillStyle='#224466';roundRect(14,8,80,32,6);ctx.fill();
-  ctx.strokeStyle=rebindAction?'#ff6644':'#00c8ff';ctx.lineWidth=1.5;roundRect(14,8,80,32,6);ctx.stroke();
-  ctx.fillStyle=rebindAction?'#ff9966':'#00c8ff';ctx.font='14px sans-serif';ctx.textAlign='center';
+  ctx.strokeStyle=rebindAction?'#ff6644':AC;ctx.lineWidth=1.5;roundRect(14,8,80,32,6);ctx.stroke();
+  ctx.fillStyle=rebindAction?'#ff9966':AC;ctx.font='14px sans-serif';ctx.textAlign='center';
   ctx.fillText(rebindAction?'✕ CANCEL':'< BACK',54,29);
 
   // ── Volume sliders ──────────────────────────────────────────────────────
@@ -2049,7 +2057,7 @@ function drawSettings(){
   if(_mv>0){ctx.fillStyle='#0090b8';roundRect(_slX,_slY1,_mv,_slH,_slR);ctx.fill();}
   const _mkx=_slX+_mv;
   ctx.beginPath();ctx.arc(_mkx,_slY1+_slR,_slR+4,0,Math.PI*2);
-  ctx.fillStyle='#fff';ctx.fill();ctx.strokeStyle='#00c8ff';ctx.lineWidth=2.5;ctx.stroke();
+  ctx.fillStyle='#fff';ctx.fill();ctx.strokeStyle=AC;ctx.lineWidth=2.5;ctx.stroke();
   btnRects['set_vol_sl']={x:_slX-8,y:_slY1-6,w:_slW+16,h:_slH+12};
   // SFX slider
   ctx.fillStyle='#aaaaaa';ctx.font='bold 13px sans-serif';ctx.textAlign='left';
@@ -2072,7 +2080,7 @@ function drawSettings(){
   // ── Controls ─────────────────────────────────────────────────────────────
   if(!touchMode){
     const c1=GW/4,colY=162;
-    ctx.fillStyle='#00c8ff';ctx.font='bold 14px sans-serif';ctx.textAlign='center';
+    ctx.fillStyle=AC;ctx.font='bold 14px sans-serif';ctx.textAlign='center';
     ctx.fillText('PC CONTROLS',c1,colY);
     ctx.fillText('PHONE CONTROLS',3*GW/4,colY);
     ctx.strokeStyle='#1e3050';ctx.lineWidth=1;
@@ -2160,7 +2168,7 @@ function drawLevelComplete(){
 
 function drawMenu(){
   ctx.font='bold 72px monospace';ctx.textAlign='center';
-  ctx.fillStyle='#00c8ff';ctx.shadowColor='#00c8ff';ctx.shadowBlur=18;
+  ctx.fillStyle=AC;ctx.shadowColor=AC;ctx.shadowBlur=18;
   ctx.fillText('SPACE',GW/2,GH/2-90);
   ctx.fillStyle='#fff';ctx.shadowColor='#fff';ctx.shadowBlur=8;
   ctx.fillText('SHOOTER',GW/2,GH/2-20);
@@ -2180,7 +2188,7 @@ function drawMenu(){
     const sel=(key==='phone'&&touchMode)||(menuSel===i&&key!=='phone');
     ctx.fillStyle=sel?rgba(0,150,220,0.9):rgba(20,40,80,0.8);
     roundRect(x,y,w,h,10);ctx.fill();
-    ctx.strokeStyle=sel?'#00c8ff':'#224466';ctx.lineWidth=2;
+    ctx.strokeStyle=sel?AC:'#224466';ctx.lineWidth=2;
     roundRect(x,y,w,h,10);ctx.stroke();
     ctx.fillStyle=sel?'#fff':'#88ccff';ctx.font='bold 18px sans-serif';ctx.textAlign='center';
     ctx.fillText(label,x+w/2,y+h/2+6);
@@ -2228,12 +2236,12 @@ function drawMenu(){
 }
 
 function drawLevelSelect(){
-  ctx.font='bold 28px monospace';ctx.textAlign='center';ctx.fillStyle='#00c8ff';
+  ctx.font='bold 28px monospace';ctx.textAlign='center';ctx.fillStyle=AC;
   ctx.fillText('SELECT LEVEL',GW/2,40);
   btnRects={ls_back:{x:14,y:8,w:80,h:32}};
   ctx.fillStyle='#224466';roundRect(14,8,80,32,6);ctx.fill();
-  ctx.strokeStyle='#00c8ff';ctx.lineWidth=1.5;roundRect(14,8,80,32,6);ctx.stroke();
-  ctx.fillStyle='#00c8ff';ctx.font='14px sans-serif';ctx.textAlign='center';
+  ctx.strokeStyle=AC;ctx.lineWidth=1.5;roundRect(14,8,80,32,6);ctx.stroke();
+  ctx.fillStyle=AC;ctx.font='14px sans-serif';ctx.textAlign='center';
   ctx.fillText('< BACK',54,29);
   for(let i=0;i<20;i++){
     const col=i%5,row=Math.floor(i/5);
@@ -2245,7 +2253,7 @@ function drawLevelSelect(){
     const unlocked=i<=maxUnlocked,sel=lsCursor===i;
     ctx.fillStyle=unlocked?(sel?rgba(0,120,200,0.9):rgba(20,50,90,0.8)):rgba(20,20,30,0.8);
     roundRect(x,y,w,h,10);ctx.fill();
-    ctx.strokeStyle=unlocked?(sel?'#00c8ff':'#224488'):'#333';ctx.lineWidth=2;
+    ctx.strokeStyle=unlocked?(sel?AC:'#224488'):'#333';ctx.lineWidth=2;
     roundRect(x,y,w,h,10);ctx.stroke();
     ctx.fillStyle=unlocked?'#fff':'#444';ctx.font='bold 22px monospace';ctx.textAlign='center';
     ctx.fillText('LV '+(i+1),x+w/2,y+34);
@@ -2277,7 +2285,7 @@ function drawGameOver(){
   ctx.font='bold 60px monospace';ctx.textAlign='center';
   ctx.fillStyle='#f44';ctx.shadowColor='#f00';ctx.shadowBlur=20;
   ctx.fillText('GAME OVER',GW/2,GH/2-80);ctx.shadowBlur=0;
-  ctx.fillStyle='#00c8ff';ctx.font='24px monospace';
+  ctx.fillStyle=AC;ctx.font='24px monospace';
   ctx.fillText('Score: '+score,GW/2,GH/2-30);
   const lvTxt=gameMode==='levels'?('Level: '+(lvIdx+1)+' / 20'):('Level: '+level);
   ctx.fillStyle='#ffdc00';ctx.font='18px monospace';ctx.fillText(lvTxt,GW/2,GH/2+4);
@@ -2298,7 +2306,7 @@ function drawVictory(){
   ctx.font='bold 60px monospace';ctx.textAlign='center';
   ctx.fillStyle='#ffdc00';ctx.shadowColor='#ffdc00';ctx.shadowBlur=22;
   ctx.fillText('VICTORY!',GW/2,GH/2-80);ctx.shadowBlur=0;
-  ctx.fillStyle='#00c8ff';ctx.font='24px monospace';ctx.fillText('Score: '+score,GW/2,GH/2-28);
+  ctx.fillStyle=AC;ctx.font='24px monospace';ctx.fillText('Score: '+score,GW/2,GH/2-28);
   const vbtns=[['PLAY AGAIN','retry'],['MAIN MENU','vmenu']];
   btnRects={};
   vbtns.forEach(([label,key],i)=>{
