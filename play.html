@@ -264,7 +264,7 @@ let _prevGS='';
 function _updateMusic(){
   if(!actx)return;
   let want='off';
-  if(['menu','level_select','settings','intro'].includes(gameState))want='menu';
+  if(['menu','level_select','settings','intro','stats'].includes(gameState))want='menu';
   else if(gameState==='playing'){
     const hasFinal=bosses&&bosses.some(b=>b instanceof FinalBoss&&!b.dead);
     const hasDread=!hasFinal&&bosses&&bosses.some(b=>b instanceof Dreadnought&&!b.dead);
@@ -378,6 +378,26 @@ class Bullet{
     ctx.shadowBlur=0;
   }
   get rect(){return{x:this.x,y:this.y-2,w:18,h:5};}
+}
+
+class RocketBullet{
+  constructor(x,y){
+    this.x=x;this.y=y;this.vx=6;this.vy=0;this.dead=false;this.W=24;this.H=8;
+  }
+  update(){
+    this.x+=this.vx;this.y+=this.vy;
+    if(this.x>GW+30||this.x<-30)this.dead=true;
+  }
+  draw(){
+    const x=this.x,y=this.y;
+    ctx.shadowColor='#ff3300';ctx.shadowBlur=14;
+    ctx.fillStyle='#ff5500';ctx.beginPath();ctx.ellipse(x,y,12,5,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#ffcc00';ctx.beginPath();ctx.ellipse(x,y,7,3,0,0,Math.PI*2);ctx.fill();
+    ctx.shadowBlur=6;ctx.fillStyle='#ff8800';
+    ctx.beginPath();ctx.moveTo(x-12,y-3);ctx.lineTo(x-20,y);ctx.lineTo(x-12,y+3);ctx.closePath();ctx.fill();
+    ctx.shadowBlur=0;
+  }
+  get rect(){return{x:this.x-12,y:this.y-5,w:this.W,h:this.H};}
 }
 
 // ── Enemy bullet (angle-based; 180° = straight left) ──────────────────────────
@@ -614,6 +634,9 @@ const PU_CFG={
   shield:{color:AC,label:'SHD'},
   slow:  {color:'#a01edc',label:'SLW'},
   life:  {color:'#dc5064',label:'+HP'},
+  wpn_spread:{color:'#00ff88',label:'SPR'},
+  wpn_rapid: {color:'#ff6600',label:'RPD'},
+  wpn_rocket:{color:'#ff3333',label:'RKT'},
 };
 class PowerUp{
   constructor(x,y,kind){
@@ -654,6 +677,7 @@ class Player{
     this.invFrames=0;
     this.doubleTimer=0;this.slowTimer=0;this.hasShield=false;
     this.bullets=[];
+    this.weapon='normal';this.weaponTimer=0;
   }
   update(keys){
     if(keys.up)   this.y-=this.speed;
@@ -666,18 +690,30 @@ class Player{
     if(keys.fire&&this.shootCd===0)this._shoot();
     if(this.invFrames>0)this.invFrames--;
     if(this.doubleTimer>0)this.doubleTimer--;
+    if(this.weaponTimer>0){this.weaponTimer--;if(!this.weaponTimer)this.weapon='normal';}
     if(this.slowTimer>0)this.slowTimer--;
     this.bullets=this.bullets.filter(b=>{b.update();return !b.dead;});
   }
   _shoot(){
     const bx=this.x+32;
-    if(this.doubleTimer>0){
-      this.bullets.push(new Bullet(bx,this.y-9));
-      this.bullets.push(new Bullet(bx,this.y+9));
+    if(this.weapon==='spread'){
+      for(const dy of[-14,0,14])this.bullets.push(new Bullet(bx,this.y+dy));
+      this.shootCd=this.shootDelay+6;
+    }else if(this.weapon==='rapid'){
+      this.bullets.push(new Bullet(bx,this.y+(Math.random()-0.5)*5));
+      this.shootCd=7;
+    }else if(this.weapon==='rocket'){
+      this.bullets.push(new RocketBullet(bx,this.y));
+      this.shootCd=this.shootDelay+20;
     }else{
-      this.bullets.push(new Bullet(bx,this.y));
+      if(this.doubleTimer>0){
+        this.bullets.push(new Bullet(bx,this.y-9));
+        this.bullets.push(new Bullet(bx,this.y+9));
+      }else{
+        this.bullets.push(new Bullet(bx,this.y));
+      }
+      this.shootCd=this.shootDelay;
     }
-    this.shootCd=this.shootDelay;
     SND.shoot();
   }
   takeDamage(){
@@ -690,6 +726,9 @@ class Player{
     else if(kind==='shield')this.hasShield=true;
     else if(kind==='slow')this.slowTimer=300;
     else if(kind==='life')this.health=Math.min(this.health+1,this.maxHp);
+    else if(kind==='wpn_spread'){this.weapon='spread';this.weaponTimer=700;}
+    else if(kind==='wpn_rapid'){this.weapon='rapid';this.weaponTimer=600;}
+    else if(kind==='wpn_rocket'){this.weapon='rocket';this.weaponTimer=500;}
   }
   get slowActive(){return this.slowTimer>0;}
   draw(){
@@ -991,7 +1030,7 @@ class FinalBoss{
         SND.boom();
       }
       if(t%12===0&&t<160)screenShake=Math.min(20,t*0.14+4);
-      if(t>=220){this.dead=true;gameState='victory';SND.victory();}
+      if(t>=220){this.dead=true;recordOverlordVictory();gameState='victory';SND.victory();}
       this.bullets=this.bullets.filter(b=>{b.update();return !b.dead;});
       return;
     }
@@ -1563,6 +1602,41 @@ function drawIntro(){
 // ── Game state ─────────────────────────────────────────────────────────────────
 let gameState='intro',gameMode='arcade',touchMode=('ontouchstart' in window||navigator.maxTouchPoints>0);
 let score=0,level=1,kills=0,killsLevel=10,spawnTimer=0,spawnDelay=90;
+let combo=0,comboTimer=0,bestCombo=0;
+const COMBO_TIMEOUT=300;
+function comboMult(){if(combo>=50)return 5;if(combo>=30)return 4;if(combo>=20)return 3;if(combo>=10)return 2;if(combo>=5)return 1.5;return 1;}
+function comboLabel(){const m=comboMult();return m>=5?'★LEGENDARY★':m>=4?'★EPIC★':m>=3?'★GREAT★':m>=2?'×2':m>1?'×1.5':'';}
+function addKill(base){combo++;comboTimer=COMBO_TIMEOUT;if(combo>bestCombo)bestCombo=combo;statsKills++;try{localStorage.setItem('ss_stat_kills',statsKills);}catch(e){}return Math.round(base*comboMult());}
+let arcadeBestScore=parseInt(localStorage.getItem('ss_arc_score')||'0');
+let arcadeBestCombo=parseInt(localStorage.getItem('ss_arc_combo')||'0');
+let arcadeBestLevel=parseInt(localStorage.getItem('ss_arc_lvl')||'0');
+function saveArcadeRecord(){
+  const changed=score>arcadeBestScore||bestCombo>arcadeBestCombo||level>arcadeBestLevel;
+  if(score>arcadeBestScore){arcadeBestScore=score;try{localStorage.setItem('ss_arc_score',score);}catch(e){}}
+  if(bestCombo>arcadeBestCombo){arcadeBestCombo=bestCombo;try{localStorage.setItem('ss_arc_combo',bestCombo);}catch(e){}}
+  if(level>arcadeBestLevel){arcadeBestLevel=level;try{localStorage.setItem('ss_arc_lvl',level);}catch(e){}}
+  return changed;
+}
+let statsGames=parseInt(localStorage.getItem('ss_stat_games')||'0');
+let statsKills=parseInt(localStorage.getItem('ss_stat_kills')||'0');
+let statsOverlordWins=parseInt(localStorage.getItem('ss_stat_ol')||'0');
+let playerCallsign=localStorage.getItem('ss_callsign')||'';
+let overlordHoF=JSON.parse(localStorage.getItem('ss_hof')||'[]');
+function saveStats(){
+  try{
+    localStorage.setItem('ss_stat_games',statsGames);
+    localStorage.setItem('ss_stat_kills',statsKills);
+    localStorage.setItem('ss_stat_ol',statsOverlordWins);
+  }catch(e){}
+}
+function recordOverlordVictory(){
+  statsOverlordWins++;saveStats();
+  if(!playerCallsign)playerCallsign=window.prompt('Введи свой позывной, пилот:','Пилот')||'Неизвестный';
+  try{localStorage.setItem('ss_callsign',playerCallsign);}catch(e){}
+  const entry={name:playerCallsign,score,date:new Date().toLocaleDateString('ru-RU')};
+  overlordHoF.unshift(entry);if(overlordHoF.length>10)overlordHoF.pop();
+  try{localStorage.setItem('ss_hof',JSON.stringify(overlordHoF));}catch(e){}
+}
 let stars=[],player=null,enemies=[],powerups=[],explosions=[],bosses=[];
 let lvIdx=0,maxUnlocked=loadProgress();
 let lvPhase='enemies',lvEnemiesLeft=0,lvBossQueue=[],lvNextBossTimer=0,lvFinalDelayTimer=0;
@@ -1575,8 +1649,9 @@ let cheatBuf='',cheatMsg='',cheatTimer=0;
 let titleTapCount=0,titleTapTime=0;
 let menuDelHold=0,wipeConfirm=false;
 function wipeProgressData(){
-  try{localStorage.removeItem('ss_unlocked');}catch(e){}
-  maxUnlocked=0;
+  try{['ss_unlocked','ss_arc_score','ss_arc_combo','ss_arc_lvl','ss_stat_games','ss_stat_kills','ss_stat_ol','ss_hof'].forEach(k=>localStorage.removeItem(k));}catch(e){}
+  maxUnlocked=0;arcadeBestScore=0;arcadeBestCombo=0;arcadeBestLevel=0;
+  statsGames=0;statsKills=0;statsOverlordWins=0;overlordHoF=[];
   cheatMsg='✓ ПРОГРЕСС СБРОШЕН';cheatTimer=200;
 }
 function wipeSettingsData(){
@@ -1610,6 +1685,8 @@ function startGame(mode,idx){
   idx=idx===undefined?0:idx;
   initAudio();gameMode=mode;lvIdx=idx;level=idx+1;
   score=0;kills=0;killsLevel=10;spawnTimer=0;spawnDelay=90;
+  combo=0;comboTimer=0;bestCombo=0;
+  statsGames++;saveStats();
   player=new Player();enemies=[];powerups=[];explosions=[];bosses=[];asteroids=[];asteroidTimer=0;freeEBullets=[];
   bossEnraged=false;bossesSpawnedArcade.clear();
   warnText='';warnTimer=0;screenShake=0;flashAlpha=0;vigAlpha=0;enrageFlash=0;
@@ -1671,8 +1748,9 @@ function doCollisions(){
       if(e.dead)continue;
       if(rectsOverlap(b.rect,e.rect)){
         b.dead=true;
+        if(b instanceof RocketBullet){explosions.push(new Explosion(b.x,b.y,true));SND.boom();}
         if(e.takeHit()){
-          e.dead=true;score+=e.score;kills++;
+          e.dead=true;score+=addKill(e.score);kills++;
           explosions.push(new Explosion(e.x,e.y,true));SND.boom();
           if(e.shouldDrop())powerups.push(new PowerUp(e.x,e.y));
         }else{explosions.push(new Explosion(e.x,e.y));}
@@ -1695,6 +1773,8 @@ function doCollisions(){
             score+=boss.score;
             for(let i=0;i<boss.dropCount;i++)
               powerups.push(new PowerUp(boss.x+Math.random()*130-65,boss.y+Math.random()*90-45));
+            const wpns=['wpn_spread','wpn_rapid','wpn_rocket'];
+            powerups.push(new PowerUp(boss.x,boss.y-30,wpns[rndInt(0,2)]));
             SND.bossDie();screenShake=22;vibrate([100,40,100]);
           }else{
             boss.dead=true;score+=boss.score;
@@ -1704,6 +1784,8 @@ function doCollisions(){
             SND.bossDie();flashAlpha=120;screenShake=15;vibrate([60,30,60]);
             for(let i=0;i<boss.dropCount;i++)
               powerups.push(new PowerUp(boss.x+Math.random()*130-65,boss.y+Math.random()*90-45));
+            const wpns2=['wpn_spread','wpn_rapid','wpn_rocket'];
+            powerups.push(new PowerUp(boss.x,boss.y-30,wpns2[rndInt(0,2)]));
             if(gameMode==='arcade'){kills+=boss instanceof MiniBoss?3:6;}
           }
         }else{
@@ -1722,7 +1804,7 @@ function doCollisions(){
       if(rectsOverlap(eb.rect,pr)){
         eb.dead=true;
         const dmg=player.takeDamage();
-        if(dmg==='hit'){explosions.push(new Explosion(player.x,player.y));screenShake=6;flashAlpha=40;vibrate(25);}
+        if(dmg==='hit'){explosions.push(new Explosion(player.x,player.y));screenShake=6;flashAlpha=40;vibrate(25);combo=0;comboTimer=0;}
         else if(dmg==='shield'){screenShake=4;}
       }
     }
@@ -1735,7 +1817,7 @@ function doCollisions(){
     for(const lr of lrs){
       if(lr&&rectsOverlap(lr,pr)){
         const dmg=player.takeDamage();
-        if(dmg==='hit'){explosions.push(new Explosion(player.x,player.y));flashAlpha=30;vibrate(25);}
+        if(dmg==='hit'){explosions.push(new Explosion(player.x,player.y));flashAlpha=30;vibrate(25);combo=0;comboTimer=0;}
       }
     }
   }
@@ -1746,7 +1828,7 @@ function doCollisions(){
       if(e instanceof Mine)e.takeHit(); // triggers 8-bullet explosion
       e.dead=true;explosions.push(new Explosion(e.x,e.y,true));SND.boom();
       const dmg=player.takeDamage();
-      if(dmg==='hit'){explosions.push(new Explosion(player.x,player.y));screenShake=8;}
+      if(dmg==='hit'){explosions.push(new Explosion(player.x,player.y));screenShake=8;combo=0;comboTimer=0;}
     }
   }
   // Mine explosion bullets vs player
@@ -1755,7 +1837,7 @@ function doCollisions(){
     if(rectsOverlap(eb.rect,pr)){
       eb.dead=true;
       const dmg=player.takeDamage();
-      if(dmg==='hit'){explosions.push(new Explosion(player.x,player.y));screenShake=5;flashAlpha=35;}
+      if(dmg==='hit'){explosions.push(new Explosion(player.x,player.y));screenShake=5;flashAlpha=35;combo=0;comboTimer=0;}
       else if(dmg==='shield'){screenShake=3;}
     }
   }
@@ -1778,7 +1860,7 @@ function doCollisions(){
     if(!a.dead&&rectsOverlap(a.rect,pr)){
       a.dead=true;explosions.push(new Explosion(a.x,a.y,true));SND.boom();
       const dmg=player.takeDamage();
-      if(dmg==='hit'){explosions.push(new Explosion(player.x,player.y));screenShake=7;flashAlpha=35;}
+      if(dmg==='hit'){explosions.push(new Explosion(player.x,player.y));screenShake=7;flashAlpha=35;combo=0;comboTimer=0;}
     }
   }
   // Powerups
@@ -1786,7 +1868,7 @@ function doCollisions(){
     if(pu.dead)continue;
     if(rectsOverlap(pu.rect,pr)){pu.dead=true;player.applyPowerup(pu.kind);SND.powerup();}
   }
-  if(player.health<=0)gameState='game_over';
+  if(player.health<=0){if(gameMode==='arcade')saveArcadeRecord();gameState='game_over';}
 }
 
 // ── Levels state machine ───────────────────────────────────────────────────────
@@ -1874,6 +1956,7 @@ function update(){
   if(screenShake>0)screenShake*=0.82;
   if(flashAlpha>0)flashAlpha=Math.max(0,flashAlpha-15);
   if(enrageFlash>0)enrageFlash--;
+  if(comboTimer>0){comboTimer--;if(!comboTimer)combo=0;}
   if(warnTimer>0)warnTimer--;
 
   const ts=player&&player.slowActive?0.45:1.0;
@@ -1971,6 +2054,7 @@ function draw(){
   if(gameState==='level_select'){drawLevelSelect();return;}
   if(gameState==='settings'){drawSettings();return;}
   if(gameState==='layout'){drawLayout();return;}
+  if(gameState==='stats'){drawStats();return;}
 
   // Slow tint
   if(player&&player.slowActive){ctx.fillStyle=rgba(60,30,160,0.08);ctx.fillRect(0,0,GW,GH);}
@@ -2073,6 +2157,7 @@ function drawHUD(){
   if(player.doubleTimer>0)pus.push(['2x SHOT','#ffdc00',player.doubleTimer,600]);
   if(player.hasShield)pus.push(['SHIELD',AC,1,1]);
   if(player.slowTimer>0)pus.push(['SLOW','#a01edc',player.slowTimer,300]);
+  if(player.weapon!=='normal')pus.push([player.weapon==='spread'?'SPREAD':player.weapon==='rapid'?'RAPID':'ROCKET',player.weapon==='spread'?'#00ff88':player.weapon==='rapid'?'#ff6600':'#ff3333',player.weaponTimer,player.weapon==='spread'?700:player.weapon==='rapid'?600:500]);
   for(const[label,col,rem,tot]of pus){
     const pw=90;
     ctx.fillStyle=rgba(25,25,35,1);roundRect(px0,py0,pw,26,5);ctx.fill();
@@ -2087,6 +2172,18 @@ function drawHUD(){
   ctx.textAlign='left';
   ctx.fillStyle='#555';ctx.font='12px sans-serif';ctx.textAlign='center';
   ctx.fillText('WASD/Arrows — move   Space — shoot',GW/2,GH-8);
+
+  // Combo display
+  if(combo>=3){
+    const m=comboMult(),lbl=comboLabel();
+    const pulse=1+0.05*Math.sin(Date.now()*0.012);
+    const cx=m>=3?'#ff8c00':m>=2?'#ffdc00':'#aaffaa';
+    ctx.save();ctx.translate(GW/2,GH/2);ctx.scale(pulse,pulse);
+    ctx.fillStyle=cx;ctx.shadowColor=cx;ctx.shadowBlur=12;
+    ctx.font=`bold ${m>=4?22:18}px monospace`;ctx.textAlign='center';
+    ctx.fillText(`${combo} KILLS  ${lbl}`,0,GH*0.38-GH/2);
+    ctx.shadowBlur=0;ctx.restore();
+  }
 
   // Pause button — always visible (works on PC and phone)
   const pbx=GW/2-30,pby=GH-70,pbw=60,pbh=36;
@@ -2326,6 +2423,11 @@ function drawMenu(){
   ctx.strokeStyle='#224466';ctx.lineWidth=1.5;roundRect(GW-106,9,92,28,6);ctx.stroke();
   ctx.fillStyle='#88ccff';ctx.font='14px sans-serif';ctx.textAlign='center';
   ctx.fillText('⚙ SETTINGS',GW-60,27);
+  btnRects['m_stats']={x:GW-208,y:9,w:92,h:28};
+  ctx.fillStyle=rgba(20,40,80,0.8);roundRect(GW-208,9,92,28,6);ctx.fill();
+  ctx.strokeStyle='#224466';ctx.lineWidth=1.5;roundRect(GW-208,9,92,28,6);ctx.stroke();
+  ctx.fillStyle='#88ccff';ctx.font='14px sans-serif';ctx.textAlign='center';
+  ctx.fillText('📊 STATS',GW-164,27);
   const _isTouchDev='ontouchstart' in window||navigator.maxTouchPoints>0;
   const btns=_isTouchDev?[['ARCADE MODE','arcade'],['LEVELS MODE','levels']]:[['ARCADE MODE','arcade'],['LEVELS MODE','levels'],['PHONE MODE','phone']];
   btns.forEach(([label,key],i)=>{
@@ -2430,15 +2532,25 @@ function drawGameOver(){
   ctx.fillStyle=rgba(0,0,0,0.7);ctx.fillRect(0,0,GW,GH);
   ctx.font='bold 60px monospace';ctx.textAlign='center';
   ctx.fillStyle='#f44';ctx.shadowColor='#f00';ctx.shadowBlur=20;
-  ctx.fillText('GAME OVER',GW/2,GH/2-80);ctx.shadowBlur=0;
+  ctx.fillText('GAME OVER',GW/2,GH/2-100);ctx.shadowBlur=0;
   ctx.fillStyle=AC;ctx.font='24px monospace';
-  ctx.fillText('Score: '+score,GW/2,GH/2-30);
-  const lvTxt=gameMode==='levels'?('Level: '+(lvIdx+1)+' / 20'):('Level: '+level);
-  ctx.fillStyle='#ffdc00';ctx.font='18px monospace';ctx.fillText(lvTxt,GW/2,GH/2+4);
+  ctx.fillText('Score: '+score,GW/2,GH/2-58);
+  const lvTxt=gameMode==='levels'?('Level: '+(lvIdx+1)+' / 20'):('Wave: '+level);
+  ctx.fillStyle='#ffdc00';ctx.font='18px monospace';ctx.fillText(lvTxt,GW/2,GH/2-28);
+  if(gameMode==='arcade'){
+    const isNewBest=score>=arcadeBestScore;
+    ctx.fillStyle='#888';ctx.font='13px monospace';ctx.fillText('Best score: '+arcadeBestScore,GW/2,GH/2+2);
+    ctx.fillStyle='#888';ctx.fillText('Best combo: '+arcadeBestCombo+'  Best wave: '+arcadeBestLevel,GW/2,GH/2+22);
+    if(isNewBest&&score>0){
+      ctx.fillStyle='#ffdc00';ctx.shadowColor='#ffdc00';ctx.shadowBlur=10;
+      ctx.font='bold 16px monospace';ctx.fillText('★ NEW RECORD! ★',GW/2,GH/2+45);ctx.shadowBlur=0;
+    }
+  }
   const gobtns=[['RETRY','retry'],['MAIN MENU','gmenu']];
   btnRects={};
+  const yOff=gameMode==='arcade'?50:30;
   gobtns.forEach(([label,key],i)=>{
-    const x=GW/2-110,y=GH/2+30+i*70,w=220,h=50;
+    const x=GW/2-110,y=GH/2+yOff+i*70,w=220,h=50;
     btnRects['g_'+key]={x,y,w,h};
     ctx.fillStyle=rgba(20,40,80,0.85);roundRect(x,y,w,h,12);ctx.fill();
     ctx.strokeStyle='#224466';ctx.lineWidth=2;roundRect(x,y,w,h,12);ctx.stroke();
@@ -2465,6 +2577,66 @@ function drawVictory(){
   });
 }
 
+function drawStats(){
+  ctx.fillStyle=rgba(0,0,10,0.95);ctx.fillRect(0,0,GW,GH);
+  btnRects={};
+  btnRects['stats_back']={x:14,y:8,w:80,h:32};
+  ctx.fillStyle='#224466';roundRect(14,8,80,32,6);ctx.fill();
+  ctx.strokeStyle=AC;ctx.lineWidth=1.5;roundRect(14,8,80,32,6);ctx.stroke();
+  ctx.fillStyle=AC;ctx.font='14px sans-serif';ctx.textAlign='center';ctx.fillText('< BACK',54,29);
+  // Title
+  ctx.font='bold 30px monospace';ctx.textAlign='center';
+  ctx.fillStyle='#ffdc00';ctx.shadowColor='#ffdc00';ctx.shadowBlur=10;
+  ctx.fillText('★ СТАТИСТИКА ★',GW/2,52);ctx.shadowBlur=0;
+  // Personal records section
+  const col1=GW*0.25,col2=GW*0.75;
+  ctx.strokeStyle='#1e3050';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(30,62);ctx.lineTo(GW-30,62);ctx.stroke();
+  ctx.fillStyle=AC;ctx.font='bold 14px sans-serif';ctx.textAlign='center';
+  ctx.fillText('ЛИЧНЫЕ РЕКОРДЫ',col1,80);
+  const stats=[
+    ['Лучший счёт',arcadeBestScore.toLocaleString(),'#ffdc00'],
+    ['Лучшее комбо',arcadeBestCombo+'x','#ff8c00'],
+    ['Лучшая волна',arcadeBestLevel,'#32c832'],
+    ['Игр сыграно',statsGames,'#888'],
+    ['Всего убийств',statsKills.toLocaleString(),'#cc4444'],
+    ['Кримсон побеждён',statsOverlordWins,'#ff00ff'],
+  ];
+  stats.forEach(([label,val,col],i)=>{
+    const y=100+i*36;
+    ctx.fillStyle='#556677';ctx.font='13px sans-serif';ctx.textAlign='left';
+    ctx.fillText(label,38,y);
+    ctx.fillStyle=col;ctx.font='bold 14px monospace';ctx.textAlign='right';
+    ctx.fillText(val,col1*2-38,y);
+  });
+  // Hall of Fame section
+  ctx.strokeStyle='#1e3050';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(GW/2+10,62);ctx.lineTo(GW/2+10,GH-20);ctx.stroke();
+  ctx.fillStyle='#ff4488';ctx.font='bold 14px sans-serif';ctx.textAlign='center';
+  ctx.shadowColor='#ff4488';ctx.shadowBlur=8;
+  ctx.fillText('★ ПОБЕДИТЕЛИ КРИМСОНА ★',col2,80);ctx.shadowBlur=0;
+  if(overlordHoF.length===0){
+    ctx.fillStyle='#446655';ctx.font='13px sans-serif';ctx.textAlign='center';
+    ctx.fillText('Пока никто не победил...',col2,120);
+  }else{
+    overlordHoF.slice(0,8).forEach((e,i)=>{
+      const y=100+i*44;
+      const isYou=e.name===playerCallsign;
+      ctx.fillStyle=isYou?rgba(80,40,0,0.7):rgba(20,30,50,0.7);
+      roundRect(col2-150,y-18,300,36,6);ctx.fill();
+      ctx.strokeStyle=isYou?'#ff8c00':'#1e3050';ctx.lineWidth=isYou?2:1;
+      roundRect(col2-150,y-18,300,36,6);ctx.stroke();
+      ctx.fillStyle=isYou?'#ffdc00':'#88aacc';
+      ctx.font=`bold ${isYou?14:13}px monospace`;ctx.textAlign='left';
+      ctx.fillText((i+1)+'. '+e.name,col2-140,y-2);
+      ctx.fillStyle='#ff8888';ctx.font='12px monospace';
+      ctx.fillText(e.score.toLocaleString(),col2-140,y+14);
+      ctx.fillStyle='#556677';ctx.font='11px sans-serif';ctx.textAlign='right';
+      ctx.fillText(e.date,col2+140,y+14);
+    });
+  }
+}
+
 // ── Button handling ────────────────────────────────────────────────────────────
 function hitBtn(x,y){
   for(const[k,r]of Object.entries(btnRects))if(x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h)return k;
@@ -2473,6 +2645,8 @@ function hitBtn(x,y){
 function handleBtn(key){
   if(!key)return;
   SND.uiClick();
+  if(key==='m_stats'){gameState='stats';return;}
+  if(key==='stats_back'){gameState='menu';return;}
   if(key==='m_settings'){gameState='settings';return;}
   if(key==='set_back'){rebindAction=null;wipeConfirm=false;gameState='menu';return;}
   if(key==='set_layout'){gameState='layout';_layDrag=null;return;}
@@ -2594,6 +2768,7 @@ window.addEventListener('keydown',e=>{
     else if(gameState==='level_select'){gameState='menu';}
     else if(gameState==='settings'){gameState='menu';}
     else if(gameState==='layout'){saveTouchLayout();gameState='settings';}
+    else if(gameState==='stats'){gameState='menu';}
     else if(gameState==='game_over'||gameState==='victory'){gameState='menu';}
   }
   if(e.key&&e.key.length===1){
