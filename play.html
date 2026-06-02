@@ -49,8 +49,9 @@ function range(a,b,s=1){const r=[];for(let i=a;i<b;i+=s)r.push(i);return r;}
 // ── Firebase Realtime Database ─────────────────────────────────────────────────
 const FB_URL='https://space-shooter-6b66a-default-rtdb.europe-west1.firebasedatabase.app';
 const _fbOK=FB_URL!=='YOUR_FIREBASE_URL_HERE';
-let globalPlays=0,globalKills=0,globalOverlords=0,globalLeaderboard=[];
+let globalPlays=0,globalKills=0,globalOverlords=0,globalLeaderboard=[],globalArcadeLb=[];
 let globalStatsLoaded=false,_globalFetching=false;
+let statsLeaderboardTab='arcade';
 let sessionKills=0; // kills this game session, flushed to FB on game end
 
 async function _fbReq(path,opts){
@@ -67,12 +68,17 @@ async function fetchGlobalData(){
   if(_globalFetching)return;_globalFetching=true;
   if(!_fbOK){globalStatsLoaded=true;_globalFetching=false;return;}
   try{
-    const[st,lb]=await Promise.all([_fbGet('stats'),_fbGet('leaderboard')]);
+    const[st,lb,alb]=await Promise.all([_fbGet('stats'),_fbGet('leaderboard'),_fbGet('arcade_lb')]);
     if(st){globalPlays=st.plays||0;globalKills=st.kills||0;globalOverlords=st.overlords||0;}
     if(lb&&typeof lb==='object'){
       globalLeaderboard=Object.values(lb)
         .filter(e=>e&&e.name&&e.score!=null)
-        .sort((a,b)=>b.score-a.score).slice(0,10);
+        .sort((a,b)=>b.score-a.score).slice(0,100);
+    }
+    if(alb&&typeof alb==='object'){
+      globalArcadeLb=Object.values(alb)
+        .filter(e=>e&&e.name&&e.score!=null)
+        .sort((a,b)=>b.score-a.score).slice(0,100);
     }
   }catch(e){}
   globalStatsLoaded=true;_globalFetching=false;
@@ -82,6 +88,7 @@ async function postGlobalEntry(name,sc,date){
   _fbPost('leaderboard',{name,score:sc,date});
   _fbInc('stats/overlords');
 }
+async function postArcadeScore(name,sc,date){if(!_fbOK||sc<=0)return;_fbPost('arcade_lb',{name,score:sc,date});}
 function globalIncrementPlays(){if(_fbOK)_fbInc('stats/plays');}
 function globalFlushKills(){if(_fbOK&&sessionKills>0){_fbIncBy('stats/kills',sessionKills);sessionKills=0;}}
 
@@ -1920,7 +1927,16 @@ function doCollisions(){
     if(pu.dead)continue;
     if(rectsOverlap(pu.rect,pr)){pu.dead=true;player.applyPowerup(pu.kind);SND.powerup();}
   }
-  if(player.health<=0){if(gameMode==='arcade'){saveArcadeRecord();globalFlushKills();}gameState='game_over';}
+  if(player.health<=0){
+    if(gameMode==='arcade'){
+      saveArcadeRecord();globalFlushKills();
+      if(score>0){
+        if(!playerCallsign){playerCallsign=window.prompt('Your callsign, pilot:','Pilot')||'Unknown';try{localStorage.setItem('ss_callsign',playerCallsign);}catch(e){}}
+        postArcadeScore(playerCallsign,score,new Date().toLocaleDateString('en-GB'));
+      }
+    }
+    gameState='game_over';
+  }
 }
 
 // ── Levels state machine ───────────────────────────────────────────────────────
@@ -2678,58 +2694,69 @@ function drawStats(){
     ctx.fillStyle=col;ctx.font='bold 13px monospace';ctx.textAlign='right';ctx.fillText(val,GW/2-34,y+4);
   });
 
-  // Right: Global Hall of Fame
-  ctx.fillStyle='#ff44cc';ctx.shadowColor='#ff44cc';ctx.shadowBlur=8;
-  ctx.font='bold 13px sans-serif';ctx.textAlign='center';
-  ctx.fillText('👑 OVERLORD SLAYERS',col2,128);ctx.shadowBlur=0;
-  // Show loading spinner or "no backend" hint
-  if(!_fbOK){
-    ctx.fillStyle='#446655';ctx.font='11px sans-serif';ctx.textAlign='center';
-    ctx.fillText('Connect Firebase to see',col2,155);ctx.fillText('global leaderboard',col2,170);
-    ctx.strokeStyle='#2a4455';ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(GW/2+20,182);ctx.lineTo(GW-20,182);ctx.stroke();
-    ctx.fillStyle='#334455';ctx.font='12px sans-serif';
-    ctx.fillText('Your victories:',col2,198);
-    const local=overlordHoF.slice(0,6);
-    if(local.length===0){ctx.fillStyle='#223344';ctx.font='11px sans-serif';ctx.fillText('None yet — beat the Overlord!',col2,220);}
-    else local.forEach((e,i)=>{
-      const y=215+i*38;
-      ctx.fillStyle=rgba(15,28,50,0.75);roundRect(GW/2+14,y-14,GW/2-44,30,5);ctx.fill();
-      ctx.strokeStyle='#1e3050';ctx.lineWidth=1;roundRect(GW/2+14,y-14,GW/2-44,30,5);ctx.stroke();
-      const rank=i===0?'👑':i===1?'🥈':i===2?'🥉':(i+1)+'.';
-      ctx.fillStyle='#ffdc00';ctx.font='bold 12px monospace';ctx.textAlign='left';ctx.fillText(rank+' '+e.name,GW/2+24,y);
-      ctx.fillStyle='#ff6688';ctx.font='10px monospace';ctx.fillText(e.score.toLocaleString()+' pts',GW/2+24,y+13);
-      ctx.fillStyle='#445566';ctx.font='10px sans-serif';ctx.textAlign='right';ctx.fillText(e.date,GW-34,y+13);
-    });
-  }else if(!globalStatsLoaded){
-    // Loading spinner
+  // Right: Leaderboard with tabs
+  const rLbX=GW/2+14,rLbW=GW/2-28;
+  const tabW3=Math.round(rLbW/2)-4,tabH3=24;
+  const t1x3=rLbX,t2x3=rLbX+tabW3+8;
+
+  const arcSel=statsLeaderboardTab==='arcade';
+  ctx.fillStyle=arcSel?AC+'33':'rgba(10,20,35,0.8)';roundRect(t1x3,116,tabW3,tabH3,5);ctx.fill();
+  ctx.strokeStyle=arcSel?AC:'#334455';ctx.lineWidth=arcSel?2:1;roundRect(t1x3,116,tabW3,tabH3,5);ctx.stroke();
+  ctx.fillStyle=arcSel?AC:'#556677';ctx.font='bold 10px sans-serif';ctx.textAlign='center';
+  ctx.fillText('🏆 ARCADE TOP',t1x3+tabW3/2,130);
+  btnRects['stats_tab_arcade']={x:t1x3,y:116,w:tabW3,h:tabH3};
+
+  const ovlSel=statsLeaderboardTab==='overlord';
+  ctx.fillStyle=ovlSel?'#ff44cc33':'rgba(10,20,35,0.8)';roundRect(t2x3,116,tabW3,tabH3,5);ctx.fill();
+  ctx.strokeStyle=ovlSel?'#ff44cc':'#334455';ctx.lineWidth=ovlSel?2:1;roundRect(t2x3,116,tabW3,tabH3,5);ctx.stroke();
+  ctx.fillStyle=ovlSel?'#ff44cc':'#556677';ctx.font='bold 10px sans-serif';ctx.textAlign='center';
+  ctx.fillText('👑 OVERLORDS',t2x3+tabW3/2,130);
+  btnRects['stats_tab_overlord']={x:t2x3,y:116,w:tabW3,h:tabH3};
+
+  const isArcTab=statsLeaderboardTab==='arcade';
+  const tabColor=isArcTab?AC:'#ff44cc';
+
+  if(_fbOK&&!globalStatsLoaded){
     const sp=Date.now()*0.003;
-    ctx.strokeStyle='#ff44cc';ctx.lineWidth=3;
-    ctx.beginPath();ctx.arc(col2,190,18,sp,sp+Math.PI*1.5);ctx.stroke();
-    ctx.fillStyle='#445566';ctx.font='11px sans-serif';ctx.textAlign='center';ctx.fillText('Loading...',col2,225);
+    ctx.strokeStyle=tabColor;ctx.lineWidth=3;
+    ctx.beginPath();ctx.arc(col2,200,18,sp,sp+Math.PI*1.5);ctx.stroke();
+    ctx.fillStyle='#445566';ctx.font='11px sans-serif';ctx.textAlign='center';
+    ctx.fillText('Loading...',col2,235);
   }else{
-    const list=globalLeaderboard.length>0?globalLeaderboard:overlordHoF.slice(0,8);
-    if(list.length===0){
+    const list=isArcTab
+      ?(_fbOK?globalArcadeLb:[])
+      :(_fbOK?globalLeaderboard:overlordHoF);
+    if(!_fbOK&&isArcTab){
+      ctx.fillStyle='#334455';ctx.font='11px sans-serif';ctx.textAlign='center';
+      ctx.fillText('Firebase not connected',col2,185);
+    }else if(list.length===0){
       ctx.fillStyle='#334455';ctx.font='13px sans-serif';ctx.textAlign='center';
-      ctx.fillText('No victors yet...',col2,175);ctx.font='11px sans-serif';
-      ctx.fillText('Defeat the Overlord to be first!',col2,195);
+      ctx.fillText('No entries yet...',col2,185);
+      ctx.font='11px sans-serif';
+      ctx.fillText(isArcTab?'Play arcade & die to be first!':'Defeat the Overlord first!',col2,205);
     }else{
-      list.forEach((e,i)=>{
-        const y=145+i*42;
+      const maxRows=Math.floor((GH-160)/30);
+      const maxShow=Math.min(list.length,maxRows);
+      list.slice(0,maxShow).forEach((e,i)=>{
+        const ey=150+i*30;
         const isYou=e.name===playerCallsign;
-        ctx.fillStyle=isYou?rgba(90,50,0,0.75):rgba(15,28,50,0.75);
-        roundRect(GW/2+14,y-14,GW/2-44,34,6);ctx.fill();
+        ctx.fillStyle=isYou?'rgba(90,50,0,0.75)':'rgba(15,28,50,0.75)';
+        roundRect(rLbX,ey-12,rLbW,27,5);ctx.fill();
         ctx.strokeStyle=isYou?'#ffaa00':'#1e3050';ctx.lineWidth=isYou?2:1;
-        roundRect(GW/2+14,y-14,GW/2-44,34,6);ctx.stroke();
+        roundRect(rLbX,ey-12,rLbW,27,5);ctx.stroke();
         const rank=i===0?'👑':i===1?'🥈':i===2?'🥉':(i+1)+'.';
         ctx.fillStyle=isYou?'#ffdc00':'#88aacc';
-        ctx.font=`bold ${isYou?13:12}px monospace`;ctx.textAlign='left';
-        ctx.fillText(rank+' '+e.name,GW/2+24,y+1);
-        ctx.fillStyle=isYou?'#ff8800':'#ff6688';ctx.font='11px monospace';
-        ctx.fillText(e.score.toLocaleString()+'  pts',GW/2+24,y+16);
-        ctx.fillStyle='#445566';ctx.font='10px sans-serif';ctx.textAlign='right';
-        ctx.fillText(e.date,GW-34,y+16);
+        ctx.font='bold 11px monospace';ctx.textAlign='left';
+        ctx.fillText((rank+' '+e.name).substring(0,18),rLbX+8,ey+1);
+        ctx.fillStyle=isYou?'#ff8800':'#ff6688';ctx.font='10px monospace';
+        ctx.fillText(e.score.toLocaleString()+' pts',rLbX+8,ey+13);
+        ctx.fillStyle='#445566';ctx.font='9px sans-serif';ctx.textAlign='right';
+        ctx.fillText(e.date||'',rLbX+rLbW-6,ey+13);
       });
+      if(list.length>maxShow){
+        ctx.fillStyle='#334455';ctx.font='10px sans-serif';ctx.textAlign='center';
+        ctx.fillText('+'+(list.length-maxShow)+' more',col2,152+maxShow*30);
+      }
     }
   }
 }
@@ -2744,6 +2771,8 @@ function handleBtn(key){
   SND.uiClick();
   if(key==='m_stats'){gameState='stats';globalStatsLoaded=false;fetchGlobalData();return;}
   if(key==='stats_back'){gameState='menu';return;}
+  if(key==='stats_tab_arcade'){statsLeaderboardTab='arcade';return;}
+  if(key==='stats_tab_overlord'){statsLeaderboardTab='overlord';return;}
   if(key==='m_settings'){gameState='settings';return;}
   if(key==='set_back'){rebindAction=null;wipeConfirm=false;gameState='menu';return;}
   if(key==='set_layout'){gameState='layout';_layDrag=null;return;}
