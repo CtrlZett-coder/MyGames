@@ -36,24 +36,12 @@ jobs:
           gradle assembleDebug --no-daemon
           mv app/build/outputs/apk/debug/app-debug.apk ../SpaceShooter.apk
 
-      # ── Red Ball APK ─────────────────────────────────────────────────────────
-      - name: Build Red Ball APK
-        run: |
-          cp red_ball.html android/app/src/main/assets/game.html
-          sed -i 's/Space Shooter/Red Ball/g' android/app/src/main/res/values/strings.xml
-          sed -i 's/Space Shooter/Red Ball/g' android/app/src/main/AndroidManifest.xml
-          cd android
-          gradle assembleDebug --no-daemon
-          mv app/build/outputs/apk/debug/app-debug.apk ../RedBall.apk
-
       # ── Upload artifacts ─────────────────────────────────────────────────────
-      - name: Upload APKs as artifacts
+      - name: Upload APK as artifact
         uses: actions/upload-artifact@v4
         with:
           name: MyGames-APKs
-          path: |
-            SpaceShooter.apk
-            RedBall.apk
+          path: SpaceShooter.apk
           retention-days: 30
 
       # ── GitHub Release ───────────────────────────────────────────────────────
@@ -71,16 +59,9 @@ jobs:
           | \`SpaceShooter.apk\` | Android APK — установи и играй |
           | \`SpaceShooterHTML5.html\` | HTML5 — открой в браузере без интернета |
 
-          ### 🔴 Red Ball
-          | Файл | Описание |
-          |---|---|
-          | \`RedBall.apk\` | Android APK — установи и играй |
-          | \`RedBall.html\` | HTML5 — открой в браузере без интернета |
-
           **Установка APK:** Настройки → Безопасность → Разрешить из неизвестных источников"
 
           cp space_shooter.html SpaceShooterHTML5.html
-          cp red_ball.html RedBallHTML5.html
 
           gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --yes 2>/dev/null || true
           git push origin ":refs/tags/$TAG" 2>/dev/null || true
@@ -91,4 +72,4 @@ jobs:
             --title "$TITLE" \
             --notes "$NOTES" \
             --latest \
-            SpaceShooter.apk RedBall.apk SpaceShooterHTML5.html RedBallHTML5.html
+            SpaceShooter.apk SpaceShooterHTML5.html
