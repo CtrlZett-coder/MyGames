@@ -1867,8 +1867,15 @@ function _updateTrans(){
 function _drawTrans(){
   if(_transA<=0)return;
   const t=_transA*_transA*(3-2*_transA); // smoothstep
-  ctx.fillStyle=`rgba(0,2,8,${t})`;
-  ctx.fillRect(0,0,GW,GH);
+  ctx.fillStyle='#000208';
+  if(_transDir===1){
+    // Wipe in: black curtain sweeps left → right
+    ctx.fillRect(0,0,GW*t,GH);
+  }else{
+    // Wipe out: curtain recedes left → right
+    const x=GW*(1-t);
+    ctx.fillRect(x,0,GW-x,GH);
+  }
 }
 let stars=[],player=null,enemies=[],powerups=[],explosions=[],bosses=[];
 let lvIdx=0,maxUnlocked=loadProgress();
