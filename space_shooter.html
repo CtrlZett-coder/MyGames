@@ -46,6 +46,45 @@ function rectsOverlap(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h
 function range(a,b,s=1){const r=[];for(let i=a;i<b;i+=s)r.push(i);return r;}
 
 // ── Audio ──────────────────────────────────────────────────────────────────────
+// ── Firebase Realtime Database ─────────────────────────────────────────────────
+const FB_URL='YOUR_FIREBASE_URL_HERE'; // replace with your Firebase DB URL
+const _fbOK=FB_URL!=='YOUR_FIREBASE_URL_HERE';
+let globalPlays=0,globalKills=0,globalOverlords=0,globalLeaderboard=[];
+let globalStatsLoaded=false,_globalFetching=false;
+let sessionKills=0; // kills this game session, flushed to FB on game end
+
+async function _fbReq(path,opts){
+  if(!_fbOK)return null;
+  try{const r=await fetch(FB_URL+'/'+path+'.json',opts);return await r.json();}catch(e){return null;}
+}
+async function _fbGet(p){return _fbReq(p);}
+async function _fbPut(p,v){return _fbReq(p,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)});}
+async function _fbPost(p,v){return _fbReq(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)});}
+async function _fbInc(p){const c=await _fbGet(p)||0;await _fbPut(p,c+1);}
+async function _fbIncBy(p,n){if(n<=0)return;const c=await _fbGet(p)||0;await _fbPut(p,c+n);}
+
+async function fetchGlobalData(){
+  if(_globalFetching)return;_globalFetching=true;
+  if(!_fbOK){globalStatsLoaded=true;_globalFetching=false;return;}
+  try{
+    const[st,lb]=await Promise.all([_fbGet('stats'),_fbGet('leaderboard')]);
+    if(st){globalPlays=st.plays||0;globalKills=st.kills||0;globalOverlords=st.overlords||0;}
+    if(lb&&typeof lb==='object'){
+      globalLeaderboard=Object.values(lb)
+        .filter(e=>e&&e.name&&e.score!=null)
+        .sort((a,b)=>b.score-a.score).slice(0,10);
+    }
+  }catch(e){}
+  globalStatsLoaded=true;_globalFetching=false;
+}
+async function postGlobalEntry(name,sc,date){
+  if(!_fbOK)return;
+  _fbPost('leaderboard',{name,score:sc,date});
+  _fbInc('stats/overlords');
+}
+function globalIncrementPlays(){if(_fbOK)_fbInc('stats/plays');}
+function globalFlushKills(){if(_fbOK&&sessionKills>0){_fbIncBy('stats/kills',sessionKills);sessionKills=0;}}
+
 let actx=null,masterGain=null,sfxGain=null;
 let masterVolume=parseFloat(localStorage.getItem('ss_vol')||'0.7');
 let sfxVolume=parseFloat(localStorage.getItem('ss_sfx')||'0.7');
@@ -1606,7 +1645,7 @@ let combo=0,comboTimer=0,bestCombo=0;
 const COMBO_TIMEOUT=300;
 function comboMult(){if(combo>=50)return 5;if(combo>=30)return 4;if(combo>=20)return 3;if(combo>=10)return 2;if(combo>=5)return 1.5;return 1;}
 function comboLabel(){const m=comboMult();return m>=5?'★LEGENDARY★':m>=4?'★EPIC★':m>=3?'★GREAT★':m>=2?'×2':m>1?'×1.5':'';}
-function addKill(base){combo++;comboTimer=COMBO_TIMEOUT;if(combo>bestCombo)bestCombo=combo;statsKills++;try{localStorage.setItem('ss_stat_kills',statsKills);}catch(e){}return Math.round(base*comboMult());}
+function addKill(base){combo++;comboTimer=COMBO_TIMEOUT;if(combo>bestCombo)bestCombo=combo;statsKills++;sessionKills++;try{localStorage.setItem('ss_stat_kills',statsKills);}catch(e){}return Math.round(base*comboMult());}
 let arcadeBestScore=parseInt(localStorage.getItem('ss_arc_score')||'0');
 let arcadeBestCombo=parseInt(localStorage.getItem('ss_arc_combo')||'0');
 let arcadeBestLevel=parseInt(localStorage.getItem('ss_arc_lvl')||'0');
@@ -1630,20 +1669,23 @@ function saveStats(){
   }catch(e){}
 }
 function getWorldStats(){
-  const hrs=Math.max(0,(Date.now()-1735689600000)/3600000);
+  // While Firebase loads, show local stats as fallback
   return{
-    plays:  Math.round(50000+hrs*22+statsGames),
-    kills:  Math.round(2400000+hrs*920+statsKills),
-    overlords:Math.round(820+hrs*0.95+statsOverlordWins)
+    plays:  globalStatsLoaded?globalPlays:statsGames,
+    kills:  globalStatsLoaded?globalKills:statsKills,
+    overlords:globalStatsLoaded?globalOverlords:statsOverlordWins
   };
 }
 function recordOverlordVictory(){
   statsOverlordWins++;saveStats();
+  globalFlushKills();
   if(!playerCallsign)playerCallsign=window.prompt('Enter your callsign, pilot:','Pilot')||'Unknown';
   try{localStorage.setItem('ss_callsign',playerCallsign);}catch(e){}
-  const entry={name:playerCallsign,score,date:new Date().toLocaleDateString('ru-RU')};
+  const dateStr=new Date().toLocaleDateString('en-GB');
+  const entry={name:playerCallsign,score,date:dateStr};
   overlordHoF.unshift(entry);if(overlordHoF.length>10)overlordHoF.pop();
   try{localStorage.setItem('ss_hof',JSON.stringify(overlordHoF));}catch(e){}
+  postGlobalEntry(playerCallsign,score,dateStr);
 }
 let stars=[],player=null,enemies=[],powerups=[],explosions=[],bosses=[];
 let lvIdx=0,maxUnlocked=loadProgress();
@@ -1695,6 +1737,8 @@ function startGame(mode,idx){
   score=0;kills=0;killsLevel=10;spawnTimer=0;spawnDelay=90;
   combo=0;comboTimer=0;bestCombo=0;
   statsGames++;saveStats();
+  sessionKills=0;
+  if(mode==='arcade')globalIncrementPlays();
   player=new Player();enemies=[];powerups=[];explosions=[];bosses=[];asteroids=[];asteroidTimer=0;freeEBullets=[];
   bossEnraged=false;bossesSpawnedArcade.clear();
   warnText='';warnTimer=0;screenShake=0;flashAlpha=0;vigAlpha=0;enrageFlash=0;
@@ -1876,7 +1920,7 @@ function doCollisions(){
     if(pu.dead)continue;
     if(rectsOverlap(pu.rect,pr)){pu.dead=true;player.applyPowerup(pu.kind);SND.powerup();}
   }
-  if(player.health<=0){if(gameMode==='arcade')saveArcadeRecord();gameState='game_over';}
+  if(player.health<=0){if(gameMode==='arcade'){saveArcadeRecord();globalFlushKills();}gameState='game_over';}
 }
 
 // ── Levels state machine ───────────────────────────────────────────────────────
@@ -2600,8 +2644,14 @@ function drawStats(){
     ctx.fillStyle=rgba(10,20,40,0.8);roundRect(wx-82,63,164,40,8);ctx.fill();
     ctx.strokeStyle=col+'66';ctx.lineWidth=1;roundRect(wx-82,63,164,40,8);ctx.stroke();
     ctx.fillStyle='#556677';ctx.font='10px sans-serif';ctx.textAlign='center';ctx.fillText(lbl,wx,75);
-    ctx.fillStyle=col;ctx.shadowColor=col;ctx.shadowBlur=6;
-    ctx.font='bold 17px monospace';ctx.fillText(val,wx,93);ctx.shadowBlur=0;
+    if(_fbOK&&!globalStatsLoaded){
+      ctx.strokeStyle=col;ctx.lineWidth=2;
+      const sp2=Date.now()*0.004+i;
+      ctx.beginPath();ctx.arc(wx,82,9,sp2,sp2+Math.PI*1.3);ctx.stroke();
+    }else{
+      ctx.fillStyle=col;ctx.shadowColor=col;ctx.shadowBlur=6;
+      ctx.font='bold 17px monospace';ctx.fillText(val,wx,93);ctx.shadowBlur=0;
+    }
   });
   ctx.beginPath();ctx.moveTo(30,110);ctx.lineTo(GW-30,110);ctx.stroke();
 
@@ -2628,33 +2678,59 @@ function drawStats(){
     ctx.fillStyle=col;ctx.font='bold 13px monospace';ctx.textAlign='right';ctx.fillText(val,GW/2-34,y+4);
   });
 
-  // Right: Hall of Fame
+  // Right: Global Hall of Fame
   ctx.fillStyle='#ff44cc';ctx.shadowColor='#ff44cc';ctx.shadowBlur=8;
   ctx.font='bold 13px sans-serif';ctx.textAlign='center';
   ctx.fillText('👑 OVERLORD SLAYERS',col2,128);ctx.shadowBlur=0;
-  if(overlordHoF.length===0){
-    ctx.fillStyle='#334455';ctx.font='13px sans-serif';ctx.textAlign='center';
-    ctx.fillText('No victors yet...',col2,180);
-    ctx.fillStyle='#223344';ctx.font='11px sans-serif';
-    ctx.fillText('Defeat the Crimson Overlord',col2,200);
-    ctx.fillText('to enter the Hall of Fame!',col2,216);
-  }else{
-    overlordHoF.slice(0,8).forEach((e,i)=>{
-      const y=145+i*42;
-      const isYou=e.name===playerCallsign;
-      ctx.fillStyle=isYou?rgba(90,50,0,0.75):rgba(15,28,50,0.75);
-      roundRect(GW/2+14,y-14,GW/2-44,34,6);ctx.fill();
-      ctx.strokeStyle=isYou?'#ffaa00':'#1e3050';ctx.lineWidth=isYou?2:1;
-      roundRect(GW/2+14,y-14,GW/2-44,34,6);ctx.stroke();
+  // Show loading spinner or "no backend" hint
+  if(!_fbOK){
+    ctx.fillStyle='#446655';ctx.font='11px sans-serif';ctx.textAlign='center';
+    ctx.fillText('Connect Firebase to see',col2,155);ctx.fillText('global leaderboard',col2,170);
+    ctx.strokeStyle='#2a4455';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(GW/2+20,182);ctx.lineTo(GW-20,182);ctx.stroke();
+    ctx.fillStyle='#334455';ctx.font='12px sans-serif';
+    ctx.fillText('Your victories:',col2,198);
+    const local=overlordHoF.slice(0,6);
+    if(local.length===0){ctx.fillStyle='#223344';ctx.font='11px sans-serif';ctx.fillText('None yet — beat the Overlord!',col2,220);}
+    else local.forEach((e,i)=>{
+      const y=215+i*38;
+      ctx.fillStyle=rgba(15,28,50,0.75);roundRect(GW/2+14,y-14,GW/2-44,30,5);ctx.fill();
+      ctx.strokeStyle='#1e3050';ctx.lineWidth=1;roundRect(GW/2+14,y-14,GW/2-44,30,5);ctx.stroke();
       const rank=i===0?'👑':i===1?'🥈':i===2?'🥉':(i+1)+'.';
-      ctx.fillStyle=isYou?'#ffdc00':'#88aacc';
-      ctx.font=`bold ${isYou?13:12}px monospace`;ctx.textAlign='left';
-      ctx.fillText(rank+' '+e.name,GW/2+24,y+1);
-      ctx.fillStyle=isYou?'#ff8800':'#ff6688';ctx.font='11px monospace';
-      ctx.fillText(e.score.toLocaleString()+'  pts',GW/2+24,y+16);
-      ctx.fillStyle='#445566';ctx.font='10px sans-serif';ctx.textAlign='right';
-      ctx.fillText(e.date,GW-34,y+16);
+      ctx.fillStyle='#ffdc00';ctx.font='bold 12px monospace';ctx.textAlign='left';ctx.fillText(rank+' '+e.name,GW/2+24,y);
+      ctx.fillStyle='#ff6688';ctx.font='10px monospace';ctx.fillText(e.score.toLocaleString()+' pts',GW/2+24,y+13);
+      ctx.fillStyle='#445566';ctx.font='10px sans-serif';ctx.textAlign='right';ctx.fillText(e.date,GW-34,y+13);
     });
+  }else if(!globalStatsLoaded){
+    // Loading spinner
+    const sp=Date.now()*0.003;
+    ctx.strokeStyle='#ff44cc';ctx.lineWidth=3;
+    ctx.beginPath();ctx.arc(col2,190,18,sp,sp+Math.PI*1.5);ctx.stroke();
+    ctx.fillStyle='#445566';ctx.font='11px sans-serif';ctx.textAlign='center';ctx.fillText('Loading...',col2,225);
+  }else{
+    const list=globalLeaderboard.length>0?globalLeaderboard:overlordHoF.slice(0,8);
+    if(list.length===0){
+      ctx.fillStyle='#334455';ctx.font='13px sans-serif';ctx.textAlign='center';
+      ctx.fillText('No victors yet...',col2,175);ctx.font='11px sans-serif';
+      ctx.fillText('Defeat the Overlord to be first!',col2,195);
+    }else{
+      list.forEach((e,i)=>{
+        const y=145+i*42;
+        const isYou=e.name===playerCallsign;
+        ctx.fillStyle=isYou?rgba(90,50,0,0.75):rgba(15,28,50,0.75);
+        roundRect(GW/2+14,y-14,GW/2-44,34,6);ctx.fill();
+        ctx.strokeStyle=isYou?'#ffaa00':'#1e3050';ctx.lineWidth=isYou?2:1;
+        roundRect(GW/2+14,y-14,GW/2-44,34,6);ctx.stroke();
+        const rank=i===0?'👑':i===1?'🥈':i===2?'🥉':(i+1)+'.';
+        ctx.fillStyle=isYou?'#ffdc00':'#88aacc';
+        ctx.font=`bold ${isYou?13:12}px monospace`;ctx.textAlign='left';
+        ctx.fillText(rank+' '+e.name,GW/2+24,y+1);
+        ctx.fillStyle=isYou?'#ff8800':'#ff6688';ctx.font='11px monospace';
+        ctx.fillText(e.score.toLocaleString()+'  pts',GW/2+24,y+16);
+        ctx.fillStyle='#445566';ctx.font='10px sans-serif';ctx.textAlign='right';
+        ctx.fillText(e.date,GW-34,y+16);
+      });
+    }
   }
 }
 
@@ -2666,7 +2742,7 @@ function hitBtn(x,y){
 function handleBtn(key){
   if(!key)return;
   SND.uiClick();
-  if(key==='m_stats'){gameState='stats';return;}
+  if(key==='m_stats'){gameState='stats';globalStatsLoaded=false;fetchGlobalData();return;}
   if(key==='stats_back'){gameState='menu';return;}
   if(key==='m_settings'){gameState='settings';return;}
   if(key==='set_back'){rebindAction=null;wipeConfirm=false;gameState='menu';return;}
