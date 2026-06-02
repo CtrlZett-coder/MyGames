@@ -14,10 +14,38 @@
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:100%;height:100%;background:#000;overflow:hidden}
 canvas{display:block;touch-action:none;position:fixed;top:0;left:0}
+#auth-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.88);display:flex;align-items:center;justify-content:center;z-index:100;font-family:monospace;}
+#auth-box{background:#0a1628;border:2px solid #00c8ff;border-radius:12px;padding:28px 32px;width:310px;max-width:90vw;box-shadow:0 0 40px rgba(0,200,255,0.25);}
+#auth-box h2{color:#00c8ff;text-align:center;margin:0 0 4px;letter-spacing:3px;font-size:20px;}
+#auth-box p{color:#88ccff;text-align:center;margin:0 0 16px;font-size:12px;}
+#auth-err{color:#ff6666;text-align:center;min-height:16px;font-size:12px;margin-bottom:8px;}
+.auth-inp{width:100%;padding:10px 12px;margin-bottom:10px;background:#0d1f3a;border:1.5px solid #224466;border-radius:7px;color:#cce;font-family:monospace;font-size:14px;outline:none;box-sizing:border-box;}
+.auth-inp:focus{border-color:#00c8ff;}
+.auth-btn{width:100%;padding:11px;margin-bottom:8px;border:none;border-radius:7px;font-family:monospace;font-weight:bold;font-size:15px;cursor:pointer;letter-spacing:1px;}
+#auth-submit{background:#00a0cc;color:#fff;}
+#auth-submit:hover{background:#00c8ff;}
+#auth-submit:disabled{background:#224466;cursor:default;}
+#auth-toggle{background:transparent;color:#88ccff;border:1.5px solid #224466;font-size:12px;}
+#auth-toggle:hover{border-color:#00c8ff;color:#00c8ff;}
+#auth-guest{background:transparent;color:#446688;border:none;font-size:12px;margin-top:2px;cursor:pointer;width:100%;padding:6px;}
+#auth-guest:hover{color:#88aacc;}
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
+<div id="auth-overlay">
+  <div id="auth-box">
+    <h2>SPACE SHOOTER</h2>
+    <p id="auth-sub">Sign in to track your scores</p>
+    <div id="auth-err"></div>
+    <input class="auth-inp" id="auth-email" type="email" placeholder="Email" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('auth-pass').focus()">
+    <input class="auth-inp" id="auth-pass" type="password" placeholder="Password (min 6 chars)" autocomplete="current-password" onkeydown="if(event.key==='Enter'){const c=document.getElementById('auth-call');if(c.style.display!=='none')c.focus();else authSubmit();}">
+    <input class="auth-inp" id="auth-call" type="text" placeholder="Callsign (display name)" style="display:none" onkeydown="if(event.key==='Enter')authSubmit()">
+    <button class="auth-btn" id="auth-submit" onclick="authSubmit()">SIGN IN</button>
+    <button class="auth-btn" id="auth-toggle" onclick="authToggleMode()">Create account</button>
+    <button id="auth-guest" onclick="authGuest()">Play as guest</button>
+  </div>
+</div>
 <script>
 'use strict';
 let GW=900,GH=600;
@@ -69,6 +97,125 @@ async function _fbPost(p,v){return _fbReq(p,{method:'POST',headers:{'Content-Typ
 async function _fbInc(p){const c=await _fbGet(p)||0;await _fbPut(p,c+1);}
 async function _fbIncBy(p,n){if(n<=0)return;const c=await _fbGet(p)||0;await _fbPut(p,c+n);}
 
+// ── Firebase Auth ──────────────────────────────────────────────────────────────
+const FB_API_KEY='AIzaSyBOppZ8UZPXwVFpjDW9ghG2gIpLErZ8PbU';
+let authIdToken=localStorage.getItem('ss_auth_token')||'';
+let authUid=localStorage.getItem('ss_auth_uid')||'';
+let authEmail=localStorage.getItem('ss_auth_email')||'';
+let _authMode='signin';
+
+async function _fbAuthReq(endpoint,body){
+  try{
+    const r=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:${endpoint}?key=${FB_API_KEY}`,
+      {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    return r.json();
+  }catch(e){return{error:{message:'NETWORK_ERROR'}};}
+}
+async function _fbTokenRefresh(rt){
+  try{
+    const r=await fetch(`https://securetoken.googleapis.com/v1/token?key=${FB_API_KEY}`,
+      {method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+       body:`grant_type=refresh_token&refresh_token=${encodeURIComponent(rt)}`});
+    return r.json();
+  }catch(e){return{};}
+}
+function _saveAuth(d){
+  authIdToken=d.idToken||d.id_token||'';
+  authUid=d.localId||d.user_id||'';
+  authEmail=d.email||authEmail;
+  try{
+    localStorage.setItem('ss_auth_token',authIdToken);
+    localStorage.setItem('ss_auth_uid',authUid);
+    localStorage.setItem('ss_auth_email',authEmail);
+    const rt=d.refreshToken||d.refresh_token||'';
+    if(rt)localStorage.setItem('ss_auth_refresh',rt);
+  }catch(e){}
+}
+function _clearAuth(){
+  authIdToken='';authUid='';authEmail='';
+  try{['ss_auth_token','ss_auth_uid','ss_auth_email','ss_auth_refresh'].forEach(k=>localStorage.removeItem(k));}catch(e){}
+}
+async function _loadUserCallsign(){
+  if(!authUid||!_fbOK)return;
+  const cs=await _fbGet('users/'+authUid+'/callsign');
+  if(cs&&typeof cs==='string'){
+    playerCallsign=cs;
+    try{localStorage.setItem('ss_callsign',cs);}catch(e){}
+  }
+}
+async function _saveUserCallsign(cs){
+  if(!authUid||!_fbOK)return;
+  _fbPut('users/'+authUid+'/callsign',cs);
+}
+function _hideAuthOverlay(){
+  const el=document.getElementById('auth-overlay');
+  if(el)el.style.display='none';
+}
+function authToggleMode(){
+  _authMode=_authMode==='signin'?'signup':'signin';
+  const isUp=_authMode==='signup';
+  document.getElementById('auth-sub').textContent=isUp?'Create your account':'Sign in to track your scores';
+  document.getElementById('auth-submit').textContent=isUp?'SIGN UP':'SIGN IN';
+  document.getElementById('auth-toggle').textContent=isUp?'Already have an account? Sign in':'Create account';
+  document.getElementById('auth-call').style.display=isUp?'block':'none';
+  document.getElementById('auth-err').textContent='';
+}
+async function authSubmit(){
+  const email=document.getElementById('auth-email').value.trim();
+  const pass=document.getElementById('auth-pass').value;
+  const call=document.getElementById('auth-call').value.trim();
+  const errEl=document.getElementById('auth-err');
+  const btn=document.getElementById('auth-submit');
+  if(!email||!pass){errEl.textContent='Enter email and password';return;}
+  if(_authMode==='signup'&&!call){errEl.textContent='Enter a callsign';return;}
+  if(_authMode==='signup'&&(call.length<2||call.length>20)){errEl.textContent='Callsign: 2–20 characters';return;}
+  btn.disabled=true;btn.textContent=_authMode==='signup'?'Creating...':'Signing in...';
+  errEl.textContent='';
+  const endpoint=_authMode==='signup'?'signUp':'signInWithPassword';
+  const data=await _fbAuthReq(endpoint,{email,password:pass,returnSecureToken:true});
+  btn.disabled=false;btn.textContent=_authMode==='signup'?'SIGN UP':'SIGN IN';
+  if(data.error){
+    const MSG={
+      EMAIL_EXISTS:'Email already in use',
+      INVALID_LOGIN_CREDENTIALS:'Wrong email or password',
+      EMAIL_NOT_FOUND:'Email not found',
+      INVALID_PASSWORD:'Wrong password',
+      WEAK_PASSWORD__SHOULD_BE_AT_LEAST_6_CHARACTERS:'Password must be at least 6 characters',
+      TOO_MANY_ATTEMPTS_TRY_LATER:'Too many attempts, try later',
+      NETWORK_ERROR:'Network error, try again'
+    };
+    errEl.textContent=MSG[data.error.message]||data.error.message||'Error, try again';
+    return;
+  }
+  _saveAuth(data);
+  if(_authMode==='signup'){
+    const cs=call||'Pilot';
+    playerCallsign=cs;
+    try{localStorage.setItem('ss_callsign',cs);}catch(e){}
+    await _saveUserCallsign(cs);
+  }else{
+    await _loadUserCallsign();
+    if(!playerCallsign)playerCallsign=authEmail.split('@')[0]||'Pilot';
+  }
+  _hideAuthOverlay();
+}
+function authGuest(){_hideAuthOverlay();}
+
+// Silently restore session on page load
+(async()=>{
+  const rt=localStorage.getItem('ss_auth_refresh');
+  if(rt){
+    const d=await _fbTokenRefresh(rt);
+    if(d.id_token){
+      _saveAuth(d);
+      await _loadUserCallsign();
+      _hideAuthOverlay();
+      return;
+    }else{_clearAuth();}
+  }
+  // No session — overlay stays visible
+})();
+
 async function fetchGlobalData(){
   if(_globalFetching)return;_globalFetching=true;
   if(!_fbOK){globalStatsLoaded=true;_globalFetching=false;return;}
@@ -94,7 +241,7 @@ async function postGlobalEntry(name,sc,date){
   _fbPost('leaderboard',{name,score:sc,date});
   _fbInc('stats/overlords');
 }
-async function postArcadeScore(name,sc,date){if(!_fbOK||sc<=0)return;_fbPut('arcade_lb/'+deviceId,{name,score:sc,date,uid:deviceId});}
+async function postArcadeScore(name,sc,date){if(!_fbOK||sc<=0)return;const uid=authUid||deviceId;_fbPut('arcade_lb/'+uid,{name,score:sc,date,uid});}
 function globalIncrementPlays(){if(_fbOK)_fbInc('stats/plays');}
 function globalFlushKills(){if(_fbOK&&sessionKills>0){_fbIncBy('stats/kills',sessionKills);sessionKills=0;}}
 
@@ -2748,7 +2895,8 @@ function drawStats(){
       ctx.fillText(isArcTab?'Play arcade to be first!':'Defeat the Overlord first!',col2,listTop+60);
     }else{
       // Find player's index in full list
-      const playerIdx=list.findIndex(e=>e.uid===deviceId||e.name===playerCallsign);
+      const _myUid=authUid||deviceId;
+      const playerIdx=list.findIndex(e=>e.uid===_myUid||e.name===playerCallsign);
       const totalH=list.length*entH;
       _lbMaxScroll=Math.max(0,totalH-listH);
       _lbScrollY=Math.max(0,Math.min(_lbScrollY,_lbMaxScroll));
@@ -2760,7 +2908,7 @@ function drawStats(){
       list.forEach((e,i)=>{
         const ey=listTop+i*entH-_lbScrollY+entH/2;
         if(ey<listTop-entH||ey>listBot+entH)return;
-        const isYou=e.uid===deviceId||e.name===playerCallsign;
+        const isYou=e.uid===(authUid||deviceId)||e.name===playerCallsign;
         ctx.fillStyle=isYou?'rgba(180,100,0,0.85)':'rgba(15,28,50,0.75)';
         roundRect(rLbX,ey-12,rLbW,27,5);ctx.fill();
         ctx.strokeStyle=isYou?'#ffcc00':i<3?'#334466':'#1e3050';
