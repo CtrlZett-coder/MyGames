@@ -1530,9 +1530,9 @@ function drawLayout(){
   ctx.fillStyle=rgba(0,0,0,0.48);ctx.fillRect(0,0,GW,GH);
   ctx.fillStyle=AC;ctx.font='bold 18px sans-serif';ctx.textAlign='center';
   ctx.shadowColor=AC;ctx.shadowBlur=8;
-  ctx.fillText('РАСПОЛОЖЕНИЕ УПРАВЛЕНИЯ',GW/2,26);ctx.shadowBlur=0;
+  ctx.fillText('CONTROL LAYOUT',GW/2,26);ctx.shadowBlur=0;
   ctx.fillStyle='#556677';ctx.font='12px sans-serif';
-  ctx.fillText('Перемести • Потяни за край чтобы изменить размер',GW/2,44);
+  ctx.fillText('Drag to move • Pull edge to resize',GW/2,44);
   btnRects={};
   const jp=getJoyPos(),fr=getFireR(),fp=getFirePos();
   const jDrag=_layDrag==='joy'||_layDrag==='joy_resize';
@@ -1576,18 +1576,18 @@ function drawLayout(){
   ctx.strokeStyle=joyStatic?AC:'#446688';ctx.lineWidth=1.5;
   roundRect(jtX,jtY,jtW,jtH,8);ctx.stroke();
   ctx.fillStyle='#cce4ff';ctx.font='bold 13px sans-serif';ctx.textAlign='center';
-  ctx.fillText(joyStatic?'◉ СТАТИЧНЫЙ':'○ ПЛАВАЮЩИЙ',jp.x,jtY+jtH/2+5);
+  ctx.fillText(joyStatic?'◉ FIXED':'○ FLOATING',jp.x,jtY+jtH/2+5);
   // Bottom buttons
   btnRects['lay_done']={x:GW/2-70,y:GH-48,w:140,h:34};
   ctx.fillStyle=rgba(0,110,55,0.9);roundRect(GW/2-70,GH-48,140,34,10);ctx.fill();
   ctx.strokeStyle='#00cc66';ctx.lineWidth=2;roundRect(GW/2-70,GH-48,140,34,10);ctx.stroke();
   ctx.fillStyle='#fff';ctx.font='bold 15px sans-serif';ctx.textAlign='center';
-  ctx.fillText('✓ ГОТОВО',GW/2,GH-25);
+  ctx.fillText('✓ DONE',GW/2,GH-25);
   btnRects['lay_reset']={x:GW/2+85,y:GH-48,w:90,h:34};
   ctx.fillStyle=rgba(60,15,15,0.85);roundRect(GW/2+85,GH-48,90,34,8);ctx.fill();
   ctx.strokeStyle='#553333';ctx.lineWidth=1.5;roundRect(GW/2+85,GH-48,90,34,8);ctx.stroke();
   ctx.fillStyle='#ff9977';ctx.font='13px sans-serif';ctx.textAlign='center';
-  ctx.fillText('↺ СБРОС',GW/2+130,GH-25);
+  ctx.fillText('↺ RESET',GW/2+130,GH-25);
 }
 function _layInputDown(x,y){
   const jp=getJoyPos(),fp=getFirePos(),fr=getFireR();
@@ -1789,7 +1789,7 @@ function drawIntro(){
     ctx.globalAlpha=0.42+0.28*Math.sin(t*0.07);
     ctx.font='13px sans-serif';ctx.textAlign='center';
     ctx.fillStyle='#888888';
-    ctx.fillText('Нажми чтобы пропустить',GW/2,GH-16);
+    ctx.fillText('Tap to skip',GW/2,GH-16);
     ctx.globalAlpha=1;
   }
   // Fade overlays
@@ -1862,7 +1862,7 @@ function wipeProgressData(){
   try{['ss_unlocked','ss_arc_score','ss_arc_combo','ss_arc_lvl','ss_stat_games','ss_stat_kills','ss_stat_ol','ss_hof'].forEach(k=>localStorage.removeItem(k));}catch(e){}
   maxUnlocked=0;arcadeBestScore=0;arcadeBestCombo=0;arcadeBestLevel=0;
   statsGames=0;statsKills=0;statsOverlordWins=0;overlordHoF=[];
-  cheatMsg='✓ ПРОГРЕСС СБРОШЕН';cheatTimer=200;
+  cheatMsg='✓ PROGRESS RESET';cheatTimer=200;
 }
 function wipeSettingsData(){
   try{['ss_vol','ss_sfx','ss_keys','ss_joy','ss_joySt','ss_joyPX','ss_joyPY','ss_fireSz','ss_firePX','ss_firePY','ss_particles','ss_vibrate','ss_accent'].forEach(k=>localStorage.removeItem(k));}catch(e){}
@@ -1873,11 +1873,11 @@ function wipeSettingsData(){
   joyScale=1.0;applyJoyScale();
   joyStatic=false;_joyPX=0;_joyPY=0;_fireSz=1.0;_firePX=0;_firePY=0;
   particlesEnabled=true;vibrateEnabled=true;setAccent(0);
-  cheatMsg='✓ НАСТРОЙКИ СБРОШЕНЫ';cheatTimer=200;
+  cheatMsg='✓ SETTINGS RESET';cheatTimer=200;
 }
 function wipeAllData(){
   wipeProgressData();wipeSettingsData();
-  cheatMsg='✓ ВСЕ ДАННЫЕ СБРОШЕНЫ';cheatTimer=200;
+  cheatMsg='✓ ALL DATA RESET';cheatTimer=200;
 }
 let menuSel=0,lsCursor=0,btnRects={};
 let screenShake=0,flashAlpha=0,vigAlpha=0,enrageFlash=0,bossEnraged=false;
@@ -2151,11 +2151,11 @@ function triggerLevelComplete(){
 // ── Update ─────────────────────────────────────────────────────────────────────
 function update(){
   _updateMusic();
+  for(const s of stars)s.update();
+  for(const r of bgRocks)r.update();
   if(gameState==='intro'){updateIntro();return;}
-  if(gameState==='layout'){for(const s of stars)s.update();for(const r of bgRocks)r.update();return;}
+  if(gameState==='layout'){return;}
   if(gameState==='level_complete'){
-    for(const s of stars)s.update();
-    for(const r of bgRocks)r.update();
     lvCompleteTimer--;
     if(lvCompleteTimer<=0){
       lvIdx++;level=lvIdx+1;
@@ -2173,8 +2173,6 @@ function update(){
     return;
   }
   if(gameState!=='playing')return;
-  for(const s of stars)s.update();
-  for(const r of bgRocks)r.update();
   if(screenShake>0)screenShake*=0.82;
   if(flashAlpha>0)flashAlpha=Math.max(0,flashAlpha-15);
   if(enrageFlash>0)enrageFlash--;
@@ -2225,11 +2223,11 @@ function update(){
 
 // ── Background planets ─────────────────────────────────────────────────────────
 const _PLANETS=[
-  {x:GW*0.78,y:GH*0.28,r:120,vx:0.06,c0:'#2a4888',c1:'#0e1c3a',
+  {x:GW*0.78,y:GH*0.28,r:120,vx:0.22,c0:'#2a4888',c1:'#0e1c3a',
    bands:[[0,-28,0.88,12],[0,14,0.78,10],[0,48,0.60,8]]},
-  {x:GW*0.22,y:GH*0.78,r:48,vx:0.025,c0:'#884428',c1:'#100401',
+  {x:GW*0.22,y:GH*0.78,r:48,vx:0.10,c0:'#884428',c1:'#100401',
    bands:[[-6,-12,0.82,8],[4,14,0.72,6]]},
-  {x:GW*1.18,y:GH*0.16,r:72,vx:0.04,c0:'#226642',c1:'#020a05',
+  {x:GW*1.18,y:GH*0.16,r:72,vx:0.16,c0:'#226642',c1:'#020a05',
    bands:[[0,-18,0.84,10],[0,22,0.72,8]]},
 ];
 function drawPlanets(){
@@ -2465,7 +2463,7 @@ function drawSettings(){
   const _slY1=72,_slY2=116;
   // Music slider
   ctx.fillStyle='#aaaaaa';ctx.font='bold 13px sans-serif';ctx.textAlign='left';
-  ctx.fillText('🎵 МУЗЫКА',_slX,_slY1-4);
+  ctx.fillText('🎵 MUSIC',_slX,_slY1-4);
   ctx.fillStyle='#334455';ctx.font='13px monospace';ctx.textAlign='right';
   ctx.fillText(Math.round(masterVolume*100)+'%',_slX+_slW,_slY1-4);
   ctx.fillStyle='#1a2a3a';roundRect(_slX,_slY1,_slW,_slH,_slR);ctx.fill();
@@ -2478,7 +2476,7 @@ function drawSettings(){
   btnRects['set_vol_sl']={x:_slX-8,y:_slY1-6,w:_slW+16,h:_slH+12};
   // SFX slider
   ctx.fillStyle='#aaaaaa';ctx.font='bold 13px sans-serif';ctx.textAlign='left';
-  ctx.fillText('🔫 ЭФФЕКТЫ',_slX,_slY2-4);
+  ctx.fillText('🔫 EFFECTS',_slX,_slY2-4);
   ctx.fillStyle='#334455';ctx.font='13px monospace';ctx.textAlign='right';
   ctx.fillText(Math.round(sfxVolume*100)+'%',_slX+_slW,_slY2-4);
   ctx.fillStyle='#1a2a3a';roundRect(_slX,_slY2,_slW,_slH,_slR);ctx.fill();
@@ -2702,7 +2700,7 @@ function drawMenu(){
     ctx.fillStyle='#334455';ctx.font='13px sans-serif';ctx.textAlign='center';
     ctx.fillText('Phone Mode = show on-screen joystick',GW/2,GH-22);
     ctx.fillStyle='#2a3a45';ctx.font='12px sans-serif';
-    ctx.fillText('Удерживай DEL 3с — сбросить все данные',GW/2,GH-6);
+    ctx.fillText('Hold DEL 3s — reset all data',GW/2,GH-6);
   }
 }
 
