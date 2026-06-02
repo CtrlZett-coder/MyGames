@@ -29,6 +29,20 @@ canvas{display:block;touch-action:none;position:fixed;top:0;left:0}
 #auth-toggle:hover{border-color:#00c8ff;color:#00c8ff;}
 #auth-guest{background:transparent;color:#446688;border:none;font-size:12px;margin-top:2px;cursor:pointer;width:100%;padding:6px;}
 #auth-guest:hover{color:#88aacc;}
+#auth-forgot-link{color:#4488aa;font-size:11px;cursor:pointer;text-decoration:underline;float:right;margin:-4px 0 10px;}
+#auth-forgot-link:hover{color:#88ccff;}
+#auth-report-link{color:#334455;font-size:11px;cursor:pointer;text-decoration:underline;display:block;text-align:center;margin-top:10px;}
+#auth-report-link:hover{color:#6688aa;}
+#support-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.88);display:none;align-items:center;justify-content:center;z-index:102;font-family:monospace;}
+#support-box{background:#0a1628;border:2px solid #226644;border-radius:12px;padding:26px 30px;width:320px;max-width:92vw;box-shadow:0 0 40px rgba(0,200,100,0.2);}
+#support-box h2{color:#55cc88;text-align:center;margin:0 0 4px;letter-spacing:2px;font-size:18px;}
+#support-box>p{color:#88bbaa;text-align:center;margin:0 0 14px;font-size:12px;}
+#sup-err{color:#ff6666;text-align:center;min-height:16px;font-size:12px;margin-bottom:8px;}
+#sup-msg{height:88px;resize:none;line-height:1.45;}
+#sup-category{appearance:none;-webkit-appearance:none;}
+#sup-submit{background:#226644;color:#fff;}
+#sup-submit:hover{background:#33aa66;}
+#sup-submit:disabled{background:#224455;cursor:default;}
 </style>
 </head>
 <body>
@@ -42,6 +56,7 @@ canvas{display:block;touch-action:none;position:fixed;top:0;left:0}
     <div id="auth-form">
       <input class="auth-inp" id="auth-email" type="email" placeholder="Email" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('auth-pass').focus()">
       <input class="auth-inp" id="auth-pass" type="password" placeholder="Password (min 6 chars)" autocomplete="new-password" onkeydown="if(event.key==='Enter'){const cf=document.getElementById('auth-confirm');const cl=document.getElementById('auth-call');if(cf.style.display!=='none')cf.focus();else if(cl.style.display!=='none')cl.focus();else authSubmit();}">
+      <a id="auth-forgot-link" onclick="authShowForgot()">Forgot password?</a>
       <input class="auth-inp" id="auth-confirm" type="password" placeholder="Confirm password" style="display:none" onkeydown="if(event.key==='Enter'){const c=document.getElementById('auth-call');if(c.style.display!=='none')c.focus();else authSubmit();}">
       <input class="auth-inp" id="auth-call" type="text" placeholder="Callsign (display name)" style="display:none" onkeydown="if(event.key==='Enter')authSubmit()">
       <button class="auth-btn" id="auth-submit" onclick="authSubmit()">SIGN IN</button>
@@ -55,6 +70,39 @@ canvas{display:block;touch-action:none;position:fixed;top:0;left:0}
       <button class="auth-btn" id="auth-resend" onclick="authResend()" style="background:#00a0cc;color:#fff;margin-bottom:8px">Resend email</button>
       <button class="auth-btn" id="auth-verified-btn" onclick="authCheckVerified()" style="background:#226644;color:#fff;margin-bottom:8px">I've verified ✓</button>
       <button class="auth-btn" id="auth-back" onclick="authBackToSignin()" style="background:transparent;color:#88ccff;border:1.5px solid #224466;font-size:12px">Back to sign in</button>
+    </div>
+    <!-- Password reset screen -->
+    <div id="auth-reset-box" style="display:none">
+      <input class="auth-inp" id="auth-reset-email" type="email" placeholder="Your email address" onkeydown="if(event.key==='Enter')authSendReset()">
+      <div id="auth-reset-sent" style="display:none;color:#55cc88;font-size:12px;text-align:center;margin-bottom:10px">✓ Reset link sent! Check your inbox.</div>
+      <button class="auth-btn" id="auth-reset-btn" onclick="authSendReset()" style="background:#226644;color:#fff;margin-bottom:8px">Send reset link</button>
+      <button class="auth-btn" onclick="authBackFromForgot()" style="background:transparent;color:#88ccff;border:1.5px solid #224466;font-size:12px">Back to sign in</button>
+    </div>
+    <a id="auth-report-link" onclick="showSupport()">Having trouble? Report a problem</a>
+  </div>
+</div>
+<!-- Support / Bug report overlay -->
+<div id="support-overlay">
+  <div id="support-box">
+    <h2>SUPPORT</h2>
+    <p>Having trouble? Tell us what happened.</p>
+    <div id="sup-err"></div>
+    <div id="sup-form">
+      <input class="auth-inp" id="sup-email" type="email" placeholder="Your email">
+      <select class="auth-inp" id="sup-category">
+        <option value="bug">Bug in game</option>
+        <option value="auth">Sign in / registration issue</option>
+        <option value="feedback">Game feedback / suggestion</option>
+        <option value="other">Other</option>
+      </select>
+      <textarea class="auth-inp" id="sup-msg" placeholder="Describe the issue..." onkeydown="if(event.key==='Enter'&&event.ctrlKey)submitSupport()"></textarea>
+      <button class="auth-btn" id="sup-submit" onclick="submitSupport()">SEND</button>
+      <button class="auth-btn" onclick="hideSupport()" style="background:transparent;color:#88ccff;border:1.5px solid #224466;font-size:12px">Cancel</button>
+    </div>
+    <div id="sup-success" style="display:none;text-align:center">
+      <div style="font-size:40px;margin-bottom:12px">✅</div>
+      <p style="color:#55cc88;margin-bottom:18px;font-size:13px">Thank you! We'll look into it.</p>
+      <button class="auth-btn" onclick="hideSupport()" style="background:#226644;color:#fff">Close</button>
     </div>
   </div>
 </div>
@@ -183,11 +231,13 @@ function authBackToSignin(){
   _authMode='signin';
   document.getElementById('auth-form').style.display='block';
   document.getElementById('auth-verify-box').style.display='none';
+  document.getElementById('auth-reset-box').style.display='none';
   document.getElementById('auth-sub').textContent='Sign in to track your scores';
   document.getElementById('auth-submit').textContent='SIGN IN';
   document.getElementById('auth-toggle').textContent='Create account';
   document.getElementById('auth-confirm').style.display='none';
   document.getElementById('auth-call').style.display='none';
+  document.getElementById('auth-forgot-link').style.display='inline';
   document.getElementById('auth-err').textContent='';
   _pendingVerifyToken='';
 }
@@ -232,6 +282,7 @@ function authToggleMode(){
   document.getElementById('auth-toggle').textContent=isUp?'Already have an account? Sign in':'Create account';
   document.getElementById('auth-call').style.display=isUp?'block':'none';
   document.getElementById('auth-confirm').style.display=isUp?'block':'none';
+  document.getElementById('auth-forgot-link').style.display=isUp?'none':'inline';
   document.getElementById('auth-err').textContent='';
 }
 async function authSubmit(){
@@ -291,6 +342,73 @@ async function authSubmit(){
   }
 }
 function authGuest(){_hideAuthOverlay();}
+
+// ── Forgot password ────────────────────────────────────────────────────────────
+function authShowForgot(){
+  const email=document.getElementById('auth-email').value.trim();
+  document.getElementById('auth-form').style.display='none';
+  document.getElementById('auth-verify-box').style.display='none';
+  document.getElementById('auth-reset-box').style.display='block';
+  document.getElementById('auth-reset-email').value=email;
+  document.getElementById('auth-reset-sent').style.display='none';
+  document.getElementById('auth-reset-btn').disabled=false;
+  document.getElementById('auth-reset-btn').textContent='Send reset link';
+  document.getElementById('auth-sub').textContent='Reset your password';
+  document.getElementById('auth-err').textContent='';
+}
+function authBackFromForgot(){
+  document.getElementById('auth-reset-box').style.display='none';
+  document.getElementById('auth-form').style.display='block';
+  document.getElementById('auth-sub').textContent=_authMode==='signup'?'Create your account':'Sign in to track your scores';
+  document.getElementById('auth-err').textContent='';
+}
+async function authSendReset(){
+  const email=document.getElementById('auth-reset-email').value.trim();
+  const errEl=document.getElementById('auth-err');
+  if(!email){errEl.textContent='Enter your email address';return;}
+  const btn=document.getElementById('auth-reset-btn');
+  btn.disabled=true;btn.textContent='Sending...';
+  errEl.textContent='';
+  const r=await _fbAuthReq('sendOobCode',{requestType:'PASSWORD_RESET',email});
+  if(r&&r.error){
+    const MSG={EMAIL_NOT_FOUND:'No account with that email',TOO_MANY_ATTEMPTS_TRY_LATER:'Too many attempts, try later'};
+    errEl.textContent=MSG[r.error.message]||r.error.message||'Error, try again';
+    btn.disabled=false;btn.textContent='Send reset link';
+    return;
+  }
+  document.getElementById('auth-reset-sent').style.display='block';
+  btn.textContent='Send again';
+  setTimeout(()=>{btn.disabled=false;},4000);
+}
+
+// ── Support / Bug report ───────────────────────────────────────────────────────
+function showSupport(){
+  const ol=document.getElementById('support-overlay');
+  ol.style.display='flex';
+  if(authEmail)document.getElementById('sup-email').value=authEmail;
+  document.getElementById('sup-msg').value='';
+  document.getElementById('sup-err').textContent='';
+  document.getElementById('sup-success').style.display='none';
+  document.getElementById('sup-form').style.display='block';
+}
+function hideSupport(){
+  document.getElementById('support-overlay').style.display='none';
+}
+async function submitSupport(){
+  const email=document.getElementById('sup-email').value.trim();
+  const cat=document.getElementById('sup-category').value;
+  const msg=document.getElementById('sup-msg').value.trim();
+  const errEl=document.getElementById('sup-err');
+  if(!email){errEl.textContent='Enter your email so we can follow up';return;}
+  if(msg.length<10){errEl.textContent='Please describe the issue (at least 10 characters)';return;}
+  const btn=document.getElementById('sup-submit');
+  btn.disabled=true;btn.textContent='Sending...';
+  errEl.textContent='';
+  await _fbPost('support_tickets',{email,category:cat,message:msg,uid:authUid||null,date:new Date().toISOString()});
+  btn.disabled=false;btn.textContent='SEND';
+  document.getElementById('sup-form').style.display='none';
+  document.getElementById('sup-success').style.display='block';
+}
 
 // Silently restore session on page load
 (async()=>{
@@ -2858,6 +2976,10 @@ function drawMenu(){
     ctx.fillStyle='#2a3a45';ctx.font='12px sans-serif';
     ctx.fillText('Hold DEL 3s — reset all data',GW/2,GH-6);
   }
+  // Support link — bottom-left corner
+  btnRects['m_support']={x:6,y:GH-22,w:72,h:18};
+  ctx.fillStyle='#2a3a45';ctx.font='12px sans-serif';ctx.textAlign='left';
+  ctx.fillText('? Support',8,GH-8);
 }
 
 function drawLevelSelect(){
@@ -3192,6 +3314,7 @@ function handleBtn(key){
   }
   if(key==='m_arcade'){fadeToScreen(()=>{wipeConfirm=false;menuSel=0;startGame('arcade');});return;}
   if(key==='m_levels'){fadeToScreen(()=>{wipeConfirm=false;gameState='level_select';lsCursor=0;});return;}
+  if(key==='m_support'){showSupport();return;}
   if(key==='m_phone'){touchMode=!touchMode;return;}
   if(key==='ls_back'){fadeToScreen(()=>{gameState='menu';});return;}
   if(key.startsWith('ls_')){const i=parseInt(key.slice(3));if(i<=maxUnlocked){fadeToScreen(()=>startGame('levels',i));}return;}
