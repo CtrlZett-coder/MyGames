@@ -1879,12 +1879,17 @@ function _updatePauseScale(){
   }
 }
 // ── Ship entry animation on game start ────────────────────────────────────────
-let _shipEntry=false,_shipEntryTarget=0;
-function _startShipEntry(){_shipEntry=true;}
+let _shipEntry=false,_shipEntryT=0,_shipEntryFrom=0,_shipEntryTarget=0;
+const _SHIP_ENTRY_DUR=90; // frames ≈ 1.4s
+function _startShipEntry(){_shipEntry=true;_shipEntryT=0;_shipEntryFrom=player.x;}
 function _updateShipEntry(){
   if(!_shipEntry||!player)return;
-  if(player.x<_shipEntryTarget){player.x=Math.min(_shipEntryTarget,player.x+7);}
-  else{_shipEntry=false;}
+  _shipEntryT=Math.min(1,_shipEntryT+1/_SHIP_ENTRY_DUR);
+  // Cubic ease in/out
+  const t=_shipEntryT;
+  const e=t<0.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+  player.x=_shipEntryFrom+(_shipEntryTarget-_shipEntryFrom)*e;
+  if(_shipEntryT>=1)_shipEntry=false;
 }
 let stars=[],player=null,enemies=[],powerups=[],explosions=[],bosses=[];
 let lvIdx=0,maxUnlocked=loadProgress();
@@ -3214,11 +3219,11 @@ window.addEventListener('keydown',e=>{
   if(e.code==='Escape'){
     if(gameState==='playing'){gameState='paused';_openPause();}
     else if(gameState==='paused'){_closePause(()=>{gameState='playing';clearTouch();});}
-    else if(gameState==='level_select'){gameState='menu';}
-    else if(gameState==='settings'){gameState='menu';}
-    else if(gameState==='layout'){saveTouchLayout();gameState='settings';}
-    else if(gameState==='stats'){gameState='menu';}
-    else if(gameState==='game_over'||gameState==='victory'){gameState='menu';}
+    else if(gameState==='level_select'){fadeToScreen(()=>{gameState='menu';});}
+    else if(gameState==='settings'){fadeToScreen(()=>{rebindAction=null;wipeConfirm=false;gameState='menu';});}
+    else if(gameState==='layout'){fadeToScreen(()=>{saveTouchLayout();gameState='settings';});}
+    else if(gameState==='stats'){fadeToScreen(()=>{gameState='menu';});}
+    else if(gameState==='game_over'||gameState==='victory'){fadeToScreen(()=>{gameState='menu';});}
   }
   if(e.key&&e.key.length===1){
     cheatBuf=(cheatBuf+e.key).slice(-10);
