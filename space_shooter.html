@@ -2780,7 +2780,7 @@ function handleBtn(key){
   if(key==='ls_back'){gameState='menu';return;}
   if(key.startsWith('ls_')){const i=parseInt(key.slice(3));if(i<=maxUnlocked){startGame('levels',i);}return;}
   if(key==='p_resume'){gameState='playing';clearTouch();return;}
-  if(key==='p_pmenu'){gameState='menu';clearTouch();return;}
+  if(key==='p_pmenu'){globalFlushKills();gameState='menu';clearTouch();return;}
   if(key==='g_retry'){startGame(gameMode,gameMode==='levels'?lvIdx:0);return;}
   if(key==='g_gmenu'){gameState='menu';return;}
   if(key==='v_retry'){startGame(gameMode,gameMode==='levels'?0:0);return;}
