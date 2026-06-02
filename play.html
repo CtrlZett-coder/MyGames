@@ -1864,17 +1864,63 @@ function _updateTrans(){
     if(_transA<=0)_transDir=0;
   }
 }
+function _drawTransShip(sx,sy){
+  const x=Math.round(sx),y=Math.round(sy);
+  ctx.save();
+  ctx.translate(x,y);
+  // Speed trail lines (behind the ship, to the left)
+  for(let i=0;i<6;i++){
+    const len=rnd(25,90),yoff=rnd(-18,18),alpha=rnd(0.15,0.5);
+    ctx.globalAlpha=alpha;ctx.fillStyle='#66aaff';
+    ctx.fillRect(-28-len,yoff-1,len,1.5);
+  }
+  ctx.globalAlpha=1;
+  // Wings
+  ctx.fillStyle='#3264ff';
+  ctx.beginPath();ctx.moveTo(-22,-10);ctx.lineTo(-5,-26);ctx.lineTo(12,-6);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(-22,10);ctx.lineTo(-5,26);ctx.lineTo(12,6);ctx.closePath();ctx.fill();
+  // Body
+  ctx.fillStyle=AC;
+  ctx.beginPath();ctx.moveTo(-28,12);ctx.lineTo(32,0);ctx.lineTo(-28,-12);ctx.closePath();ctx.fill();
+  ctx.strokeStyle='#00a0d2';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(-28,12);ctx.lineTo(32,0);ctx.lineTo(-28,-12);ctx.closePath();ctx.stroke();
+  // Thruster flame
+  const fl=rnd(12,22);
+  ctx.shadowColor='#ff8c00';ctx.shadowBlur=20;
+  ctx.fillStyle='#ff8c00';
+  ctx.beginPath();ctx.moveTo(-28,-5);ctx.lineTo(-28-fl,0);ctx.lineTo(-28,5);ctx.closePath();ctx.fill();
+  ctx.shadowBlur=10;ctx.fillStyle='#ffdc00';
+  ctx.beginPath();ctx.moveTo(-28,-2);ctx.lineTo(-28-fl*0.5,0);ctx.lineTo(-28,2);ctx.closePath();ctx.fill();
+  ctx.shadowBlur=0;
+  // Cockpit
+  ctx.shadowColor=AC;ctx.shadowBlur=14;
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(12,0,6,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle=AC;ctx.beginPath();ctx.arc(12,0,4,0,Math.PI*2);ctx.fill();
+  ctx.shadowBlur=0;
+  ctx.restore();
+}
 function _drawTrans(){
   if(_transA<=0)return;
   const t=_transA*_transA*(3-2*_transA); // smoothstep
   ctx.fillStyle='#000208';
   if(_transDir===1){
-    // Wipe in: black curtain sweeps left → right
-    ctx.fillRect(0,0,GW*t,GH);
+    // Wipe in: curtain sweeps left→right, ship at leading edge
+    const w=GW*t;
+    ctx.fillRect(0,0,w,GH);
+    // Edge glow
+    const eg=ctx.createLinearGradient(w,0,w+18,0);
+    eg.addColorStop(0,'rgba(100,200,255,0.18)');eg.addColorStop(1,'rgba(100,200,255,0)');
+    ctx.fillStyle=eg;ctx.fillRect(w,0,18,GH);
+    _drawTransShip(w,GH/2);
   }else{
-    // Wipe out: curtain recedes left → right
+    // Wipe out: curtain recedes left→right, ship at left edge
     const x=GW*(1-t);
     ctx.fillRect(x,0,GW-x,GH);
+    // Edge glow
+    const eg=ctx.createLinearGradient(x-18,0,x,0);
+    eg.addColorStop(0,'rgba(100,200,255,0)');eg.addColorStop(1,'rgba(100,200,255,0.18)');
+    ctx.fillStyle=eg;ctx.fillRect(x-18,0,18,GH);
+    _drawTransShip(x,GH/2);
   }
 }
 let stars=[],player=null,enemies=[],powerups=[],explosions=[],bosses=[];
