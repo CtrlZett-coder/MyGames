@@ -1848,30 +1848,35 @@ function recordOverlordVictory(){
   postGlobalEntry(playerCallsign,score,dateStr);
 }
 // ── Screen transition ──────────────────────────────────────────────────────────
-let _transA=0,_transDir=0,_transFn=null;
-const _TRANS_RATE=1/16; // 16 frames per half → ~0.5s total at 64fps
+let _transA=0,_transDir=0,_transFn=null,_transTick=0,_transFlash=0;
+const _TRANS_RATE=1/16;
 function transitionTo(fn){
   if(_transDir!==0)return;
-  _transFn=fn;_transDir=1;
+  _transFn=fn;_transDir=1;_transTick=0;
 }
 function _updateTrans(){
+  if(_transFlash>0)_transFlash=Math.max(0,_transFlash-0.18);
   if(!_transDir)return;
+  _transTick++;
   if(_transDir===1){
     _transA=Math.min(1,_transA+_TRANS_RATE);
-    if(_transA>=1){if(_transFn){_transFn();_transFn=null;}_transDir=-1;}
+    if(_transA>=1){if(_transFn){_transFn();_transFn=null;}_transFlash=1;_transDir=-1;}
   }else{
     _transA=Math.max(0,_transA-_TRANS_RATE);
-    if(_transA<=0)_transDir=0;
+    if(_transA<=0){_transDir=0;_transTick=0;}
   }
 }
 function _drawTransShip(sx,sy){
-  const x=Math.round(sx),y=Math.round(sy);
-  ctx.save();
-  ctx.translate(x,y);
-  // Speed trail lines (behind the ship, to the left)
-  for(let i=0;i<6;i++){
-    const len=rnd(25,90),yoff=rnd(-18,18),alpha=rnd(0.15,0.5);
-    ctx.globalAlpha=alpha;ctx.fillStyle='#66aaff';
+  ctx.save();ctx.translate(Math.round(sx),Math.round(sy));
+  // Dark radial shadow so ship stands out from space background
+  const sh=ctx.createRadialGradient(0,0,0,0,0,85);
+  sh.addColorStop(0,'rgba(0,0,12,0.75)');sh.addColorStop(1,'rgba(0,0,12,0)');
+  ctx.fillStyle=sh;ctx.beginPath();ctx.ellipse(0,0,85,52,0,0,Math.PI*2);ctx.fill();
+  ctx.scale(1.3,1.3);
+  // Speed trail
+  for(let i=0;i<7;i++){
+    const len=rnd(30,110),yoff=rnd(-24,24),al=rnd(0.15,0.5);
+    ctx.globalAlpha=al;ctx.fillStyle='#88ccff';
     ctx.fillRect(-28-len,yoff-1,len,1.5);
   }
   ctx.globalAlpha=1;
@@ -1882,45 +1887,41 @@ function _drawTransShip(sx,sy){
   // Body
   ctx.fillStyle=AC;
   ctx.beginPath();ctx.moveTo(-28,12);ctx.lineTo(32,0);ctx.lineTo(-28,-12);ctx.closePath();ctx.fill();
-  ctx.strokeStyle='#00a0d2';ctx.lineWidth=1;
+  // Bright outline
+  ctx.strokeStyle='rgba(180,240,255,0.95)';ctx.lineWidth=2;
   ctx.beginPath();ctx.moveTo(-28,12);ctx.lineTo(32,0);ctx.lineTo(-28,-12);ctx.closePath();ctx.stroke();
-  // Thruster flame
-  const fl=rnd(12,22);
-  ctx.shadowColor='#ff8c00';ctx.shadowBlur=20;
+  // Thruster
+  const fl=rnd(14,26);
+  ctx.shadowColor='#ff8c00';ctx.shadowBlur=26;
   ctx.fillStyle='#ff8c00';
   ctx.beginPath();ctx.moveTo(-28,-5);ctx.lineTo(-28-fl,0);ctx.lineTo(-28,5);ctx.closePath();ctx.fill();
-  ctx.shadowBlur=10;ctx.fillStyle='#ffdc00';
+  ctx.shadowBlur=12;ctx.fillStyle='#ffdc00';
   ctx.beginPath();ctx.moveTo(-28,-2);ctx.lineTo(-28-fl*0.5,0);ctx.lineTo(-28,2);ctx.closePath();ctx.fill();
   ctx.shadowBlur=0;
   // Cockpit
-  ctx.shadowColor=AC;ctx.shadowBlur=14;
+  ctx.shadowColor='#00e8ff';ctx.shadowBlur=18;
   ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(12,0,6,0,Math.PI*2);ctx.fill();
   ctx.fillStyle=AC;ctx.beginPath();ctx.arc(12,0,4,0,Math.PI*2);ctx.fill();
   ctx.shadowBlur=0;
   ctx.restore();
 }
 function _drawTrans(){
-  if(_transA<=0)return;
-  const t=_transA*_transA*(3-2*_transA); // smoothstep
-  ctx.fillStyle='#000208';
-  if(_transDir===1){
-    // Wipe in: curtain sweeps left→right, ship at leading edge
-    const w=GW*t;
-    ctx.fillRect(0,0,w,GH);
-    // Edge glow
-    const eg=ctx.createLinearGradient(w,0,w+18,0);
-    eg.addColorStop(0,'rgba(100,200,255,0.18)');eg.addColorStop(1,'rgba(100,200,255,0)');
-    ctx.fillStyle=eg;ctx.fillRect(w,0,18,GH);
-    _drawTransShip(w,GH/2);
-  }else{
-    // Wipe out: curtain recedes left→right, ship at left edge
-    const x=GW*(1-t);
-    ctx.fillRect(x,0,GW-x,GH);
-    // Edge glow
-    const eg=ctx.createLinearGradient(x-18,0,x,0);
-    eg.addColorStop(0,'rgba(100,200,255,0)');eg.addColorStop(1,'rgba(100,200,255,0.18)');
-    ctx.fillStyle=eg;ctx.fillRect(x-18,0,18,GH);
-    _drawTransShip(x,GH/2);
+  if(_transDir===0&&_transFlash<=0)return;
+  // Ship flies linearly across the full duration
+  const totalFrames=32;
+  const p=Math.min(1,_transTick/totalFrames);
+  const shipX=-70+(GW+140)*p;
+  const shipY=GH/2+Math.sin(p*Math.PI*1.5)*18;
+  _drawTransShip(shipX,shipY);
+  // Warp burst flash at the midpoint (state switch)
+  if(_transFlash>0){
+    const a=_transFlash;
+    const r=Math.max(1,(1-a)*GW*0.8);
+    const g=ctx.createRadialGradient(shipX,shipY,0,shipX,shipY,r);
+    g.addColorStop(0,`rgba(200,240,255,${a*0.85})`);
+    g.addColorStop(0.25,`rgba(80,180,255,${a*0.45})`);
+    g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g;ctx.fillRect(0,0,GW,GH);
   }
 }
 let stars=[],player=null,enemies=[],powerups=[],explosions=[],bosses=[];
