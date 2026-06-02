@@ -1604,7 +1604,7 @@ function _layInputDown(x,y){
   }
   const k=hitBtn(x,y);
   if(k==='lay_joy_mode'){joyStatic=!joyStatic;SND.uiClick();}
-  else if(k==='lay_done'){saveTouchLayout();gameState='settings';SND.uiClick();}
+  else if(k==='lay_done'){saveTouchLayout();SND.uiClick();transitionTo(()=>{gameState='settings';});}
   else if(k==='lay_reset'){resetTouchLayout();applyJoyScale();SND.uiClick();}
 }
 function _layInputMove(x,y){
@@ -1846,6 +1846,29 @@ function recordOverlordVictory(){
   overlordHoF.unshift(entry);if(overlordHoF.length>10)overlordHoF.pop();
   try{localStorage.setItem('ss_hof',JSON.stringify(overlordHoF));}catch(e){}
   postGlobalEntry(playerCallsign,score,dateStr);
+}
+// ── Screen transition ──────────────────────────────────────────────────────────
+let _transA=0,_transDir=0,_transFn=null;
+const _TRANS_RATE=1/16; // 16 frames per half → ~0.5s total at 64fps
+function transitionTo(fn){
+  if(_transDir!==0)return;
+  _transFn=fn;_transDir=1;
+}
+function _updateTrans(){
+  if(!_transDir)return;
+  if(_transDir===1){
+    _transA=Math.min(1,_transA+_TRANS_RATE);
+    if(_transA>=1){if(_transFn){_transFn();_transFn=null;}_transDir=-1;}
+  }else{
+    _transA=Math.max(0,_transA-_TRANS_RATE);
+    if(_transA<=0)_transDir=0;
+  }
+}
+function _drawTrans(){
+  if(_transA<=0)return;
+  const t=_transA*_transA*(3-2*_transA); // smoothstep
+  ctx.fillStyle=`rgba(0,2,8,${t})`;
+  ctx.fillRect(0,0,GW,GH);
 }
 let stars=[],player=null,enemies=[],powerups=[],explosions=[],bosses=[];
 let lvIdx=0,maxUnlocked=loadProgress();
@@ -2150,6 +2173,7 @@ function triggerLevelComplete(){
 
 // ── Update ─────────────────────────────────────────────────────────────────────
 function update(){
+  _updateTrans();
   _updateMusic();
   for(const s of stars)s.update();
   for(const r of bgRocks)r.update();
@@ -2319,6 +2343,7 @@ function draw(){
   else if(gameState==='victory'){drawVictory();}
   else if(gameState==='level_complete'){drawLevelComplete();}
   drawCheatMsg();
+  _drawTrans();
 }
 
 function drawVignette(){
@@ -2992,13 +3017,13 @@ function handleBtn(key){
     playerCallsign=localStorage.getItem('ss_callsign')||'';
     return;
   }
-  if(key==='m_stats'){gameState='stats';globalStatsLoaded=false;_lbScrollY=0;fetchGlobalData();return;}
-  if(key==='stats_back'){gameState='menu';return;}
+  if(key==='m_stats'){transitionTo(()=>{gameState='stats';globalStatsLoaded=false;_lbScrollY=0;fetchGlobalData();});return;}
+  if(key==='stats_back'){transitionTo(()=>{gameState='menu';});return;}
   if(key==='stats_tab_arcade'){statsLeaderboardTab='arcade';_lbScrollY=0;return;}
   if(key==='stats_tab_overlord'){statsLeaderboardTab='overlord';_lbScrollY=0;return;}
-  if(key==='m_settings'){gameState='settings';return;}
-  if(key==='set_back'){rebindAction=null;wipeConfirm=false;gameState='menu';return;}
-  if(key==='set_layout'){gameState='layout';_layDrag=null;return;}
+  if(key==='m_settings'){transitionTo(()=>{gameState='settings';});return;}
+  if(key==='set_back'){transitionTo(()=>{rebindAction=null;wipeConfirm=false;gameState='menu';});return;}
+  if(key==='set_layout'){transitionTo(()=>{gameState='layout';_layDrag=null;});return;}
   if(key==='set_part_on'){particlesEnabled=true;saveGameSettings();return;}
   if(key==='set_part_off'){particlesEnabled=false;saveGameSettings();return;}
   if(key==='set_vib_on'){vibrateEnabled=true;saveGameSettings();return;}
@@ -3026,17 +3051,17 @@ function handleBtn(key){
     }
     return;
   }
-  if(key==='m_arcade'){wipeConfirm=false;menuSel=0;startGame('arcade');return;}
-  if(key==='m_levels'){wipeConfirm=false;gameState='level_select';lsCursor=0;return;}
+  if(key==='m_arcade'){transitionTo(()=>{wipeConfirm=false;menuSel=0;startGame('arcade');});return;}
+  if(key==='m_levels'){transitionTo(()=>{wipeConfirm=false;gameState='level_select';lsCursor=0;});return;}
   if(key==='m_phone'){touchMode=!touchMode;return;}
-  if(key==='ls_back'){gameState='menu';return;}
-  if(key.startsWith('ls_')){const i=parseInt(key.slice(3));if(i<=maxUnlocked){startGame('levels',i);}return;}
+  if(key==='ls_back'){transitionTo(()=>{gameState='menu';});return;}
+  if(key.startsWith('ls_')){const i=parseInt(key.slice(3));if(i<=maxUnlocked){transitionTo(()=>startGame('levels',i));}return;}
   if(key==='p_resume'){gameState='playing';clearTouch();return;}
-  if(key==='p_pmenu'){globalFlushKills();gameState='menu';clearTouch();return;}
-  if(key==='g_retry'){startGame(gameMode,gameMode==='levels'?lvIdx:0);return;}
-  if(key==='g_gmenu'){gameState='menu';return;}
-  if(key==='v_retry'){startGame(gameMode,gameMode==='levels'?0:0);return;}
-  if(key==='v_vmenu'){gameState='menu';return;}
+  if(key==='p_pmenu'){transitionTo(()=>{globalFlushKills();gameState='menu';clearTouch();});return;}
+  if(key==='g_retry'){transitionTo(()=>{startGame(gameMode,gameMode==='levels'?lvIdx:0);});return;}
+  if(key==='g_gmenu'){transitionTo(()=>{gameState='menu';});return;}
+  if(key==='v_retry'){transitionTo(()=>{startGame(gameMode,0);});return;}
+  if(key==='v_vmenu'){transitionTo(()=>{gameState='menu';});return;}
 }
 
 // ── Canvas pos ────────────────────────────────────────────────────────────────
