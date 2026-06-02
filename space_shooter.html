@@ -38,12 +38,24 @@ canvas{display:block;touch-action:none;position:fixed;top:0;left:0}
     <h2>SPACE SHOOTER</h2>
     <p id="auth-sub">Sign in to track your scores</p>
     <div id="auth-err"></div>
-    <input class="auth-inp" id="auth-email" type="email" placeholder="Email" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('auth-pass').focus()">
-    <input class="auth-inp" id="auth-pass" type="password" placeholder="Password (min 6 chars)" autocomplete="current-password" onkeydown="if(event.key==='Enter'){const c=document.getElementById('auth-call');if(c.style.display!=='none')c.focus();else authSubmit();}">
-    <input class="auth-inp" id="auth-call" type="text" placeholder="Callsign (display name)" style="display:none" onkeydown="if(event.key==='Enter')authSubmit()">
-    <button class="auth-btn" id="auth-submit" onclick="authSubmit()">SIGN IN</button>
-    <button class="auth-btn" id="auth-toggle" onclick="authToggleMode()">Create account</button>
-    <button id="auth-guest" onclick="authGuest()">Play as guest</button>
+    <!-- Sign in / Sign up form -->
+    <div id="auth-form">
+      <input class="auth-inp" id="auth-email" type="email" placeholder="Email" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('auth-pass').focus()">
+      <input class="auth-inp" id="auth-pass" type="password" placeholder="Password (min 6 chars)" autocomplete="new-password" onkeydown="if(event.key==='Enter'){const cf=document.getElementById('auth-confirm');const cl=document.getElementById('auth-call');if(cf.style.display!=='none')cf.focus();else if(cl.style.display!=='none')cl.focus();else authSubmit();}">
+      <input class="auth-inp" id="auth-confirm" type="password" placeholder="Confirm password" style="display:none" onkeydown="if(event.key==='Enter'){const c=document.getElementById('auth-call');if(c.style.display!=='none')c.focus();else authSubmit();}">
+      <input class="auth-inp" id="auth-call" type="text" placeholder="Callsign (display name)" style="display:none" onkeydown="if(event.key==='Enter')authSubmit()">
+      <button class="auth-btn" id="auth-submit" onclick="authSubmit()">SIGN IN</button>
+      <button class="auth-btn" id="auth-toggle" onclick="authToggleMode()">Create account</button>
+      <button id="auth-guest" onclick="authGuest()">Play as guest</button>
+    </div>
+    <!-- Email verification screen -->
+    <div id="auth-verify-box" style="display:none;text-align:center">
+      <div style="font-size:42px;margin-bottom:12px">📧</div>
+      <p id="auth-verify-msg" style="color:#88ccff;font-size:13px;margin-bottom:18px;line-height:1.6"></p>
+      <button class="auth-btn" id="auth-resend" onclick="authResend()" style="background:#00a0cc;color:#fff;margin-bottom:8px">Resend email</button>
+      <button class="auth-btn" id="auth-verified-btn" onclick="authCheckVerified()" style="background:#226644;color:#fff;margin-bottom:8px">I've verified ✓</button>
+      <button class="auth-btn" id="auth-back" onclick="authBackToSignin()" style="background:transparent;color:#88ccff;border:1.5px solid #224466;font-size:12px">Back to sign in</button>
+    </div>
   </div>
 </div>
 <script>
@@ -151,24 +163,90 @@ function _hideAuthOverlay(){
   const el=document.getElementById('auth-overlay');
   if(el)el.style.display='none';
 }
+let _pendingVerifyToken='',_pendingVerifyEmail='',_pendingCallsign='';
+async function _sendVerificationEmail(idToken){
+  return _fbAuthReq('sendOobCode',{requestType:'VERIFY_EMAIL',idToken});
+}
+async function _isEmailVerified(idToken){
+  const r=await _fbAuthReq('lookup',{idToken});
+  return r.users?.[0]?.emailVerified||false;
+}
+function _showVerifyScreen(email){
+  document.getElementById('auth-form').style.display='none';
+  document.getElementById('auth-verify-box').style.display='block';
+  document.getElementById('auth-sub').textContent='Verify your email';
+  document.getElementById('auth-err').textContent='';
+  document.getElementById('auth-verify-msg').textContent=
+    `A verification link was sent to:\n${email}\n\nClick the link in the email, then press "I've verified ✓".`;
+}
+function authBackToSignin(){
+  _authMode='signin';
+  document.getElementById('auth-form').style.display='block';
+  document.getElementById('auth-verify-box').style.display='none';
+  document.getElementById('auth-sub').textContent='Sign in to track your scores';
+  document.getElementById('auth-submit').textContent='SIGN IN';
+  document.getElementById('auth-toggle').textContent='Create account';
+  document.getElementById('auth-confirm').style.display='none';
+  document.getElementById('auth-call').style.display='none';
+  document.getElementById('auth-err').textContent='';
+  _pendingVerifyToken='';
+}
+async function authResend(){
+  if(!_pendingVerifyToken)return;
+  const btn=document.getElementById('auth-resend');
+  btn.disabled=true;btn.textContent='Sending...';
+  await _sendVerificationEmail(_pendingVerifyToken);
+  btn.textContent='✓ Sent!';
+  setTimeout(()=>{btn.disabled=false;btn.textContent='Resend email';},3000);
+}
+async function authCheckVerified(){
+  if(!_pendingVerifyToken)return;
+  const btn=document.getElementById('auth-verified-btn');
+  btn.disabled=true;btn.textContent='Checking...';
+  const verified=await _isEmailVerified(_pendingVerifyToken);
+  if(verified){
+    // Save auth and proceed
+    const tempData={idToken:_pendingVerifyToken,localId:authUid,email:_pendingVerifyEmail};
+    _saveAuth(tempData);
+    if(_pendingCallsign){
+      playerCallsign=_pendingCallsign;
+      try{localStorage.setItem('ss_callsign',_pendingCallsign);}catch(e){}
+      await _saveUserCallsign(_pendingCallsign);
+      _pendingCallsign='';
+    }else{
+      await _loadUserCallsign();
+      if(!playerCallsign)playerCallsign=_pendingVerifyEmail.split('@')[0]||'Pilot';
+    }
+    _hideAuthOverlay();
+  }else{
+    btn.disabled=false;btn.textContent='I\'ve verified ✓';
+    document.getElementById('auth-err').textContent='Email not yet verified. Please click the link in your inbox.';
+  }
+}
 function authToggleMode(){
+  if(_authMode==='verify')return;
   _authMode=_authMode==='signin'?'signup':'signin';
   const isUp=_authMode==='signup';
   document.getElementById('auth-sub').textContent=isUp?'Create your account':'Sign in to track your scores';
   document.getElementById('auth-submit').textContent=isUp?'SIGN UP':'SIGN IN';
   document.getElementById('auth-toggle').textContent=isUp?'Already have an account? Sign in':'Create account';
   document.getElementById('auth-call').style.display=isUp?'block':'none';
+  document.getElementById('auth-confirm').style.display=isUp?'block':'none';
   document.getElementById('auth-err').textContent='';
 }
 async function authSubmit(){
   const email=document.getElementById('auth-email').value.trim();
   const pass=document.getElementById('auth-pass').value;
+  const confirm=document.getElementById('auth-confirm').value;
   const call=document.getElementById('auth-call').value.trim();
   const errEl=document.getElementById('auth-err');
   const btn=document.getElementById('auth-submit');
   if(!email||!pass){errEl.textContent='Enter email and password';return;}
-  if(_authMode==='signup'&&!call){errEl.textContent='Enter a callsign';return;}
-  if(_authMode==='signup'&&(call.length<2||call.length>20)){errEl.textContent='Callsign: 2–20 characters';return;}
+  if(_authMode==='signup'){
+    if(!call){errEl.textContent='Enter a callsign';return;}
+    if(call.length<2||call.length>20){errEl.textContent='Callsign: 2–20 characters';return;}
+    if(pass!==confirm){errEl.textContent='Passwords do not match';return;}
+  }
   btn.disabled=true;btn.textContent=_authMode==='signup'?'Creating...':'Signing in...';
   errEl.textContent='';
   const endpoint=_authMode==='signup'?'signUp':'signInWithPassword';
@@ -187,17 +265,30 @@ async function authSubmit(){
     errEl.textContent=MSG[data.error.message]||data.error.message||'Error, try again';
     return;
   }
-  _saveAuth(data);
   if(_authMode==='signup'){
-    const cs=call||'Pilot';
-    playerCallsign=cs;
-    try{localStorage.setItem('ss_callsign',cs);}catch(e){}
-    await _saveUserCallsign(cs);
+    // Save token and send verification email
+    _pendingVerifyToken=data.idToken;
+    _pendingVerifyEmail=email;
+    _pendingCallsign=call||'Pilot';
+    _saveAuth(data); // save uid so we can write callsign later
+    await _sendVerificationEmail(data.idToken);
+    _showVerifyScreen(email);
   }else{
+    // Sign in — check email verified
+    if(!data.emailVerified){
+      _pendingVerifyToken=data.idToken;
+      _pendingVerifyEmail=email;
+      _pendingCallsign='';
+      _saveAuth(data);
+      await _sendVerificationEmail(data.idToken);
+      _showVerifyScreen(email);
+      return;
+    }
+    _saveAuth(data);
     await _loadUserCallsign();
     if(!playerCallsign)playerCallsign=authEmail.split('@')[0]||'Pilot';
+    _hideAuthOverlay();
   }
-  _hideAuthOverlay();
 }
 function authGuest(){_hideAuthOverlay();}
 
