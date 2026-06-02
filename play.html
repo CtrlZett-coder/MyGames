@@ -1229,7 +1229,7 @@ class FinalBoss{
         SND.boom();
       }
       if(t%12===0&&t<160)screenShake=Math.min(20,t*0.14+4);
-      if(t>=220){this.dead=true;recordOverlordVictory();gameState='victory';SND.victory();}
+      if(t>=220){this.dead=true;recordOverlordVictory();gameState='victory';_uiFade=0;_uiDir=1;SND.victory();}
       this.bullets=this.bullets.filter(b=>{b.update();return !b.dead;});
       return;
     }
@@ -1604,7 +1604,7 @@ function _layInputDown(x,y){
   }
   const k=hitBtn(x,y);
   if(k==='lay_joy_mode'){joyStatic=!joyStatic;SND.uiClick();}
-  else if(k==='lay_done'){saveTouchLayout();SND.uiClick();transitionTo(()=>{gameState='settings';});}
+  else if(k==='lay_done'){saveTouchLayout();SND.uiClick();fadeToScreen(()=>{gameState='settings';});}
   else if(k==='lay_reset'){resetTouchLayout();applyJoyScale();SND.uiClick();}
 }
 function _layInputMove(x,y){
@@ -1848,81 +1848,43 @@ function recordOverlordVictory(){
   postGlobalEntry(playerCallsign,score,dateStr);
 }
 // ── Screen transition ──────────────────────────────────────────────────────────
-let _transA=0,_transDir=0,_transFn=null,_transTick=0,_transFlash=0;
-const _TRANS_RATE=1/16;
-function transitionTo(fn){
-  if(_transDir!==0)return;
-  _transFn=fn;_transDir=1;_transTick=0;
+// ── Screen transitions ─────────────────────────────────────────────────────────
+let _uiFade=1,_uiDir=0,_uiFadeFn=null;
+const _UI_FADE_SPD=0.09;
+function fadeToScreen(fn){
+  if(_uiDir!==0)return;
+  _uiFadeFn=fn;_uiDir=-1;
 }
-function _updateTrans(){
-  if(_transFlash>0)_transFlash=Math.max(0,_transFlash-0.18);
-  if(!_transDir)return;
-  _transTick++;
-  if(_transDir===1){
-    _transA=Math.min(1,_transA+_TRANS_RATE);
-    if(_transA>=1){if(_transFn){_transFn();_transFn=null;}_transFlash=1;_transDir=-1;}
-  }else{
-    _transA=Math.max(0,_transA-_TRANS_RATE);
-    if(_transA<=0){_transDir=0;_transTick=0;}
+function _updateUIFade(){
+  if(_uiDir===-1){
+    _uiFade=Math.max(0,_uiFade-_UI_FADE_SPD);
+    if(_uiFade<=0){if(_uiFadeFn){_uiFadeFn();_uiFadeFn=null;}_uiDir=1;}
+  }else if(_uiDir===1){
+    _uiFade=Math.min(1,_uiFade+_UI_FADE_SPD);
+    if(_uiFade>=1)_uiDir=0;
   }
 }
-function _drawTransShip(sx,sy){
-  ctx.save();ctx.translate(Math.round(sx),Math.round(sy));
-  // Dark radial shadow so ship stands out from space background
-  const sh=ctx.createRadialGradient(0,0,0,0,0,85);
-  sh.addColorStop(0,'rgba(0,0,12,0.75)');sh.addColorStop(1,'rgba(0,0,12,0)');
-  ctx.fillStyle=sh;ctx.beginPath();ctx.ellipse(0,0,85,52,0,0,Math.PI*2);ctx.fill();
-  ctx.scale(1.3,1.3);
-  // Speed trail
-  for(let i=0;i<7;i++){
-    const len=rnd(30,110),yoff=rnd(-24,24),al=rnd(0.15,0.5);
-    ctx.globalAlpha=al;ctx.fillStyle='#88ccff';
-    ctx.fillRect(-28-len,yoff-1,len,1.5);
+// ── Pause pop animation ────────────────────────────────────────────────────────
+let _pauseScale=0,_pauseScaleDir=0,_pauseCloseFn=null;
+const _PAUSE_SCALE_SPD=0.12;
+function _openPause(){_pauseScale=0;_pauseScaleDir=1;}
+function _closePause(fn){_pauseScaleDir=-1;_pauseCloseFn=fn||null;}
+function _updatePauseScale(){
+  if(_pauseScaleDir===1){
+    _pauseScale=Math.min(1,_pauseScale+_PAUSE_SCALE_SPD);
+    if(_pauseScale>=1)_pauseScaleDir=0;
+  }else if(_pauseScaleDir===-1){
+    _pauseScale=Math.max(0,_pauseScale-_PAUSE_SCALE_SPD);
+    if(_pauseScale<=0){_pauseScaleDir=0;if(_pauseCloseFn){_pauseCloseFn();_pauseCloseFn=null;}}
   }
-  ctx.globalAlpha=1;
-  // Wings
-  ctx.fillStyle='#3264ff';
-  ctx.beginPath();ctx.moveTo(-22,-10);ctx.lineTo(-5,-26);ctx.lineTo(12,-6);ctx.closePath();ctx.fill();
-  ctx.beginPath();ctx.moveTo(-22,10);ctx.lineTo(-5,26);ctx.lineTo(12,6);ctx.closePath();ctx.fill();
-  // Body
-  ctx.fillStyle=AC;
-  ctx.beginPath();ctx.moveTo(-28,12);ctx.lineTo(32,0);ctx.lineTo(-28,-12);ctx.closePath();ctx.fill();
-  // Bright outline
-  ctx.strokeStyle='rgba(180,240,255,0.95)';ctx.lineWidth=2;
-  ctx.beginPath();ctx.moveTo(-28,12);ctx.lineTo(32,0);ctx.lineTo(-28,-12);ctx.closePath();ctx.stroke();
-  // Thruster
-  const fl=rnd(14,26);
-  ctx.shadowColor='#ff8c00';ctx.shadowBlur=26;
-  ctx.fillStyle='#ff8c00';
-  ctx.beginPath();ctx.moveTo(-28,-5);ctx.lineTo(-28-fl,0);ctx.lineTo(-28,5);ctx.closePath();ctx.fill();
-  ctx.shadowBlur=12;ctx.fillStyle='#ffdc00';
-  ctx.beginPath();ctx.moveTo(-28,-2);ctx.lineTo(-28-fl*0.5,0);ctx.lineTo(-28,2);ctx.closePath();ctx.fill();
-  ctx.shadowBlur=0;
-  // Cockpit
-  ctx.shadowColor='#00e8ff';ctx.shadowBlur=18;
-  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(12,0,6,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle=AC;ctx.beginPath();ctx.arc(12,0,4,0,Math.PI*2);ctx.fill();
-  ctx.shadowBlur=0;
-  ctx.restore();
 }
-function _drawTrans(){
-  if(_transDir===0&&_transFlash<=0)return;
-  // Ship flies linearly across the full duration
-  const totalFrames=32;
-  const p=Math.min(1,_transTick/totalFrames);
-  const shipX=-70+(GW+140)*p;
-  const shipY=GH/2+Math.sin(p*Math.PI*1.5)*18;
-  _drawTransShip(shipX,shipY);
-  // Warp burst flash at the midpoint (state switch)
-  if(_transFlash>0){
-    const a=_transFlash;
-    const r=Math.max(1,(1-a)*GW*0.8);
-    const g=ctx.createRadialGradient(shipX,shipY,0,shipX,shipY,r);
-    g.addColorStop(0,`rgba(200,240,255,${a*0.85})`);
-    g.addColorStop(0.25,`rgba(80,180,255,${a*0.45})`);
-    g.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=g;ctx.fillRect(0,0,GW,GH);
-  }
+// ── Ship entry animation on game start ────────────────────────────────────────
+let _shipEntry=false,_shipEntryTarget=0;
+function _startShipEntry(){_shipEntry=true;}
+function _updateShipEntry(){
+  if(!_shipEntry||!player)return;
+  if(player.x<_shipEntryTarget){player.x=Math.min(_shipEntryTarget,player.x+7);}
+  else{_shipEntry=false;}
 }
 let stars=[],player=null,enemies=[],powerups=[],explosions=[],bosses=[];
 let lvIdx=0,maxUnlocked=loadProgress();
@@ -1977,6 +1939,7 @@ function startGame(mode,idx){
   sessionKills=0;
   if(mode==='arcade')globalIncrementPlays();
   player=new Player();enemies=[];powerups=[];explosions=[];bosses=[];asteroids=[];asteroidTimer=0;freeEBullets=[];
+  _shipEntryTarget=player.x;player.x=-60;_startShipEntry();
   bossEnraged=false;bossesSpawnedArcade.clear();
   warnText='';warnTimer=0;screenShake=0;flashAlpha=0;vigAlpha=0;enrageFlash=0;
   if(mode==='levels'){
@@ -2166,7 +2129,7 @@ function doCollisions(){
         if(score>=prevBest)postArcadeScore(playerCallsign,score,new Date().toLocaleDateString('en-GB'));
       }
     }
-    gameState='game_over';
+    gameState='game_over';_uiFade=0;_uiDir=1;
   }
 }
 
@@ -2227,7 +2190,8 @@ function triggerLevelComplete(){
 
 // ── Update ─────────────────────────────────────────────────────────────────────
 function update(){
-  _updateTrans();
+  _updateUIFade();
+  _updatePauseScale();
   _updateMusic();
   for(const s of stars)s.update();
   for(const r of bgRocks)r.update();
@@ -2237,7 +2201,7 @@ function update(){
     lvCompleteTimer--;
     if(lvCompleteTimer<=0){
       lvIdx++;level=lvIdx+1;
-      if(lvIdx>=LEVELS.length){gameState='victory';SND.victory();return;}
+      if(lvIdx>=LEVELS.length){gameState='victory';_uiFade=0;_uiDir=1;SND.victory();return;}
       score=0;
       if(player){player.health=Math.min(player.health+1,player.maxHp);player.invFrames=120;}
       enemies.length=0;bosses.length=0;powerups.length=0;freeEBullets.length=0;asteroids.length=0;
@@ -2251,6 +2215,7 @@ function update(){
     return;
   }
   if(gameState!=='playing')return;
+  _updateShipEntry();
   if(screenShake>0)screenShake*=0.82;
   if(flashAlpha>0)flashAlpha=Math.max(0,flashAlpha-15);
   if(enrageFlash>0)enrageFlash--;
@@ -2348,11 +2313,17 @@ function draw(){
   drawPlanets();
 
   if(gameState==='intro'){drawIntro();return;}
-  if(gameState==='menu'){drawMenu();return;}
-  if(gameState==='level_select'){drawLevelSelect();return;}
-  if(gameState==='settings'){drawSettings();return;}
-  if(gameState==='layout'){drawLayout();return;}
-  if(gameState==='stats'){drawStats();return;}
+  // UI screens fade in/out, background always visible
+  if(['menu','level_select','settings','layout','stats'].includes(gameState)){
+    ctx.save();ctx.globalAlpha=_uiFade;
+    if(gameState==='menu')drawMenu();
+    else if(gameState==='level_select')drawLevelSelect();
+    else if(gameState==='settings')drawSettings();
+    else if(gameState==='layout')drawLayout();
+    else if(gameState==='stats')drawStats();
+    ctx.restore();
+    return;
+  }
 
   // Slow tint
   if(player&&player.slowActive){ctx.fillStyle=rgba(60,30,160,0.08);ctx.fillRect(0,0,GW,GH);}
@@ -2392,12 +2363,22 @@ function draw(){
     if(touchMode)drawTouch();
     if(warnTimer>0)drawWarning();
     if(gameMode==='levels'&&lvIntroTimer>0)drawLevelIntro();
-  }else if(gameState==='paused'){drawPause();}
-  else if(gameState==='game_over'){drawGameOver();}
-  else if(gameState==='victory'){drawVictory();}
-  else if(gameState==='level_complete'){drawLevelComplete();}
+  }else if(gameState==='paused'){
+    // Pause menu pops from center
+    const _ps=_pauseScale*_pauseScale*(3-2*_pauseScale);
+    if(_ps>0){
+      ctx.save();
+      ctx.globalAlpha=_ps;
+      ctx.translate(GW/2,GH/2);ctx.scale(_ps,_ps);ctx.translate(-GW/2,-GH/2);
+      drawPause();
+      ctx.restore();
+    }
+  }else if(gameState==='game_over'){
+    ctx.save();ctx.globalAlpha=_uiFade;drawGameOver();ctx.restore();
+  }else if(gameState==='victory'){
+    ctx.save();ctx.globalAlpha=_uiFade;drawVictory();ctx.restore();
+  }else if(gameState==='level_complete'){drawLevelComplete();}
   drawCheatMsg();
-  _drawTrans();
 }
 
 function drawVignette(){
@@ -2865,6 +2846,10 @@ function drawVictory(){
   ctx.fillStyle='#ffdc00';ctx.shadowColor='#ffdc00';ctx.shadowBlur=22;
   ctx.fillText('VICTORY!',GW/2,GH/2-80);ctx.shadowBlur=0;
   ctx.fillStyle=AC;ctx.font='24px monospace';ctx.fillText('Score: '+score,GW/2,GH/2-28);
+  if(!authUid){
+    ctx.fillStyle='rgba(255,180,60,0.9)';ctx.font='14px sans-serif';ctx.textAlign='center';
+    ctx.fillText('Sign in to save your result to the leaderboard',GW/2,GH/2+5);
+  }
   const vbtns=[['PLAY AGAIN','retry'],['MAIN MENU','vmenu']];
   btnRects={};
   vbtns.forEach(([label,key],i)=>{
@@ -2976,9 +2961,13 @@ function drawStats(){
       ?(_fbOK?globalArcadeLb:[])
       :(_fbOK?globalLeaderboard:overlordHoF);
 
+    if(!authUid){
+      ctx.fillStyle='rgba(255,180,60,0.9)';ctx.font='13px sans-serif';ctx.textAlign='center';
+      ctx.fillText('Sign in to save your score to the leaderboard',col2,listTop+22);
+    }
     if(!_fbOK&&isArcTab){
       ctx.fillStyle='#334455';ctx.font='11px sans-serif';ctx.textAlign='center';
-      ctx.fillText('Firebase not connected',col2,listTop+40);
+      ctx.fillText('Firebase not connected',col2,listTop+40+(authUid?0:22));
     }else if(list.length===0){
       ctx.fillStyle='#334455';ctx.font='13px sans-serif';ctx.textAlign='center';
       ctx.fillText('No entries yet...',col2,listTop+40);
@@ -3071,13 +3060,13 @@ function handleBtn(key){
     playerCallsign=localStorage.getItem('ss_callsign')||'';
     return;
   }
-  if(key==='m_stats'){transitionTo(()=>{gameState='stats';globalStatsLoaded=false;_lbScrollY=0;fetchGlobalData();});return;}
-  if(key==='stats_back'){transitionTo(()=>{gameState='menu';});return;}
+  if(key==='m_stats'){fadeToScreen(()=>{gameState='stats';globalStatsLoaded=false;_lbScrollY=0;fetchGlobalData();});return;}
+  if(key==='stats_back'){fadeToScreen(()=>{gameState='menu';});return;}
   if(key==='stats_tab_arcade'){statsLeaderboardTab='arcade';_lbScrollY=0;return;}
   if(key==='stats_tab_overlord'){statsLeaderboardTab='overlord';_lbScrollY=0;return;}
-  if(key==='m_settings'){transitionTo(()=>{gameState='settings';});return;}
-  if(key==='set_back'){transitionTo(()=>{rebindAction=null;wipeConfirm=false;gameState='menu';});return;}
-  if(key==='set_layout'){transitionTo(()=>{gameState='layout';_layDrag=null;});return;}
+  if(key==='m_settings'){fadeToScreen(()=>{gameState='settings';});return;}
+  if(key==='set_back'){fadeToScreen(()=>{rebindAction=null;wipeConfirm=false;gameState='menu';});return;}
+  if(key==='set_layout'){fadeToScreen(()=>{gameState='layout';_layDrag=null;});return;}
   if(key==='set_part_on'){particlesEnabled=true;saveGameSettings();return;}
   if(key==='set_part_off'){particlesEnabled=false;saveGameSettings();return;}
   if(key==='set_vib_on'){vibrateEnabled=true;saveGameSettings();return;}
@@ -3105,17 +3094,17 @@ function handleBtn(key){
     }
     return;
   }
-  if(key==='m_arcade'){transitionTo(()=>{wipeConfirm=false;menuSel=0;startGame('arcade');});return;}
-  if(key==='m_levels'){transitionTo(()=>{wipeConfirm=false;gameState='level_select';lsCursor=0;});return;}
+  if(key==='m_arcade'){fadeToScreen(()=>{wipeConfirm=false;menuSel=0;startGame('arcade');});return;}
+  if(key==='m_levels'){fadeToScreen(()=>{wipeConfirm=false;gameState='level_select';lsCursor=0;});return;}
   if(key==='m_phone'){touchMode=!touchMode;return;}
-  if(key==='ls_back'){transitionTo(()=>{gameState='menu';});return;}
-  if(key.startsWith('ls_')){const i=parseInt(key.slice(3));if(i<=maxUnlocked){transitionTo(()=>startGame('levels',i));}return;}
-  if(key==='p_resume'){gameState='playing';clearTouch();return;}
-  if(key==='p_pmenu'){transitionTo(()=>{globalFlushKills();gameState='menu';clearTouch();});return;}
-  if(key==='g_retry'){transitionTo(()=>{startGame(gameMode,gameMode==='levels'?lvIdx:0);});return;}
-  if(key==='g_gmenu'){transitionTo(()=>{gameState='menu';});return;}
-  if(key==='v_retry'){transitionTo(()=>{startGame(gameMode,0);});return;}
-  if(key==='v_vmenu'){transitionTo(()=>{gameState='menu';});return;}
+  if(key==='ls_back'){fadeToScreen(()=>{gameState='menu';});return;}
+  if(key.startsWith('ls_')){const i=parseInt(key.slice(3));if(i<=maxUnlocked){fadeToScreen(()=>startGame('levels',i));}return;}
+  if(key==='p_resume'){_closePause(()=>{gameState='playing';clearTouch();});return;}
+  if(key==='p_pmenu'){_closePause(()=>{globalFlushKills();gameState='menu';_uiFade=0;_uiDir=1;clearTouch();});return;}
+  if(key==='g_retry'){fadeToScreen(()=>{startGame(gameMode,gameMode==='levels'?lvIdx:0);});return;}
+  if(key==='g_gmenu'){fadeToScreen(()=>{gameState='menu';});return;}
+  if(key==='v_retry'){fadeToScreen(()=>{startGame(gameMode,0);});return;}
+  if(key==='v_vmenu'){fadeToScreen(()=>{gameState='menu';});return;}
 }
 
 // ── Canvas pos ────────────────────────────────────────────────────────────────
@@ -3143,7 +3132,7 @@ canvas.addEventListener('mousedown',e=>{
     return;
   }
   if(gameState==='playing'){
-    if(hitBtn(x,y)==='hud_pause'){gameState='paused';clearTouch();return;}
+    if(hitBtn(x,y)==='hud_pause'){gameState='paused';_openPause();clearTouch();return;}
     if(touchMode)touchDown(-1,x,y);
   }else{handleBtn(hitBtn(x,y));}
 });
@@ -3223,8 +3212,8 @@ window.addEventListener('keydown',e=>{
   }
   if(gameState==='intro'){skipIntro();return;}
   if(e.code==='Escape'){
-    if(gameState==='playing'){gameState='paused';}
-    else if(gameState==='paused'){gameState='playing';clearTouch();}
+    if(gameState==='playing'){gameState='paused';_openPause();}
+    else if(gameState==='paused'){_closePause(()=>{gameState='playing';clearTouch();});}
     else if(gameState==='level_select'){gameState='menu';}
     else if(gameState==='settings'){gameState='menu';}
     else if(gameState==='layout'){saveTouchLayout();gameState='settings';}
