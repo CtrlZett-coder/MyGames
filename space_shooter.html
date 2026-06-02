@@ -2663,6 +2663,20 @@ function drawMenu(){
     ctx.fillRect(0,GH-6,GW*delPct,6);
   }
 
+  // Account button (top-left, after wipe icon)
+  if(authUid){
+    btnRects['m_signout']={x:52,y:9,w:108,h:28};
+    ctx.fillStyle=rgba(10,30,20,0.85);roundRect(52,9,108,28,6);ctx.fill();
+    ctx.strokeStyle='#224433';ctx.lineWidth=1.5;roundRect(52,9,108,28,6);ctx.stroke();
+    ctx.fillStyle='#55cc88';ctx.font='12px monospace';ctx.textAlign='center';
+    ctx.fillText('👤 '+(playerCallsign||authEmail.split('@')[0]||'Me').slice(0,12),106,27);
+  }else{
+    btnRects['m_signin']={x:52,y:9,w:80,h:28};
+    ctx.fillStyle=rgba(0,60,100,0.85);roundRect(52,9,80,28,6);ctx.fill();
+    ctx.strokeStyle='#004488';ctx.lineWidth=1.5;roundRect(52,9,80,28,6);ctx.stroke();
+    ctx.fillStyle='#44aaff';ctx.font='13px sans-serif';ctx.textAlign='center';
+    ctx.fillText('👤 Sign In',92,27);
+  }
   // Trash / wipe button (always shown — convenient on mobile)
   if(!wipeConfirm){
     btnRects['m_wipe']={x:8,y:9,w:38,h:28};
@@ -2965,6 +2979,21 @@ function hitBtn(x,y){
 function handleBtn(key){
   if(!key)return;
   SND.uiClick();
+  if(key==='m_signin'){
+    // Reset form to sign-in mode before showing
+    if(_authMode!=='signin')authToggleMode();
+    document.getElementById('auth-err').textContent='';
+    document.getElementById('auth-email').value='';
+    document.getElementById('auth-pass').value='';
+    const ol=document.getElementById('auth-overlay');
+    if(ol){ol.style.display='flex';setTimeout(()=>document.getElementById('auth-email').focus(),50);}
+    return;
+  }
+  if(key==='m_signout'){
+    _clearAuth();
+    playerCallsign=localStorage.getItem('ss_callsign')||'';
+    return;
+  }
   if(key==='m_stats'){gameState='stats';globalStatsLoaded=false;_lbScrollY=0;fetchGlobalData();return;}
   if(key==='stats_back'){gameState='menu';return;}
   if(key==='stats_tab_arcade'){statsLeaderboardTab='arcade';_lbScrollY=0;return;}
