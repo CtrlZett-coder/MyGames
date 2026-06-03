@@ -310,6 +310,8 @@ let authIdToken=localStorage.getItem('ss_auth_token')||'';
 let authUid=localStorage.getItem('ss_auth_uid')||'';
 let authEmail=localStorage.getItem('ss_auth_email')||'';
 let authProvider=localStorage.getItem('ss_auth_provider')||''; // 'email' | 'google'
+const _DEV_EMAILS=['ivansharkov2012@gmail.com'];
+function _isDev(){return _DEV_EMAILS.includes(authEmail);}
 let _authMode='signin';
 
 async function _fbAuthReq(endpoint,body){
@@ -791,21 +793,22 @@ async function saveAccountCallsign(){
   }
   const btn=document.querySelector('#account-box .acc-save-btn');
   btn.disabled=true;msg.textContent='Checking...';
-  // Check cooldown (local first, then cloud)
-  const localTs=_getLocalCallsignTs();
-  const now=Date.now();
-  if(localTs&&now-localTs<_CALLSIGN_COOLDOWN_MS){
-    const d=Math.ceil((_CALLSIGN_COOLDOWN_MS-(now-localTs))/86400000);
-    btn.disabled=false;msg.className='acc-msg err';
-    msg.textContent=`Next change in ${d} day${d===1?'':'s'}`;return;
-  }
-  const cloudTs=await _getCloudCallsignTs();
-  const eff=Math.max(localTs,cloudTs);
-  if(eff&&now-eff<_CALLSIGN_COOLDOWN_MS){
-    try{localStorage.setItem('ss_callsign_ts',String(cloudTs));}catch(e){}
-    const d=Math.ceil((_CALLSIGN_COOLDOWN_MS-(now-eff))/86400000);
-    btn.disabled=false;msg.className='acc-msg err';
-    msg.textContent=`Next change in ${d} day${d===1?'':'s'}`;return;
+  if(!_isDev()){
+    const localTs=_getLocalCallsignTs();
+    const now=Date.now();
+    if(localTs&&now-localTs<_CALLSIGN_COOLDOWN_MS){
+      const d=Math.ceil((_CALLSIGN_COOLDOWN_MS-(now-localTs))/86400000);
+      btn.disabled=false;msg.className='acc-msg err';
+      msg.textContent=`Next change in ${d} day${d===1?'':'s'}`;return;
+    }
+    const cloudTs=await _getCloudCallsignTs();
+    const eff=Math.max(localTs,cloudTs);
+    if(eff&&now-eff<_CALLSIGN_COOLDOWN_MS){
+      try{localStorage.setItem('ss_callsign_ts',String(cloudTs));}catch(e){}
+      const d=Math.ceil((_CALLSIGN_COOLDOWN_MS-(now-eff))/86400000);
+      btn.disabled=false;msg.className='acc-msg err';
+      msg.textContent=`Next change in ${d} day${d===1?'':'s'}`;return;
+    }
   }
   // Check uniqueness
   const taken=await _isCallsignTaken(val,authUid);
