@@ -100,7 +100,7 @@ canvas{display:block;touch-action:none;position:fixed;top:0;left:0}
         Continue with Google
       </button>
       <div class="auth-divider" id="auth-google-divider" style="display:none">or</div>
-      <input class="auth-inp" id="auth-email" type="email" placeholder="Email" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('auth-pass').focus()">
+      <input class="auth-inp" id="auth-email" type="text" placeholder="Email or callsign" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('auth-pass').focus()">
       <input class="auth-inp" id="auth-pass" type="password" placeholder="Password (min 6 chars)" autocomplete="new-password" onkeydown="if(event.key==='Enter'){const cf=document.getElementById('auth-confirm');const cl=document.getElementById('auth-call');if(cf.style.display!=='none')cf.focus();else if(cl.style.display!=='none')cl.focus();else authSubmit();}">
       <a id="auth-forgot-link" onclick="authShowForgot()">Forgot password?</a>
       <input class="auth-inp" id="auth-confirm" type="password" placeholder="Confirm password" style="display:none" onkeydown="if(event.key==='Enter'){const c=document.getElementById('auth-call');if(c.style.display!=='none')c.focus();else authSubmit();}">
@@ -403,6 +403,7 @@ function _showVerifyScreen(email, sendFailed){
 }
 function authBackToSignin(){
   _authMode='signin';
+  _pendingVerifyToken='';
   document.getElementById('auth-form').style.display='block';
   document.getElementById('auth-verify-box').style.display='none';
   document.getElementById('auth-reset-box').style.display='none';
@@ -414,7 +415,11 @@ function authBackToSignin(){
   document.getElementById('auth-call').style.display='none';
   document.getElementById('auth-forgot-link').style.display='inline';
   document.getElementById('auth-err').textContent='';
-  _pendingVerifyToken='';
+  // Reset button states in case user returns mid-flow
+  const vb=document.getElementById('auth-verified-btn');
+  if(vb){vb.disabled=false;vb.textContent="I've verified ✓";}
+  const rb=document.getElementById('auth-resend');
+  if(rb){rb.disabled=false;rb.textContent='Resend email';}
 }
 async function authResend(){
   if(!_pendingVerifyToken)return;
@@ -444,7 +449,7 @@ async function authCheckVerified(){
       playerCallsign=_pendingCallsign;
       try{localStorage.setItem('ss_callsign',_pendingCallsign);}catch(e){}
       await _saveUserCallsign(_pendingCallsign);
-      await _reserveCallsign(_pendingCallsign, authUid);
+      await _reserveCallsign(_pendingCallsign, authUid, _pendingVerifyEmail);
       _pendingCallsign='';
     }else{
       await _loadUserCallsign();
@@ -469,19 +474,21 @@ function authToggleMode(){
   document.getElementById('auth-err').textContent='';
 }
 async function authSubmit(){
-  const email=document.getElementById('auth-email').value.trim();
+  const rawInput=document.getElementById('auth-email').value.trim();
   const pass=document.getElementById('auth-pass').value;
   const confirm=document.getElementById('auth-confirm').value;
   const call=document.getElementById('auth-call').value.trim();
   const errEl=document.getElementById('auth-err');
   const btn=document.getElementById('auth-submit');
-  if(!email||!pass){errEl.textContent='Enter email and password';return;}
+  if(!rawInput||!pass){errEl.textContent='Enter email (or callsign) and password';return;}
   if(_authMode==='signup'){
+    if(!rawInput.includes('@')){errEl.textContent='Enter a valid email address';return;}
     if(!call){errEl.textContent='Enter a callsign';return;}
     if(call.length<2||call.length>20){errEl.textContent='Callsign: 2–20 characters';return;}
     if(pass!==confirm){errEl.textContent='Passwords do not match';return;}
   }
   btn.disabled=true;errEl.textContent='';
+  let email=rawInput;
   if(_authMode==='signup'){
     btn.textContent='Checking...';
     const taken=await _isCallsignTaken(call);
@@ -490,6 +497,16 @@ async function authSubmit(){
       errEl.textContent='Callsign already taken — choose another';
       return;
     }
+  } else if(!rawInput.includes('@')){
+    // Sign in by callsign — resolve to email
+    btn.textContent='Looking up...';
+    const found=await _lookupCallsignEmail(rawInput);
+    if(!found){
+      btn.disabled=false;btn.textContent='SIGN IN';
+      errEl.textContent='Callsign not found';
+      return;
+    }
+    email=found;
   }
   btn.textContent=_authMode==='signup'?'Creating...':'Signing in...';
   const endpoint=_authMode==='signup'?'signUp':'signInWithPassword';
@@ -498,7 +515,7 @@ async function authSubmit(){
   if(data.error){
     const MSG={
       EMAIL_EXISTS:'Email already in use',
-      INVALID_LOGIN_CREDENTIALS:'Wrong email or password',
+      INVALID_LOGIN_CREDENTIALS:'Wrong email/callsign or password',
       EMAIL_NOT_FOUND:'Email not found',
       INVALID_PASSWORD:'Wrong password',
       WEAK_PASSWORD__SHOULD_BE_AT_LEAST_6_CHARACTERS:'Password must be at least 6 characters',
@@ -697,7 +714,7 @@ async function _handleGoogleCredential(response){
     while(await _isCallsignTaken(attempt,authUid)&&i<=99){attempt=cs.slice(0,17)+i;i++;}
     playerCallsign=attempt;
     await _saveUserCallsign(playerCallsign);
-    await _reserveCallsign(playerCallsign,authUid);
+    await _reserveCallsign(playerCallsign,authUid,data.email||authEmail);
     try{localStorage.setItem('ss_callsign',playerCallsign);}catch(e){}
   }
   _hideAuthOverlay();
@@ -799,7 +816,7 @@ async function saveAccountCallsign(){
   playerCallsign=val;
   try{localStorage.setItem('ss_callsign',val);}catch(e){}
   await _saveUserCallsign(val);
-  await _reserveCallsign(val,authUid);
+  await _reserveCallsign(val,authUid,authEmail);
   await _setCloudCallsignTs();
   btn.disabled=false;
   msg.className='acc-msg ok';msg.textContent='✓ Saved!';
@@ -888,6 +905,7 @@ async function confirmDeleteAccount(){
   if(ol){ol.style.display='flex';}
 }
 function accSignOut(){
+  authBackToSignin();
   _clearAuth();
   playerCallsign=localStorage.getItem('ss_callsign')||'';
   hideAccount();
@@ -911,13 +929,23 @@ async function _isCallsignTaken(s,excludeUid=''){
   if(!_fbOK||!s)return false;
   const key=_callsignKey(s);
   if(!key)return false;
-  const uid=await _fbGet('callsign_index/'+key);
+  const v=await _fbGet('callsign_index/'+key);
+  if(!v)return false;
+  const uid=typeof v==='object'?v.uid:v;
   return !!(uid&&uid!==excludeUid);
 }
-async function _reserveCallsign(s,uid){
+async function _lookupCallsignEmail(s){
+  if(!_fbOK||!s)return null;
+  const key=_callsignKey(s);
+  if(!key)return null;
+  const v=await _fbGet('callsign_index/'+key);
+  if(!v||typeof v!=='object')return null;
+  return v.email||null;
+}
+async function _reserveCallsign(s,uid,email=''){
   if(!_fbOK||!s||!uid)return;
   const key=_callsignKey(s);
-  if(key)await _fbPut('callsign_index/'+key,uid);
+  if(key)await _fbPut('callsign_index/'+key,{uid,email});
 }
 async function _releaseCallsign(s){
   if(!_fbOK||!s)return;
@@ -3850,9 +3878,7 @@ function handleBtn(key){
   if(!key)return;
   SND.uiClick();
   if(key==='m_signin'){
-    // Reset form to sign-in mode before showing
-    if(_authMode!=='signin')authToggleMode();
-    document.getElementById('auth-err').textContent='';
+    authBackToSignin();
     document.getElementById('auth-email').value='';
     document.getElementById('auth-pass').value='';
     const ol=document.getElementById('auth-overlay');
