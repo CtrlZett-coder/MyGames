@@ -72,6 +72,17 @@ canvas{display:block;touch-action:none;position:fixed;top:0;left:0}
 #acc-cancel-del{width:100%;padding:8px;border:1.5px solid #334455;border-radius:7px;background:transparent;color:#88ccff;font-family:monospace;font-size:12px;cursor:pointer;}
 #acc-signout-btn{width:100%;padding:10px;margin-top:12px;border:none;border-radius:7px;border:1.5px solid #224466;background:rgba(40,60,100,0.6);color:#88aacc;font-family:monospace;font-size:13px;cursor:pointer;}
 #acc-signout-btn:hover{border-color:#4488cc;color:#cce;}
+/* ── Cosmic themed auth panels ── */
+.cosmic-top{position:relative;height:72px;overflow:hidden;margin:-20px -22px 12px;background:linear-gradient(180deg,#020b18 0%,#061522 100%);border-radius:10px 10px 0 0;border-bottom:1px solid rgba(0,200,255,0.15);}
+.cstar{position:absolute;border-radius:50%;background:#c8e8ff;}
+.cstar.a1{animation:ctw 2.2s 0.0s infinite;}.cstar.a2{animation:ctw 1.8s 0.5s infinite;}
+.cstar.a3{animation:ctw 2.5s 0.9s infinite;}.cstar.a4{animation:ctw 2.0s 1.3s infinite;}
+.cstar.a5{animation:ctw 1.6s 0.3s infinite;}.cstar.a6{animation:ctw 2.3s 0.7s infinite;}
+.cstar.a7{animation:ctw 1.9s 1.1s infinite;}.cstar.a8{animation:ctw 2.1s 1.6s infinite;}
+@keyframes ctw{0%,100%{opacity:.05}50%{opacity:.9}}
+.cosmic-ship-icon{position:absolute;top:50%;left:50%;transform:translate(-50%,-55%);filter:drop-shadow(0 0 8px #00c8ff);animation:cship 3s ease-in-out infinite;}
+@keyframes cship{0%,100%{transform:translate(-50%,-55%)}50%{transform:translate(-50%,-65%)}}
+.cosmic-glow{color:#00c8ff;font-size:12px;letter-spacing:3px;font-weight:bold;text-shadow:0 0 10px rgba(0,200,255,0.7);margin:0 0 10px;text-align:center;}
 </style>
 </head>
 <body>
@@ -100,10 +111,32 @@ canvas{display:block;touch-action:none;position:fixed;top:0;left:0}
     </div>
     <!-- Email verification screen -->
     <div id="auth-verify-box" style="display:none;text-align:center">
-      <div style="font-size:38px;margin-bottom:8px">📧</div>
-      <p id="auth-verify-msg" style="color:#88ccff;font-size:13px;margin-bottom:10px;line-height:1.6;white-space:pre-line"></p>
-      <div style="background:rgba(255,180,0,0.12);border:1px solid rgba(255,180,0,0.4);border-radius:7px;padding:8px 10px;margin-bottom:14px;font-size:12px;color:#ffcc44;line-height:1.5">
-        ⚠️ Email may land in <b>Spam / Junk</b> folder.<br>From: <span style="color:#ffaa44">Space Shooter &lt;noreply@...firebaseapp.com&gt;</span>
+      <div class="cosmic-top">
+        <span class="cstar a1" style="width:2px;height:2px;top:18%;left:12%"></span>
+        <span class="cstar a2" style="width:1px;height:1px;top:35%;left:82%"></span>
+        <span class="cstar a3" style="width:2px;height:2px;top:68%;left:22%"></span>
+        <span class="cstar a4" style="width:1px;height:1px;top:52%;left:72%"></span>
+        <span class="cstar a5" style="width:3px;height:3px;top:14%;left:56%"></span>
+        <span class="cstar a6" style="width:1px;height:1px;top:78%;left:40%"></span>
+        <span class="cstar a7" style="width:2px;height:2px;top:40%;left:92%"></span>
+        <span class="cstar a8" style="width:1px;height:1px;top:82%;left:6%"></span>
+        <svg width="46" height="46" viewBox="0 0 46 46" class="cosmic-ship-icon">
+          <path d="M23 5 L28 18 L23 23 L18 18 Z" fill="#00c8ff"/>
+          <path d="M18 18 L7 30 L15 25 Z" fill="#0077aa"/>
+          <path d="M28 18 L39 30 L31 25 Z" fill="#0077aa"/>
+          <ellipse cx="23" cy="23" rx="3.5" ry="2" fill="#ff5500"/>
+          <ellipse cx="23" cy="25" rx="2.2" ry="3.8" fill="#ff9900" opacity="0.75"/>
+          <ellipse cx="23" cy="13.5" rx="2.6" ry="3.5" fill="#001833" stroke="#00c8ff" stroke-width="1.2"/>
+          <ellipse cx="23" cy="13.5" rx="1.3" ry="2" fill="#0044aa" opacity="0.85"/>
+          <circle cx="8" cy="10" r="1" fill="#88ccff" opacity="0.6"/>
+          <circle cx="38" cy="14" r="0.8" fill="#88ccff" opacity="0.5"/>
+          <circle cx="14" cy="6" r="0.6" fill="#ccddff" opacity="0.7"/>
+        </svg>
+      </div>
+      <div class="cosmic-glow">VERIFY EMAIL</div>
+      <p id="auth-verify-msg" style="color:#88ccff;font-size:12px;margin-bottom:10px;line-height:1.6;white-space:pre-line"></p>
+      <div style="background:rgba(255,180,0,0.10);border:1px solid rgba(255,180,0,0.35);border-radius:7px;padding:7px 10px;margin-bottom:12px;font-size:11px;color:#ffcc44;line-height:1.5">
+        ⚠ Email may land in <b>Spam / Junk</b> folder.<br>From: <span style="color:#ffaa44">Space Shooter &lt;noreply@...firebaseapp.com&gt;</span>
       </div>
       <button class="auth-btn" id="auth-resend" onclick="authResend()" style="background:#00a0cc;color:#fff;margin-bottom:8px">Resend email</button>
       <button class="auth-btn" id="auth-verified-btn" onclick="authCheckVerified()" style="background:#226644;color:#fff;margin-bottom:8px">I've verified ✓</button>
@@ -118,8 +151,29 @@ canvas{display:block;touch-action:none;position:fixed;top:0;left:0}
     </div>
     <!-- Password reset — step 2: set new password (shown when oobCode in URL) -->
     <div id="auth-newpass-box" style="display:none;text-align:center">
-      <div style="font-size:36px;margin-bottom:8px">🔑</div>
-      <p style="color:#88ccff;font-size:12px;margin-bottom:12px">Enter your new password</p>
+      <div class="cosmic-top">
+        <span class="cstar a2" style="width:2px;height:2px;top:20%;left:16%"></span>
+        <span class="cstar a4" style="width:1px;height:1px;top:55%;left:80%"></span>
+        <span class="cstar a6" style="width:2px;height:2px;top:32%;left:62%"></span>
+        <span class="cstar a1" style="width:1px;height:1px;top:72%;left:28%"></span>
+        <span class="cstar a3" style="width:3px;height:3px;top:18%;left:88%"></span>
+        <span class="cstar a5" style="width:1px;height:1px;top:62%;left:8%"></span>
+        <span class="cstar a7" style="width:2px;height:2px;top:44%;left:44%"></span>
+        <span class="cstar a8" style="width:1px;height:1px;top:84%;left:66%"></span>
+        <svg width="46" height="46" viewBox="0 0 46 46" class="cosmic-ship-icon">
+          <rect x="13" y="22" width="20" height="16" rx="4" fill="#00a8e8" opacity="0.88"/>
+          <path d="M17 22 C17 14.5 29 14.5 29 22" fill="none" stroke="#00c8ff" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="23" cy="30" r="3.2" fill="#001833" stroke="#00c8ff" stroke-width="1.4"/>
+          <rect x="22" y="30" width="2" height="4.5" rx="1" fill="#00c8ff"/>
+          <circle cx="23" cy="30" r="5.5" fill="none" stroke="#00c8ff" stroke-width="0.5" opacity="0.35"/>
+          <circle cx="23" cy="30" r="8" fill="none" stroke="#00c8ff" stroke-width="0.3" opacity="0.15"/>
+          <circle cx="6" cy="8" r="0.8" fill="#88ccff" opacity="0.6"/>
+          <circle cx="40" cy="12" r="0.6" fill="#88ccff" opacity="0.5"/>
+          <circle cx="35" cy="5" r="1" fill="#ccddff" opacity="0.55"/>
+        </svg>
+      </div>
+      <div class="cosmic-glow">NEW PASSWORD</div>
+      <p style="color:#88ccff;font-size:12px;margin-bottom:12px">Enter your new password below</p>
       <input class="auth-inp" id="auth-np1" type="password" placeholder="New password (min 6 chars)" onkeydown="if(event.key==='Enter')document.getElementById('auth-np2').focus()">
       <input class="auth-inp" id="auth-np2" type="password" placeholder="Confirm new password" onkeydown="if(event.key==='Enter')authConfirmReset()">
       <button class="auth-btn" id="auth-np-btn" onclick="authConfirmReset()" style="background:#226644;color:#fff;margin-bottom:8px">Set new password</button>
@@ -390,6 +444,7 @@ async function authCheckVerified(){
       playerCallsign=_pendingCallsign;
       try{localStorage.setItem('ss_callsign',_pendingCallsign);}catch(e){}
       await _saveUserCallsign(_pendingCallsign);
+      await _reserveCallsign(_pendingCallsign, authUid);
       _pendingCallsign='';
     }else{
       await _loadUserCallsign();
@@ -426,8 +481,17 @@ async function authSubmit(){
     if(call.length<2||call.length>20){errEl.textContent='Callsign: 2–20 characters';return;}
     if(pass!==confirm){errEl.textContent='Passwords do not match';return;}
   }
-  btn.disabled=true;btn.textContent=_authMode==='signup'?'Creating...':'Signing in...';
-  errEl.textContent='';
+  btn.disabled=true;errEl.textContent='';
+  if(_authMode==='signup'){
+    btn.textContent='Checking...';
+    const taken=await _isCallsignTaken(call);
+    if(taken){
+      btn.disabled=false;btn.textContent='SIGN UP';
+      errEl.textContent='Callsign already taken — choose another';
+      return;
+    }
+  }
+  btn.textContent=_authMode==='signup'?'Creating...':'Signing in...';
   const endpoint=_authMode==='signup'?'signUp':'signInWithPassword';
   const data=await _fbAuthReq(endpoint,{email,password:pass,returnSecureToken:true});
   btn.disabled=false;btn.textContent=_authMode==='signup'?'SIGN UP':'SIGN IN';
@@ -494,6 +558,11 @@ async function authSendReset(){
   const email=document.getElementById('auth-reset-email').value.trim();
   const errEl=document.getElementById('auth-err');
   if(!email){errEl.textContent='Enter your email address';return;}
+  if(!_canResetPassword()){
+    const d=_resetCooldownDaysLeft();
+    errEl.textContent=`Password reset available in ${d} day${d===1?'':'s'}`;
+    return;
+  }
   const btn=document.getElementById('auth-reset-btn');
   btn.disabled=true;btn.textContent='Sending...';
   errEl.textContent='';
@@ -506,6 +575,7 @@ async function authSendReset(){
     btn.disabled=false;btn.textContent='Send reset link';
     return;
   }
+  _setResetTs();
   document.getElementById('auth-reset-sent').style.display='block';
   btn.textContent='Send again';
   setTimeout(()=>{btn.disabled=false;},4000);
@@ -617,8 +687,12 @@ async function _handleGoogleCredential(response){
   _saveAuth(data,'google');
   await _loadUserCallsign();
   if(!playerCallsign){
-    playerCallsign=data.displayName||data.email?.split('@')[0]||'Pilot';
+    let cs=(data.displayName||data.email?.split('@')[0]||'Pilot').slice(0,20);
+    let attempt=cs,i=2;
+    while(await _isCallsignTaken(attempt,authUid)&&i<=99){attempt=cs.slice(0,17)+i;i++;}
+    playerCallsign=attempt;
     await _saveUserCallsign(playerCallsign);
+    await _reserveCallsign(playerCallsign,authUid);
     try{localStorage.setItem('ss_callsign',playerCallsign);}catch(e){}
   }
   _hideAuthOverlay();
@@ -650,8 +724,8 @@ function showAccount(){
   document.getElementById('account-overlay').style.display='flex';
   document.getElementById('acc-email-label').textContent=authEmail;
   document.getElementById('acc-callsign').value=playerCallsign||'';
-  document.getElementById('acc-callsign-msg').textContent='';
-  document.getElementById('acc-callsign-msg').className='acc-msg';
+  const csMsg=document.getElementById('acc-callsign-msg');
+  csMsg.textContent='';csMsg.className='acc-msg';
   // Password section: only for email users
   const passSection=document.getElementById('acc-pass-section');
   passSection.style.display=authProvider==='google'?'none':'block';
@@ -663,6 +737,16 @@ function showAccount(){
   // Delete section reset
   cancelDeleteAccount();
   document.getElementById('acc-delete-msg').textContent='';
+  // Show callsign cooldown if active (check cloud asynchronously)
+  if(authUid&&_fbOK){
+    const localTs=_getLocalCallsignTs();
+    _getCloudCallsignTs().then(cloudTs=>{
+      const eff=Math.max(localTs,cloudTs);
+      if(eff){const d=Math.ceil((_CALLSIGN_COOLDOWN_MS-(Date.now()-eff))/86400000);
+        if(d>0){csMsg.className='acc-msg err';csMsg.textContent=`Next change in ${d} day${d===1?'':'s'}`;}
+      }
+    });
+  }
 }
 function hideAccount(){
   document.getElementById('account-overlay').style.display='none';
@@ -672,11 +756,46 @@ async function saveAccountCallsign(){
   const msg=document.getElementById('acc-callsign-msg');
   msg.className='acc-msg';
   if(!val||val.length<2||val.length>20){msg.className='acc-msg err';msg.textContent='2–20 characters';return;}
+  // No change — allow save without using cooldown
+  if(_callsignKey(val)===_callsignKey(playerCallsign||'')){
+    try{localStorage.setItem('ss_callsign',val);}catch(e){}
+    await _saveUserCallsign(val);
+    msg.className='acc-msg ok';msg.textContent='✓ Saved!';
+    setTimeout(()=>{msg.textContent='';},2500);
+    return;
+  }
   const btn=document.querySelector('#account-box .acc-save-btn');
-  btn.disabled=true;
+  btn.disabled=true;msg.textContent='Checking...';
+  // Check cooldown (local first, then cloud)
+  const localTs=_getLocalCallsignTs();
+  const now=Date.now();
+  if(localTs&&now-localTs<_CALLSIGN_COOLDOWN_MS){
+    const d=Math.ceil((_CALLSIGN_COOLDOWN_MS-(now-localTs))/86400000);
+    btn.disabled=false;msg.className='acc-msg err';
+    msg.textContent=`Next change in ${d} day${d===1?'':'s'}`;return;
+  }
+  const cloudTs=await _getCloudCallsignTs();
+  const eff=Math.max(localTs,cloudTs);
+  if(eff&&now-eff<_CALLSIGN_COOLDOWN_MS){
+    try{localStorage.setItem('ss_callsign_ts',String(cloudTs));}catch(e){}
+    const d=Math.ceil((_CALLSIGN_COOLDOWN_MS-(now-eff))/86400000);
+    btn.disabled=false;msg.className='acc-msg err';
+    msg.textContent=`Next change in ${d} day${d===1?'':'s'}`;return;
+  }
+  // Check uniqueness
+  const taken=await _isCallsignTaken(val,authUid);
+  if(taken){
+    btn.disabled=false;msg.className='acc-msg err';
+    msg.textContent='Callsign already taken';return;
+  }
+  // Release old, save new, update timestamps
+  const old=playerCallsign;
+  if(old&&_callsignKey(old)!==_callsignKey(val))await _releaseCallsign(old);
   playerCallsign=val;
   try{localStorage.setItem('ss_callsign',val);}catch(e){}
   await _saveUserCallsign(val);
+  await _reserveCallsign(val,authUid);
+  await _setCloudCallsignTs();
   btn.disabled=false;
   msg.className='acc-msg ok';msg.textContent='✓ Saved!';
   setTimeout(()=>{msg.textContent='';},2500);
@@ -752,6 +871,7 @@ async function confirmDeleteAccount(){
   }
   // Delete user data from DB
   if(_fbOK&&authUid){
+    if(playerCallsign)await _releaseCallsign(playerCallsign);
     await _fbDelete('users/'+authUid);
     await _fbDelete('arcade_lb/'+authUid);
   }
@@ -776,6 +896,59 @@ function upgradeGuest(){
   document.getElementById('auth-err').textContent='';
   const ol=document.getElementById('auth-overlay');
   if(ol){ol.style.display='flex';setTimeout(()=>document.getElementById('auth-email').focus(),50);}
+}
+
+// ── Callsign uniqueness ────────────────────────────────────────────────────────
+function _callsignKey(s){
+  return s.trim().toLowerCase().replace(/[^a-z0-9]/g,'_');
+}
+async function _isCallsignTaken(s,excludeUid=''){
+  if(!_fbOK||!s)return false;
+  const key=_callsignKey(s);
+  if(!key)return false;
+  const uid=await _fbGet('callsign_index/'+key);
+  return !!(uid&&uid!==excludeUid);
+}
+async function _reserveCallsign(s,uid){
+  if(!_fbOK||!s||!uid)return;
+  const key=_callsignKey(s);
+  if(key)await _fbPut('callsign_index/'+key,uid);
+}
+async function _releaseCallsign(s){
+  if(!_fbOK||!s)return;
+  const key=_callsignKey(s);
+  if(key)await _fbDelete('callsign_index/'+key);
+}
+
+// ── Password reset cooldown (once per week) ───────────────────────────────────
+const _RESET_COOLDOWN_MS=7*24*60*60*1000;
+function _canResetPassword(){
+  const ts=parseInt(localStorage.getItem('ss_reset_ts')||'0',10);
+  return Date.now()-ts>=_RESET_COOLDOWN_MS;
+}
+function _setResetTs(){
+  try{localStorage.setItem('ss_reset_ts',String(Date.now()));}catch(e){}
+}
+function _resetCooldownDaysLeft(){
+  const ts=parseInt(localStorage.getItem('ss_reset_ts')||'0',10);
+  return Math.ceil((_RESET_COOLDOWN_MS-(Date.now()-ts))/86400000);
+}
+
+// ── Callsign change cooldown (once per month) ─────────────────────────────────
+const _CALLSIGN_COOLDOWN_MS=30*24*60*60*1000;
+function _getLocalCallsignTs(){
+  return parseInt(localStorage.getItem('ss_callsign_ts')||'0',10);
+}
+async function _getCloudCallsignTs(){
+  if(!authUid||!_fbOK)return 0;
+  const v=await _fbGet('users/'+authUid+'/callsign_ts');
+  return typeof v==='number'?v:0;
+}
+async function _setCloudCallsignTs(){
+  if(!authUid||!_fbOK)return;
+  const now=Date.now();
+  _fbPut('users/'+authUid+'/callsign_ts',now);
+  try{localStorage.setItem('ss_callsign_ts',String(now));}catch(e){}
 }
 
 // ── Flush on hide / close ─────────────────────────────────────────────────────
