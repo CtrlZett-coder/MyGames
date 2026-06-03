@@ -109,12 +109,21 @@ canvas{display:block;touch-action:none;position:fixed;top:0;left:0}
       <button class="auth-btn" id="auth-verified-btn" onclick="authCheckVerified()" style="background:#226644;color:#fff;margin-bottom:8px">I've verified ✓</button>
       <button class="auth-btn" id="auth-back" onclick="authBackToSignin()" style="background:transparent;color:#88ccff;border:1.5px solid #224466;font-size:12px">Back to sign in</button>
     </div>
-    <!-- Password reset screen -->
+    <!-- Password reset — step 1: send email -->
     <div id="auth-reset-box" style="display:none">
       <input class="auth-inp" id="auth-reset-email" type="email" placeholder="Your email address" onkeydown="if(event.key==='Enter')authSendReset()">
-      <div id="auth-reset-sent" style="display:none;color:#55cc88;font-size:12px;text-align:center;margin-bottom:10px">✓ Reset link sent! Check your inbox.</div>
+      <div id="auth-reset-sent" style="display:none;color:#55cc88;font-size:12px;text-align:center;margin-bottom:10px">✓ Reset link sent! Check your inbox (and Spam).</div>
       <button class="auth-btn" id="auth-reset-btn" onclick="authSendReset()" style="background:#226644;color:#fff;margin-bottom:8px">Send reset link</button>
       <button class="auth-btn" onclick="authBackFromForgot()" style="background:transparent;color:#88ccff;border:1.5px solid #224466;font-size:12px">Back to sign in</button>
+    </div>
+    <!-- Password reset — step 2: set new password (shown when oobCode in URL) -->
+    <div id="auth-newpass-box" style="display:none;text-align:center">
+      <div style="font-size:36px;margin-bottom:8px">🔑</div>
+      <p style="color:#88ccff;font-size:12px;margin-bottom:12px">Enter your new password</p>
+      <input class="auth-inp" id="auth-np1" type="password" placeholder="New password (min 6 chars)" onkeydown="if(event.key==='Enter')document.getElementById('auth-np2').focus()">
+      <input class="auth-inp" id="auth-np2" type="password" placeholder="Confirm new password" onkeydown="if(event.key==='Enter')authConfirmReset()">
+      <button class="auth-btn" id="auth-np-btn" onclick="authConfirmReset()" style="background:#226644;color:#fff;margin-bottom:8px">Set new password</button>
+      <button class="auth-btn" onclick="authBackToSignin()" style="background:transparent;color:#88ccff;border:1.5px solid #224466;font-size:12px">Back to sign in</button>
     </div>
     <a id="auth-report-link" onclick="showSupport()">Having trouble? Report a problem</a>
   </div>
@@ -343,6 +352,7 @@ function authBackToSignin(){
   document.getElementById('auth-form').style.display='block';
   document.getElementById('auth-verify-box').style.display='none';
   document.getElementById('auth-reset-box').style.display='none';
+  document.getElementById('auth-newpass-box').style.display='none';
   document.getElementById('auth-sub').textContent='Sign in to track your scores';
   document.getElementById('auth-submit').textContent='SIGN IN';
   document.getElementById('auth-toggle').textContent='Create account';
@@ -487,7 +497,9 @@ async function authSendReset(){
   const btn=document.getElementById('auth-reset-btn');
   btn.disabled=true;btn.textContent='Sending...';
   errEl.textContent='';
-  const r=await _fbAuthReq('sendOobCode',{requestType:'PASSWORD_RESET',email});
+  // continueUrl brings user back to the game after clicking the email link
+  const continueUrl=location.href.split('?')[0].split('#')[0];
+  const r=await _fbAuthReq('sendOobCode',{requestType:'PASSWORD_RESET',email,continueUrl});
   if(r&&r.error){
     const MSG={EMAIL_NOT_FOUND:'No account with that email',TOO_MANY_ATTEMPTS_TRY_LATER:'Too many attempts, try later'};
     errEl.textContent=MSG[r.error.message]||r.error.message||'Error, try again';
@@ -498,6 +510,53 @@ async function authSendReset(){
   btn.textContent='Send again';
   setTimeout(()=>{btn.disabled=false;},4000);
 }
+
+let _resetOobCode='';
+async function authConfirmReset(){
+  const p1=document.getElementById('auth-np1').value;
+  const p2=document.getElementById('auth-np2').value;
+  const errEl=document.getElementById('auth-err');
+  errEl.textContent='';
+  if(p1.length<6){errEl.textContent='Password must be at least 6 characters';return;}
+  if(p1!==p2){errEl.textContent='Passwords do not match';return;}
+  const btn=document.getElementById('auth-np-btn');
+  btn.disabled=true;btn.textContent='Saving...';
+  const r=await _fbAuthReq('resetPassword',{oobCode:_resetOobCode,newPassword:p1});
+  btn.disabled=false;btn.textContent='Set new password';
+  if(r&&r.error){
+    const MSG={EXPIRED_OOB_CODE:'Reset link expired — request a new one',INVALID_OOB_CODE:'Invalid reset link — request a new one'};
+    errEl.textContent=MSG[r.error.message]||r.error.message||'Error, try again';
+    return;
+  }
+  // Success — go to sign-in with email pre-filled
+  _resetOobCode='';
+  authBackToSignin();
+  document.getElementById('auth-email').value=r.email||'';
+  document.getElementById('auth-err').textContent='';
+  document.getElementById('auth-sub').textContent='✓ Password updated — sign in';
+}
+// Check URL for oobCode on page load (user came back from reset email link)
+(()=>{
+  const p=new URLSearchParams(location.search);
+  if(p.get('mode')==='resetPassword'&&p.get('oobCode')){
+    _resetOobCode=p.get('oobCode');
+    // Show new-password form once the overlay is visible
+    const _showNewPass=()=>{
+      const ol=document.getElementById('auth-overlay');
+      if(ol)ol.style.display='flex';
+      document.getElementById('auth-form').style.display='none';
+      document.getElementById('auth-verify-box').style.display='none';
+      document.getElementById('auth-reset-box').style.display='none';
+      document.getElementById('auth-newpass-box').style.display='block';
+      document.getElementById('auth-sub').textContent='Set new password';
+      document.getElementById('auth-err').textContent='';
+      // Clean URL so refresh doesn't re-trigger
+      history.replaceState(null,'',location.pathname);
+    };
+    // Delay slightly so the game and overlay are initialized
+    setTimeout(_showNewPass,600);
+  }
+})();
 
 // ── Support / Bug report ───────────────────────────────────────────────────────
 function showSupport(){
