@@ -283,10 +283,34 @@ async function _loadUserCallsign(){
     playerCallsign=cs;
     try{localStorage.setItem('ss_callsign',cs);}catch(e){}
   }
+  await _loadProgressFromCloud();
 }
 async function _saveUserCallsign(cs){
   if(!authUid||!_fbOK)return;
   _fbPut('users/'+authUid+'/callsign',cs);
+}
+
+// ── Cloud progress sync ────────────────────────────────────────────────────────
+async function _saveProgressToCloud(){
+  if(!authUid||!_fbOK)return;
+  _fbPut('users/'+authUid+'/progress',{
+    unlocked:maxUnlocked,
+    arcScore:arcadeBestScore,
+    arcCombo:arcadeBestCombo,
+    arcLevel:arcadeBestLevel
+  });
+}
+async function _loadProgressFromCloud(){
+  if(!authUid||!_fbOK)return;
+  const p=await _fbGet('users/'+authUid+'/progress');
+  if(!p)return;
+  // Take the best of cloud vs local for each field (updates localStorage directly to avoid re-upload loop)
+  if((p.unlocked||0)>maxUnlocked){maxUnlocked=p.unlocked;try{localStorage.setItem('ss_unlocked',maxUnlocked);}catch(e){}}
+  if((p.arcScore||0)>arcadeBestScore){arcadeBestScore=p.arcScore;try{localStorage.setItem('ss_arc_score',arcadeBestScore);}catch(e){}}
+  if((p.arcCombo||0)>arcadeBestCombo){arcadeBestCombo=p.arcCombo;try{localStorage.setItem('ss_arc_combo',arcadeBestCombo);}catch(e){}}
+  if((p.arcLevel||0)>arcadeBestLevel){arcadeBestLevel=p.arcLevel;try{localStorage.setItem('ss_arc_lvl',arcadeBestLevel);}catch(e){}}
+  // Push merged best back so cloud stays up to date if local had anything better
+  _saveProgressToCloud();
 }
 function _hideAuthOverlay(){
   const el=document.getElementById('auth-overlay');
@@ -994,7 +1018,7 @@ const ARCADE_WEIGHTS={
   4:{fighter:3,scout:3,heavy:2,mine:2,gunship:1},
 };
 
-function saveProgress(n){try{localStorage.setItem('ss_unlocked',n);}catch(e){}}
+function saveProgress(n){try{localStorage.setItem('ss_unlocked',n);}catch(e){}if(typeof _saveProgressToCloud==='function')_saveProgressToCloud();}
 function loadProgress(){try{return parseInt(localStorage.getItem('ss_unlocked'))||0;}catch(e){return 0;}}
 
 // ── Stars (parallax layers) ────────────────────────────────────────────────────
@@ -2295,6 +2319,7 @@ function saveArcadeRecord(){
   if(score>arcadeBestScore){arcadeBestScore=score;try{localStorage.setItem('ss_arc_score',score);}catch(e){}}
   if(bestCombo>arcadeBestCombo){arcadeBestCombo=bestCombo;try{localStorage.setItem('ss_arc_combo',bestCombo);}catch(e){}}
   if(level>arcadeBestLevel){arcadeBestLevel=level;try{localStorage.setItem('ss_arc_lvl',level);}catch(e){}}
+  if(changed)_saveProgressToCloud();
   return changed;
 }
 let statsGames=parseInt(localStorage.getItem('ss_stat_games')||'0');
