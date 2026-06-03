@@ -199,8 +199,10 @@ function resize(){
 }
 resize();
 window.addEventListener('resize',resize);
-document.addEventListener('visibilitychange',()=>{if(document.hidden){_mStop();_prevGS='';}});
-window.addEventListener('pagehide',()=>{_mStop();_prevGS='';})
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){_mStop();_prevGS='';_flushOnHide();}
+});
+window.addEventListener('pagehide',()=>{_mStop();_prevGS='';_flushOnHide();})
 
 const rnd=(a,b)=>Math.random()*(b-a)+a;
 const rndInt=(a,b)=>Math.floor(rnd(a,b+1));
@@ -705,6 +707,24 @@ function upgradeGuest(){
   const ol=document.getElementById('auth-overlay');
   if(ol){ol.style.display='flex';setTimeout(()=>document.getElementById('auth-email').focus(),50);}
 }
+
+// ── Flush on hide / close ─────────────────────────────────────────────────────
+function _flushOnHide(){
+  // Flush mid-session kills to Firebase global stats
+  if(typeof globalFlushKills==='function')globalFlushKills();
+  // Save cloud progress if signed in (includes any mid-session bests)
+  if(typeof _saveProgressToCloud==='function')_saveProgressToCloud();
+}
+
+// ── Auto token refresh (every 50 min) ────────────────────────────────────────
+setInterval(async()=>{
+  if(!authUid)return;
+  const rt=localStorage.getItem('ss_auth_refresh');
+  if(!rt)return;
+  const d=await _fbTokenRefresh(rt);
+  if(d.id_token)_saveAuth(d);
+  else _clearAuth();
+},50*60*1000);
 
 // Silently restore session on page load
 (async()=>{
