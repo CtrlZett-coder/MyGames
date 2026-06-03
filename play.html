@@ -14,8 +14,8 @@
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:100%;height:100%;background:#000;overflow:hidden}
 canvas{display:block;touch-action:none;position:fixed;top:0;left:0}
-#auth-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.88);display:flex;align-items:center;justify-content:center;z-index:100;font-family:monospace;}
-#auth-box{background:#0a1628;border:2px solid #00c8ff;border-radius:12px;padding:28px 32px;width:310px;max-width:90vw;box-shadow:0 0 40px rgba(0,200,255,0.25);}
+#auth-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.88);display:none;align-items:center;justify-content:center;z-index:100;font-family:monospace;}
+#auth-box{background:#0a1628;border:2px solid #00c8ff;border-radius:12px;padding:20px 22px;width:290px;max-width:88vw;box-shadow:0 0 40px rgba(0,200,255,0.25);}
 #auth-box h2{color:#00c8ff;text-align:center;margin:0 0 4px;letter-spacing:3px;font-size:20px;}
 #auth-box p{color:#88ccff;text-align:center;margin:0 0 16px;font-size:12px;}
 #auth-err{color:#ff6666;text-align:center;min-height:16px;font-size:12px;margin-bottom:8px;}
@@ -242,6 +242,7 @@ async function _fbIncBy(p,n){if(n<=0)return;const c=await _fbGet(p)||0;await _fb
 // ── Firebase Auth ──────────────────────────────────────────────────────────────
 const FB_API_KEY='AIzaSyBOppZ8UZPXwVFpjDW9ghG2gIpLErZ8PbU';
 const GOOGLE_CLIENT_ID='YOUR_GOOGLE_CLIENT_ID'; // set after enabling Google in Firebase console
+let _showAuthAfterIntro=false; // set by session restore; overlay shown only after intro ends
 let authIdToken=localStorage.getItem('ss_auth_token')||'';
 let authUid=localStorage.getItem('ss_auth_uid')||'';
 let authEmail=localStorage.getItem('ss_auth_email')||'';
@@ -744,11 +745,12 @@ setInterval(async()=>{
     if(d.id_token){
       _saveAuth(d); // provider already in localStorage, preserved by _saveAuth
       await _loadUserCallsign();
-      _hideAuthOverlay();
+      // Overlay already hidden (display:none in CSS) — nothing to do
       return;
     }else{_clearAuth();}
   }
-  // No session — overlay stays visible
+  // No session — show auth overlay only after intro animation finishes
+  _showAuthAfterIntro=true;
 })();
 
 async function fetchGlobalData(){
@@ -2223,7 +2225,14 @@ function _drawPlayerAt(cx,cy){
   ctx.shadowBlur=0;ctx.restore();
 }
 
-function skipIntro(){gameState='menu';}
+function _maybeShowAuthOverlay(){
+  if(_showAuthAfterIntro){
+    _showAuthAfterIntro=false;
+    const ol=document.getElementById('auth-overlay');
+    if(ol)ol.style.display='flex';
+  }
+}
+function skipIntro(){gameState='menu';_maybeShowAuthOverlay();}
 
 function updateIntro(){
   introT++;
@@ -2237,7 +2246,7 @@ function updateIntro(){
     if(introT===175)[1046.5,1318.5,1568,2093,2637].forEach((f,i)=>setTimeout(()=>playTone(f,0.55,'sine',0.030),i*55));
     if(introT===220)playTone(880,0.7,'sine',0.034);
   }
-  if(introT>=300)gameState='menu';
+  if(introT>=300){gameState='menu';_maybeShowAuthOverlay();}
 }
 
 function drawIntro(){
@@ -3731,7 +3740,7 @@ canvas.addEventListener('touchstart',e=>{
       break;
     }
     if(gameState==='playing'){
-      if(hitBtn(x,y)==='hud_pause'){gameState='paused';clearTouch();break;}
+      if(hitBtn(x,y)==='hud_pause'){gameState='paused';_openPause();clearTouch();break;}
       if(touchMode)touchDown(t.identifier,x,y);
     }else{handleBtn(hitBtn(x,y));}
   }
