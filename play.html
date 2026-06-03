@@ -43,9 +43,39 @@ canvas{display:block;touch-action:none;position:fixed;top:0;left:0}
 #sup-submit{background:#226644;color:#fff;}
 #sup-submit:hover{background:#33aa66;}
 #sup-submit:disabled{background:#224455;cursor:default;}
+.auth-divider{display:flex;align-items:center;gap:8px;margin:4px 0 10px;color:#334455;font-size:11px;}
+.auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:#1e3050;}
+.google-btn{width:100%;padding:10px;margin-bottom:6px;border:1.5px solid #334466;border-radius:7px;background:#0d1f3a;color:#cce;font-family:monospace;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;letter-spacing:0.5px;}
+.google-btn:hover{border-color:#4488cc;background:#122030;}
+.google-btn:disabled{opacity:0.5;cursor:default;}
+#account-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.88);display:none;align-items:center;justify-content:center;z-index:103;font-family:monospace;}
+#account-box{background:#0a1628;border:2px solid #00c8ff;border-radius:12px;padding:22px 28px 20px;width:330px;max-width:92vw;max-height:90vh;overflow-y:auto;box-shadow:0 0 40px rgba(0,200,255,0.2);}
+#account-box h2{color:#00c8ff;text-align:center;margin:0 0 2px;letter-spacing:3px;font-size:18px;}
+.acc-email{color:#446688;text-align:center;font-size:12px;margin-bottom:14px;}
+.acc-section{border-top:1px solid #1e3050;padding-top:12px;margin-top:12px;}
+.acc-section-title{color:#88ccff;font-size:12px;font-weight:bold;letter-spacing:1px;margin-bottom:8px;text-transform:uppercase;}
+.acc-row{display:flex;gap:8px;margin-bottom:4px;}
+.acc-row .auth-inp{flex:1;margin-bottom:0;}
+.acc-save-btn{padding:9px 14px;border:none;border-radius:7px;font-family:monospace;font-weight:bold;font-size:13px;cursor:pointer;background:#00a0cc;color:#fff;white-space:nowrap;}
+.acc-save-btn:hover{background:#00c8ff;}
+.acc-save-btn:disabled{background:#224466;cursor:default;}
+.acc-msg{font-size:12px;min-height:16px;margin:4px 0 2px;text-align:center;}
+.acc-msg.ok{color:#55cc88;}
+.acc-msg.err{color:#ff6666;}
+#acc-delete-btn{width:100%;padding:9px;border:1.5px solid #552222;border-radius:7px;background:transparent;color:#ff6666;font-family:monospace;font-size:13px;cursor:pointer;}
+#acc-delete-btn:hover{background:rgba(180,30,30,0.15);}
+#acc-delete-confirm{display:none;margin-top:8px;}
+#acc-delete-confirm p{color:#ff9988;font-size:12px;margin-bottom:10px;line-height:1.5;}
+#acc-delete-exec{width:100%;padding:10px;border:none;border-radius:7px;background:#aa2222;color:#fff;font-family:monospace;font-weight:bold;font-size:14px;cursor:pointer;margin-bottom:6px;}
+#acc-delete-exec:hover{background:#cc3333;}
+#acc-delete-exec:disabled{background:#442222;cursor:default;}
+#acc-cancel-del{width:100%;padding:8px;border:1.5px solid #334455;border-radius:7px;background:transparent;color:#88ccff;font-family:monospace;font-size:12px;cursor:pointer;}
+#acc-signout-btn{width:100%;padding:10px;margin-top:12px;border:none;border-radius:7px;border:1.5px solid #224466;background:rgba(40,60,100,0.6);color:#88aacc;font-family:monospace;font-size:13px;cursor:pointer;}
+#acc-signout-btn:hover{border-color:#4488cc;color:#cce;}
 </style>
 </head>
 <body>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <canvas id="c"></canvas>
 <div id="auth-overlay">
   <div id="auth-box">
@@ -54,6 +84,11 @@ canvas{display:block;touch-action:none;position:fixed;top:0;left:0}
     <div id="auth-err"></div>
     <!-- Sign in / Sign up form -->
     <div id="auth-form">
+      <button class="google-btn" id="auth-google-btn" onclick="triggerGoogleSignIn()" style="display:none">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.33 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-3.59-13.46-8.91l-7.98 6.19C6.51 42.67 14.62 48 24 48z"/></svg>
+        Continue with Google
+      </button>
+      <div class="auth-divider" id="auth-google-divider" style="display:none">or</div>
       <input class="auth-inp" id="auth-email" type="email" placeholder="Email" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('auth-pass').focus()">
       <input class="auth-inp" id="auth-pass" type="password" placeholder="Password (min 6 chars)" autocomplete="new-password" onkeydown="if(event.key==='Enter'){const cf=document.getElementById('auth-confirm');const cl=document.getElementById('auth-call');if(cf.style.display!=='none')cf.focus();else if(cl.style.display!=='none')cl.focus();else authSubmit();}">
       <a id="auth-forgot-link" onclick="authShowForgot()">Forgot password?</a>
@@ -106,6 +141,47 @@ canvas{display:block;touch-action:none;position:fixed;top:0;left:0}
     </div>
   </div>
 </div>
+<!-- Account management overlay -->
+<div id="account-overlay">
+  <div id="account-box">
+    <h2>MY ACCOUNT</h2>
+    <div class="acc-email" id="acc-email-label"></div>
+    <!-- Callsign -->
+    <div class="acc-section">
+      <div class="acc-section-title">Callsign / Display Name</div>
+      <div class="acc-row">
+        <input class="auth-inp" id="acc-callsign" type="text" maxlength="20" placeholder="Your callsign" onkeydown="if(event.key==='Enter')saveAccountCallsign()">
+        <button class="acc-save-btn" onclick="saveAccountCallsign()">Save</button>
+      </div>
+      <div class="acc-msg" id="acc-callsign-msg"></div>
+    </div>
+    <!-- Change password (email users only) -->
+    <div class="acc-section" id="acc-pass-section">
+      <div class="acc-section-title">Change Password</div>
+      <input class="auth-inp" id="acc-pass-cur" type="password" placeholder="Current password">
+      <input class="auth-inp" id="acc-pass-new" type="password" placeholder="New password (min 6 chars)">
+      <input class="auth-inp" id="acc-pass-conf" type="password" placeholder="Confirm new password" onkeydown="if(event.key==='Enter')changePassword()">
+      <button class="acc-save-btn" id="acc-pass-btn" onclick="changePassword()" style="width:100%">Update Password</button>
+      <div class="acc-msg" id="acc-pass-msg"></div>
+    </div>
+    <!-- Delete account -->
+    <div class="acc-section">
+      <div class="acc-section-title">Danger Zone</div>
+      <button id="acc-delete-btn" onclick="showDeleteConfirm()">Delete Account</button>
+      <div id="acc-delete-confirm">
+        <p id="acc-delete-desc"></p>
+        <input class="auth-inp" id="acc-delete-pass" type="password" placeholder="Enter your password to confirm">
+        <button id="acc-delete-exec" onclick="confirmDeleteAccount()">Permanently Delete Account</button>
+        <button id="acc-cancel-del" onclick="cancelDeleteAccount()">Cancel</button>
+      </div>
+      <div class="acc-msg" id="acc-delete-msg"></div>
+    </div>
+    <!-- Sign out -->
+    <button id="acc-signout-btn" onclick="accSignOut()">Sign Out</button>
+    <!-- Close -->
+    <button class="auth-btn" onclick="hideAccount()" style="background:transparent;color:#88ccff;border:1.5px solid #224466;font-size:12px;margin-top:8px">Close</button>
+  </div>
+</div>
 <script>
 'use strict';
 let GW=900,GH=600;
@@ -154,14 +230,17 @@ async function _fbReq(path,opts){
 async function _fbGet(p){return _fbReq(p);}
 async function _fbPut(p,v){return _fbReq(p,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)});}
 async function _fbPost(p,v){return _fbReq(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)});}
+async function _fbDelete(p){return _fbReq(p,{method:'DELETE'});}
 async function _fbInc(p){const c=await _fbGet(p)||0;await _fbPut(p,c+1);}
 async function _fbIncBy(p,n){if(n<=0)return;const c=await _fbGet(p)||0;await _fbPut(p,c+n);}
 
 // ── Firebase Auth ──────────────────────────────────────────────────────────────
 const FB_API_KEY='AIzaSyBOppZ8UZPXwVFpjDW9ghG2gIpLErZ8PbU';
+const GOOGLE_CLIENT_ID='YOUR_GOOGLE_CLIENT_ID'; // set after enabling Google in Firebase console
 let authIdToken=localStorage.getItem('ss_auth_token')||'';
 let authUid=localStorage.getItem('ss_auth_uid')||'';
 let authEmail=localStorage.getItem('ss_auth_email')||'';
+let authProvider=localStorage.getItem('ss_auth_provider')||''; // 'email' | 'google'
 let _authMode='signin';
 
 async function _fbAuthReq(endpoint,body){
@@ -179,21 +258,23 @@ async function _fbTokenRefresh(rt){
     return r.json();
   }catch(e){return{};}
 }
-function _saveAuth(d){
+function _saveAuth(d,provider=''){
   authIdToken=d.idToken||d.id_token||'';
   authUid=d.localId||d.user_id||'';
   authEmail=d.email||authEmail;
+  if(provider)authProvider=provider;
   try{
     localStorage.setItem('ss_auth_token',authIdToken);
     localStorage.setItem('ss_auth_uid',authUid);
     localStorage.setItem('ss_auth_email',authEmail);
+    if(authProvider)localStorage.setItem('ss_auth_provider',authProvider);
     const rt=d.refreshToken||d.refresh_token||'';
     if(rt)localStorage.setItem('ss_auth_refresh',rt);
   }catch(e){}
 }
 function _clearAuth(){
-  authIdToken='';authUid='';authEmail='';
-  try{['ss_auth_token','ss_auth_uid','ss_auth_email','ss_auth_refresh'].forEach(k=>localStorage.removeItem(k));}catch(e){}
+  authIdToken='';authUid='';authEmail='';authProvider='';
+  try{['ss_auth_token','ss_auth_uid','ss_auth_email','ss_auth_refresh','ss_auth_provider'].forEach(k=>localStorage.removeItem(k));}catch(e){}
 }
 async function _loadUserCallsign(){
   if(!authUid||!_fbOK)return;
@@ -257,7 +338,7 @@ async function authCheckVerified(){
   if(verified){
     // Save auth and proceed
     const tempData={idToken:_pendingVerifyToken,localId:authUid,email:_pendingVerifyEmail};
-    _saveAuth(tempData);
+    _saveAuth(tempData,'email');
     if(_pendingCallsign){
       playerCallsign=_pendingCallsign;
       try{localStorage.setItem('ss_callsign',_pendingCallsign);}catch(e){}
@@ -321,7 +402,7 @@ async function authSubmit(){
     _pendingVerifyToken=data.idToken;
     _pendingVerifyEmail=email;
     _pendingCallsign=call||'Pilot';
-    _saveAuth(data); // save uid so we can write callsign later
+    _saveAuth(data,'email'); // save uid so we can write callsign later
     await _sendVerificationEmail(data.idToken);
     _showVerifyScreen(email);
   }else{
@@ -330,12 +411,12 @@ async function authSubmit(){
       _pendingVerifyToken=data.idToken;
       _pendingVerifyEmail=email;
       _pendingCallsign='';
-      _saveAuth(data);
+      _saveAuth(data,'email');
       await _sendVerificationEmail(data.idToken);
       _showVerifyScreen(email);
       return;
     }
-    _saveAuth(data);
+    _saveAuth(data,'email');
     await _loadUserCallsign();
     if(!playerCallsign)playerCallsign=authEmail.split('@')[0]||'Pilot';
     _hideAuthOverlay();
@@ -410,13 +491,204 @@ async function submitSupport(){
   document.getElementById('sup-success').style.display='block';
 }
 
+// ── Google Sign-In ─────────────────────────────────────────────────────────────
+function _initGIS(){
+  if(GOOGLE_CLIENT_ID==='YOUR_GOOGLE_CLIENT_ID'||!window.google?.accounts?.id)return;
+  google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID,callback:_handleGoogleCredential,auto_select:false});
+  // Show button when GIS is ready
+  const btn=document.getElementById('auth-google-btn');
+  const div=document.getElementById('auth-google-divider');
+  if(btn){btn.style.display='flex';}
+  if(div){div.style.display='flex';}
+}
+async function _handleGoogleCredential(response){
+  const errEl=document.getElementById('auth-err');
+  const btn=document.getElementById('auth-google-btn');
+  if(btn){btn.disabled=true;}
+  if(errEl)errEl.textContent='';
+  const googleToken=response.credential;
+  const data=await _fbAuthReq('signInWithIdp',{
+    postBody:`id_token=${googleToken}&providerId=google.com`,
+    requestUri:window.location.href,
+    returnIdpCredential:true,
+    returnSecureToken:true
+  });
+  if(btn){btn.disabled=false;}
+  if(data.error){
+    if(errEl)errEl.textContent=data.error.message||'Google sign-in failed';
+    return;
+  }
+  _saveAuth(data,'google');
+  await _loadUserCallsign();
+  if(!playerCallsign){
+    playerCallsign=data.displayName||data.email?.split('@')[0]||'Pilot';
+    await _saveUserCallsign(playerCallsign);
+    try{localStorage.setItem('ss_callsign',playerCallsign);}catch(e){}
+  }
+  _hideAuthOverlay();
+}
+function triggerGoogleSignIn(){
+  const errEl=document.getElementById('auth-err');
+  if(GOOGLE_CLIENT_ID==='YOUR_GOOGLE_CLIENT_ID'){
+    if(errEl)errEl.textContent='Google Sign-In not configured yet';return;
+  }
+  if(!window.google?.accounts?.id){
+    if(errEl)errEl.textContent='Google Sign-In loading, try again';return;
+  }
+  google.accounts.id.prompt();
+}
+// Run _initGIS once GIS script is ready
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',()=>{
+    const s=document.querySelector('script[src*="accounts.google.com"]');
+    if(s)s.addEventListener('load',_initGIS);else _initGIS();
+  });
+}else{
+  const s=document.querySelector('script[src*="accounts.google.com"]');
+  if(s&&!s.dataset.initBound){s.dataset.initBound='1';s.addEventListener('load',_initGIS);}
+  else _initGIS();
+}
+
+// ── Account management overlay ─────────────────────────────────────────────────
+function showAccount(){
+  document.getElementById('account-overlay').style.display='flex';
+  document.getElementById('acc-email-label').textContent=authEmail;
+  document.getElementById('acc-callsign').value=playerCallsign||'';
+  document.getElementById('acc-callsign-msg').textContent='';
+  document.getElementById('acc-callsign-msg').className='acc-msg';
+  // Password section: only for email users
+  const passSection=document.getElementById('acc-pass-section');
+  passSection.style.display=authProvider==='google'?'none':'block';
+  document.getElementById('acc-pass-cur').value='';
+  document.getElementById('acc-pass-new').value='';
+  document.getElementById('acc-pass-conf').value='';
+  document.getElementById('acc-pass-msg').textContent='';
+  document.getElementById('acc-pass-msg').className='acc-msg';
+  // Delete section reset
+  cancelDeleteAccount();
+  document.getElementById('acc-delete-msg').textContent='';
+}
+function hideAccount(){
+  document.getElementById('account-overlay').style.display='none';
+}
+async function saveAccountCallsign(){
+  const val=document.getElementById('acc-callsign').value.trim();
+  const msg=document.getElementById('acc-callsign-msg');
+  msg.className='acc-msg';
+  if(!val||val.length<2||val.length>20){msg.className='acc-msg err';msg.textContent='2–20 characters';return;}
+  const btn=document.querySelector('#account-box .acc-save-btn');
+  btn.disabled=true;
+  playerCallsign=val;
+  try{localStorage.setItem('ss_callsign',val);}catch(e){}
+  await _saveUserCallsign(val);
+  btn.disabled=false;
+  msg.className='acc-msg ok';msg.textContent='✓ Saved!';
+  setTimeout(()=>{msg.textContent='';},2500);
+}
+async function changePassword(){
+  const cur=document.getElementById('acc-pass-cur').value;
+  const nw=document.getElementById('acc-pass-new').value;
+  const cf=document.getElementById('acc-pass-conf').value;
+  const msg=document.getElementById('acc-pass-msg');
+  msg.className='acc-msg';msg.textContent='';
+  if(!cur){msg.className='acc-msg err';msg.textContent='Enter current password';return;}
+  if(nw.length<6){msg.className='acc-msg err';msg.textContent='New password: at least 6 characters';return;}
+  if(nw!==cf){msg.className='acc-msg err';msg.textContent='Passwords do not match';return;}
+  const btn=document.getElementById('acc-pass-btn');
+  btn.disabled=true;btn.textContent='Updating...';
+  // Re-auth with current password to get fresh token
+  const reauth=await _fbAuthReq('signInWithPassword',{email:authEmail,password:cur,returnSecureToken:true});
+  if(reauth.error){
+    btn.disabled=false;btn.textContent='Update Password';
+    const M={INVALID_LOGIN_CREDENTIALS:'Current password is wrong',INVALID_PASSWORD:'Current password is wrong'};
+    msg.className='acc-msg err';msg.textContent=M[reauth.error.message]||'Re-authentication failed';return;
+  }
+  const upd=await _fbAuthReq('update',{idToken:reauth.idToken,password:nw,returnSecureToken:true});
+  btn.disabled=false;btn.textContent='Update Password';
+  if(upd.error){msg.className='acc-msg err';msg.textContent=upd.error.message||'Error';return;}
+  _saveAuth(upd,'email');
+  msg.className='acc-msg ok';msg.textContent='✓ Password updated!';
+  document.getElementById('acc-pass-cur').value='';
+  document.getElementById('acc-pass-new').value='';
+  document.getElementById('acc-pass-conf').value='';
+  setTimeout(()=>{msg.textContent='';},3000);
+}
+function showDeleteConfirm(){
+  document.getElementById('acc-delete-confirm').style.display='block';
+  document.getElementById('acc-delete-btn').style.display='none';
+  const desc=document.getElementById('acc-delete-desc');
+  const passRow=document.getElementById('acc-delete-pass');
+  if(authProvider==='google'){
+    desc.textContent='This will permanently delete your account and all your scores. This cannot be undone.';
+    passRow.style.display='none';
+  }else{
+    desc.textContent='This will permanently delete your account and all your scores. Enter your password to confirm.';
+    passRow.style.display='block';passRow.value='';
+  }
+}
+function cancelDeleteAccount(){
+  document.getElementById('acc-delete-confirm').style.display='none';
+  document.getElementById('acc-delete-btn').style.display='block';
+  document.getElementById('acc-delete-msg').textContent='';
+}
+async function confirmDeleteAccount(){
+  const msg=document.getElementById('acc-delete-msg');
+  msg.className='acc-msg';msg.textContent='';
+  const passEl=document.getElementById('acc-delete-pass');
+  let freshToken=authIdToken;
+  if(authProvider!=='google'){
+    const pass=passEl.value;
+    if(!pass){msg.className='acc-msg err';msg.textContent='Enter your password';return;}
+    const reauth=await _fbAuthReq('signInWithPassword',{email:authEmail,password:pass,returnSecureToken:true});
+    if(reauth.error){
+      const M={INVALID_LOGIN_CREDENTIALS:'Wrong password',INVALID_PASSWORD:'Wrong password'};
+      msg.className='acc-msg err';msg.textContent=M[reauth.error.message]||'Wrong password';return;
+    }
+    freshToken=reauth.idToken;
+  }
+  const btn=document.getElementById('acc-delete-exec');
+  btn.disabled=true;btn.textContent='Deleting...';
+  // Delete from Firebase Auth
+  const del=await _fbAuthReq('delete',{idToken:freshToken});
+  if(del&&del.error){
+    btn.disabled=false;btn.textContent='Permanently Delete Account';
+    msg.className='acc-msg err';msg.textContent=del.error.message||'Error deleting account';return;
+  }
+  // Delete user data from DB
+  if(_fbOK&&authUid){
+    await _fbDelete('users/'+authUid);
+    await _fbDelete('arcade_lb/'+authUid);
+  }
+  _clearAuth();
+  playerCallsign=localStorage.getItem('ss_callsign')||'';
+  hideAccount();
+  // Show auth overlay
+  const ol=document.getElementById('auth-overlay');
+  if(ol){ol.style.display='flex';}
+}
+function accSignOut(){
+  _clearAuth();
+  playerCallsign=localStorage.getItem('ss_callsign')||'';
+  hideAccount();
+}
+
+// ── Guest upgrade helper ───────────────────────────────────────────────────────
+function upgradeGuest(){
+  // Reset form to sign-up mode
+  if(_authMode!=='signup'){authToggleMode();}
+  document.getElementById('auth-sub').textContent='Save your score — create a free account';
+  document.getElementById('auth-err').textContent='';
+  const ol=document.getElementById('auth-overlay');
+  if(ol){ol.style.display='flex';setTimeout(()=>document.getElementById('auth-email').focus(),50);}
+}
+
 // Silently restore session on page load
 (async()=>{
   const rt=localStorage.getItem('ss_auth_refresh');
   if(rt){
     const d=await _fbTokenRefresh(rt);
     if(d.id_token){
-      _saveAuth(d);
+      _saveAuth(d); // provider already in localStorage, preserved by _saveAuth
       await _loadUserCallsign();
       _hideAuthOverlay();
       return;
@@ -2937,7 +3209,7 @@ function drawMenu(){
 
   // Account button (top-left, after wipe icon)
   if(authUid){
-    btnRects['m_signout']={x:52,y:9,w:108,h:28};
+    btnRects['m_account']={x:52,y:9,w:108,h:28};
     ctx.fillStyle=rgba(10,30,20,0.85);roundRect(52,9,108,28,6);ctx.fill();
     ctx.strokeStyle='#224433';ctx.lineWidth=1.5;roundRect(52,9,108,28,6);ctx.stroke();
     ctx.fillStyle='#55cc88';ctx.font='12px monospace';ctx.textAlign='center';
@@ -3056,6 +3328,14 @@ function drawGameOver(){
     ctx.fillStyle='#fff';ctx.font='bold 20px sans-serif';ctx.textAlign='center';
     ctx.fillText(label,x+w/2,y+h/2+7);
   });
+  if(!authUid&&score>0){
+    const sy=GH/2+yOff+gobtns.length*70+10,sw=220,sh=36;
+    btnRects['g_signup']={x:GW/2-sw/2,y:sy,w:sw,h:sh};
+    ctx.fillStyle=rgba(0,80,40,0.85);roundRect(GW/2-sw/2,sy,sw,sh,9);ctx.fill();
+    ctx.strokeStyle='#226644';ctx.lineWidth=1.5;roundRect(GW/2-sw/2,sy,sw,sh,9);ctx.stroke();
+    ctx.fillStyle='#55cc88';ctx.font='bold 13px sans-serif';ctx.textAlign='center';
+    ctx.fillText('💾 Save score — create account',GW/2,sy+sh/2+5);
+  }
 }
 
 function drawVictory(){
@@ -3064,20 +3344,25 @@ function drawVictory(){
   ctx.fillStyle='#ffdc00';ctx.shadowColor='#ffdc00';ctx.shadowBlur=22;
   ctx.fillText('VICTORY!',GW/2,GH/2-80);ctx.shadowBlur=0;
   ctx.fillStyle=AC;ctx.font='24px monospace';ctx.fillText('Score: '+score,GW/2,GH/2-28);
-  if(!authUid){
-    ctx.fillStyle='rgba(255,180,60,0.9)';ctx.font='14px sans-serif';ctx.textAlign='center';
-    ctx.fillText('Sign in to save your result to the leaderboard',GW/2,GH/2+5);
-  }
   const vbtns=[['PLAY AGAIN','retry'],['MAIN MENU','vmenu']];
   btnRects={};
+  const _vYoff=authUid?10:30;
   vbtns.forEach(([label,key],i)=>{
-    const x=GW/2-110,y=GH/2+10+i*70,w=220,h=50;
+    const x=GW/2-110,y=GH/2+_vYoff+i*70,w=220,h=50;
     btnRects['v_'+key]={x,y,w,h};
     ctx.fillStyle=rgba(20,40,80,0.85);roundRect(x,y,w,h,12);ctx.fill();
     ctx.strokeStyle='#224466';ctx.lineWidth=2;roundRect(x,y,w,h,12);ctx.stroke();
     ctx.fillStyle='#fff';ctx.font='bold 20px sans-serif';ctx.textAlign='center';
     ctx.fillText(label,x+w/2,y+h/2+7);
   });
+  if(!authUid){
+    const sy=GH/2+_vYoff+vbtns.length*70+10,sw=220,sh=36;
+    btnRects['v_signup']={x:GW/2-sw/2,y:sy,w:sw,h:sh};
+    ctx.fillStyle=rgba(0,80,40,0.85);roundRect(GW/2-sw/2,sy,sw,sh,9);ctx.fill();
+    ctx.strokeStyle='#226644';ctx.lineWidth=1.5;roundRect(GW/2-sw/2,sy,sw,sh,9);ctx.stroke();
+    ctx.fillStyle='#55cc88';ctx.font='bold 13px sans-serif';ctx.textAlign='center';
+    ctx.fillText('💾 Save score — create account',GW/2,sy+sh/2+5);
+  }
 }
 
 function drawStats(){
@@ -3273,11 +3558,8 @@ function handleBtn(key){
     if(ol){ol.style.display='flex';setTimeout(()=>document.getElementById('auth-email').focus(),50);}
     return;
   }
-  if(key==='m_signout'){
-    _clearAuth();
-    playerCallsign=localStorage.getItem('ss_callsign')||'';
-    return;
-  }
+  if(key==='m_account'){showAccount();return;}
+
   if(key==='m_stats'){fadeToScreen(()=>{gameState='stats';globalStatsLoaded=false;_lbScrollY=0;fetchGlobalData();});return;}
   if(key==='stats_back'){fadeToScreen(()=>{gameState='menu';});return;}
   if(key==='stats_tab_arcade'){statsLeaderboardTab='arcade';_lbScrollY=0;return;}
@@ -3315,6 +3597,7 @@ function handleBtn(key){
   if(key==='m_arcade'){fadeToScreen(()=>{wipeConfirm=false;menuSel=0;startGame('arcade');});return;}
   if(key==='m_levels'){fadeToScreen(()=>{wipeConfirm=false;gameState='level_select';lsCursor=0;});return;}
   if(key==='m_support'){showSupport();return;}
+  if(key==='g_signup'||key==='v_signup'){upgradeGuest();return;}
   if(key==='m_phone'){touchMode=!touchMode;return;}
   if(key==='ls_back'){fadeToScreen(()=>{gameState='menu';});return;}
   if(key.startsWith('ls_')){const i=parseInt(key.slice(3));if(i<=maxUnlocked){fadeToScreen(()=>startGame('levels',i));}return;}
