@@ -566,9 +566,10 @@ async function authSendReset(){
   const btn=document.getElementById('auth-reset-btn');
   btn.disabled=true;btn.textContent='Sending...';
   errEl.textContent='';
-  // continueUrl brings user back to the game after clicking the email link
-  const continueUrl=location.href.split('?')[0].split('#')[0];
-  const r=await _fbAuthReq('sendOobCode',{requestType:'PASSWORD_RESET',email,continueUrl});
+  const _loc=location.href.split('?')[0].split('#')[0];
+  const _body={requestType:'PASSWORD_RESET',email};
+  if(_loc.startsWith('http'))_body.continueUrl=_loc;
+  const r=await _fbAuthReq('sendOobCode',_body);
   if(r&&r.error){
     const MSG={EMAIL_NOT_FOUND:'No account with that email',TOO_MANY_ATTEMPTS_TRY_LATER:'Too many attempts, try later'};
     errEl.textContent=MSG[r.error.message]||r.error.message||'Error, try again';
