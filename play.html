@@ -387,7 +387,10 @@ function _hideAuthOverlay(){
 }
 let _pendingVerifyToken='',_pendingVerifyEmail='',_pendingCallsign='';
 async function _sendVerificationEmail(idToken){
-  return _fbAuthReq('sendOobCode',{requestType:'VERIFY_EMAIL',idToken});
+  const body={requestType:'VERIFY_EMAIL',idToken};
+  const loc=location.href.split('?')[0].split('#')[0];
+  if(loc.startsWith('http'))body.continueUrl=loc;
+  return _fbAuthReq('sendOobCode',body);
 }
 async function _isEmailVerified(idToken){
   const r=await _fbAuthReq('lookup',{idToken});
