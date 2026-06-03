@@ -651,8 +651,12 @@ async function submitSupport(){
   const btn=document.getElementById('sup-submit');
   btn.disabled=true;btn.textContent='Sending...';
   errEl.textContent='';
-  await _fbPost('support_tickets',{email,category:cat,message:msg,uid:authUid||null,date:new Date().toISOString()});
+  const r=await _fbPost('support_tickets',{email,category:cat,message:msg,uid:authUid||null,date:new Date().toISOString()});
   btn.disabled=false;btn.textContent='SEND';
+  if(!r||r.error){
+    errEl.textContent='Failed to send — check your connection and try again';
+    return;
+  }
   document.getElementById('sup-form').style.display='none';
   document.getElementById('sup-success').style.display='block';
 }
