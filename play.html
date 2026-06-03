@@ -100,8 +100,11 @@ canvas{display:block;touch-action:none;position:fixed;top:0;left:0}
     </div>
     <!-- Email verification screen -->
     <div id="auth-verify-box" style="display:none;text-align:center">
-      <div style="font-size:42px;margin-bottom:12px">📧</div>
-      <p id="auth-verify-msg" style="color:#88ccff;font-size:13px;margin-bottom:18px;line-height:1.6"></p>
+      <div style="font-size:38px;margin-bottom:8px">📧</div>
+      <p id="auth-verify-msg" style="color:#88ccff;font-size:13px;margin-bottom:10px;line-height:1.6;white-space:pre-line"></p>
+      <div style="background:rgba(255,180,0,0.12);border:1px solid rgba(255,180,0,0.4);border-radius:7px;padding:8px 10px;margin-bottom:14px;font-size:12px;color:#ffcc44;line-height:1.5">
+        ⚠️ Email may land in <b>Spam / Junk</b> folder.<br>From: <span style="color:#ffaa44">Space Shooter &lt;noreply@...firebaseapp.com&gt;</span>
+      </div>
       <button class="auth-btn" id="auth-resend" onclick="authResend()" style="background:#00a0cc;color:#fff;margin-bottom:8px">Resend email</button>
       <button class="auth-btn" id="auth-verified-btn" onclick="authCheckVerified()" style="background:#226644;color:#fff;margin-bottom:8px">I've verified ✓</button>
       <button class="auth-btn" id="auth-back" onclick="authBackToSignin()" style="background:transparent;color:#88ccff;border:1.5px solid #224466;font-size:12px">Back to sign in</button>
@@ -332,7 +335,7 @@ function _showVerifyScreen(email, sendFailed){
   document.getElementById('auth-sub').textContent='Verify your email';
   document.getElementById('auth-err').textContent=sendFailed?'⚠ Could not send email — tap "Resend email" to try again':'';
   document.getElementById('auth-verify-msg').textContent=
-    `A verification link was sent to:\n${email}\n\n📬 Check your Inbox AND Spam/Junk folder.\nClick the link, then press "I've verified ✓".`;
+    `Verification link sent to:\n${email}\n\nClick the link in the email,\nthen press "I've verified ✓".`;
 }
 function authBackToSignin(){
   _authMode='signin';
