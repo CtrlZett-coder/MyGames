@@ -580,7 +580,7 @@ async function authSendReset(){
   const email=document.getElementById('auth-reset-email').value.trim();
   const errEl=document.getElementById('auth-err');
   if(!email){errEl.textContent='Enter your email address';return;}
-  if(!_canResetPassword()){
+  if(!_isDev()&&!_canResetPassword()){
     const d=_resetCooldownDaysLeft();
     errEl.textContent=`Password reset available in ${d} day${d===1?'':'s'}`;
     return;
