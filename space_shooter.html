@@ -249,8 +249,8 @@ async function _fbAuthReq(endpoint,body){
   try{
     const r=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:${endpoint}?key=${FB_API_KEY}`,
       {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    return r.json();
-  }catch(e){return{error:{message:'NETWORK_ERROR'}};}
+    return await r.json();
+  }catch(e){return{error:{message:'NETWORK_ERROR',detail:String(e.message||e)}};}
 }
 async function _fbTokenRefresh(rt){
   try{
@@ -420,7 +420,7 @@ async function authSubmit(){
       TOO_MANY_ATTEMPTS_TRY_LATER:'Too many attempts, try later',
       NETWORK_ERROR:'Network error, try again'
     };
-    errEl.textContent=MSG[data.error.message]||data.error.message||'Error, try again';
+    errEl.textContent=MSG[data.error.message]||(data.error.detail?data.error.detail:data.error.message)||'Error, try again';
     return;
   }
   if(_authMode==='signup'){
