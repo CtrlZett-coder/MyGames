@@ -108,7 +108,6 @@ canvas{display:block;touch-action:none;position:fixed;top:0;left:0}
 </head>
 <body>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <canvas id="c"></canvas>
 <div id="auth-overlay">
   <div id="auth-box">
@@ -1771,7 +1770,6 @@ class Player{
       this.shootCd=this.shootDelay;
     }
     SND.shoot();
-    if(_mpActive&&_mpSocket)_mpSocket.emit('bf',{x:bx,y:this.y,vy:0});
   }
   takeDamage(){
     if(_mpActive&&gameMode==='mp_client')return null; // non-host is invincible for now
@@ -4013,103 +4011,191 @@ function handleBtn(key){
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// MULTIPLAYER
+// MULTIPLAYER (Firebase RTDB)
 // ══════════════════════════════════════════════════════════════════════════════
-const _MP_SERVER=localStorage.getItem('ss_mp_server')||'';
-let _mpSocket=null;
+let _mpPid='';          // this session's player id  (uid + random suffix)
 let _mpRoomCode='';
 let _mpIsHost=false;
 let _mpPlayers={};
 let _mpActive=false;
 let _mpGhosts=[];
 let _mpRemotes={};
-let _mpBullets=[];
+let _mpRoom={};         // local mirror of RTDB room node
+let _mpStream=null;     // EventSource for room SSE stream
 let _mpSendTick=0;
-let _mpEsTick=0;
+let _mpKillsDone={};    // netId→true  (already processed kills)
+let _mpHitsDone={};     // netId→true  (already processed hits)
 
-function _mpShow(view){
-  document.getElementById('mp-view-main').style.display=view==='main'?'':'none';
-  document.getElementById('mp-view-lobby').style.display=view==='lobby'?'':'none';
+function _mpShow(v){
+  document.getElementById('mp-view-main').style.display=v==='main'?'':'none';
+  document.getElementById('mp-view-lobby').style.display=v==='lobby'?'':'none';
 }
+function _mpSetErr(msg){const el=document.getElementById('mp-err');if(el)el.textContent=msg;}
 
+// ── Open overlay ──────────────────────────────────────────────────────────────
 function mpOpen(){
-  if(!authUid){
-    authBackToSignin();
-    const ol=document.getElementById('auth-overlay');
-    if(ol)ol.style.display='flex';
-    return;
-  }
+  if(!authUid){authBackToSignin();const ol=document.getElementById('auth-overlay');if(ol)ol.style.display='flex';return;}
   document.getElementById('mp-err').textContent='';
   document.getElementById('mp-code-inp').value='';
   _mpShow('main');
   document.getElementById('mp-overlay').style.display='flex';
-  if(!_mpSocket||!_mpSocket.connected)_mpConnect();
 }
-
 function mpClose(){document.getElementById('mp-overlay').style.display='none';}
 
-function _mpConnect(){
-  if(!_MP_SERVER){_mpSetErr('Multiplayer server not configured yet');return;}
-  try{
-    _mpSocket=io(_MP_SERVER,{transports:['websocket','polling'],reconnectionAttempts:3});
-  }catch(e){_mpSetErr('Could not connect to server');return;}
-  _mpSocket.on('connect_error',()=>_mpSetErr('Cannot reach server'));
-  _mpSocket.on('room_created',({code,players})=>{
-    _mpRoomCode=code;_mpIsHost=true;_mpPlayers=players;
-    document.getElementById('mp-code-display').textContent=code;
-    _mpUpdatePlist();_mpShow('lobby');
-  });
-  _mpSocket.on('room_joined',({code,players,isHost})=>{
-    _mpRoomCode=code;_mpIsHost=isHost;_mpPlayers=players;
-    document.getElementById('mp-code-display').textContent=code;
-    _mpUpdatePlist();_mpShow('lobby');
-  });
-  _mpSocket.on('room_err',msg=>_mpSetErr(msg));
-  _mpSocket.on('player_joined',p=>{_mpPlayers[p.id]=p;_mpUpdatePlist();});
-  _mpSocket.on('player_left',({id})=>{delete _mpPlayers[id];delete _mpRemotes[id];_mpUpdatePlist();});
-  _mpSocket.on('new_host',({id})=>{
-    if(_mpSocket&&id===_mpSocket.id)_mpIsHost=true;
-    if(_mpPlayers[id])_mpPlayers[id].slot=0;
-    _mpUpdatePlist();
-  });
-  _mpSocket.on('game_start',({players})=>{
-    _mpPlayers=players;_mpActive=true;
-    mpClose();
-    fadeToScreen(()=>startGame(_mpIsHost?'arcade':'mp_client'));
-  });
-  _mpSocket.on('ps',state=>{if(state.id!==(_mpSocket&&_mpSocket.id))_mpRemotes[state.id]=state;});
-  _mpSocket.on('bf',bullet=>{_mpBullets.push({x:bullet.x,y:bullet.y,vx:18,vy:bullet.vy||0,t:22});});
-  _mpSocket.on('es',snap=>{if(!_mpIsHost)_mpGhosts=snap;});
-  _mpSocket.on('eh',({i,from})=>{
-    if(!_mpIsHost)return;
-    const e=enemies.find(en=>en._netId===i);
-    if(!e||e.dead)return;
-    if(e.takeHit()){
-      e.dead=true;score+=addKill(e.score);kills++;
-      explosions.push(new Explosion(e.x,e.y,true));SND.boom();
-      if(e.shouldDrop())powerups.push(new PowerUp(e.x,e.y));
-      if(_mpSocket)_mpSocket.emit('ek',{i,x:e.x,y:e.y,sc:e.score});
-    }else{
-      explosions.push(new Explosion(e.x,e.y));
-    }
-  });
-  _mpSocket.on('ek',({i,x,y,sc})=>{
-    if(_mpIsHost)return;
-    score+=addKill(sc);kills++;
-    explosions.push(new Explosion(x,y,true));SND.boom();
-    _mpGhosts=_mpGhosts.filter(g=>g.i!==i);
-  });
+// ── Create room ───────────────────────────────────────────────────────────────
+async function mpCreate(){
+  const btn=document.querySelector('#mp-view-main .mp-btn-green');
+  if(btn){btn.disabled=true;btn.textContent='Creating…';}
+  _mpSetErr('');
+  // Find a free code
+  let code,tries=0;
+  do{
+    code=Math.random().toString(36).slice(2,6).toUpperCase();
+    const ex=await _fbGet('mp_rooms/'+code+'/meta');
+    if(!ex)break;
+  }while(++tries<6);
+  _mpPid=(authUid||'g')+'-'+Math.random().toString(36).slice(2,5);
+  _mpRoomCode=code;_mpIsHost=true;
+  const cs=playerCallsign||authEmail.split('@')[0]||'Pilot';
+  const me={uid:authUid,callsign:cs,slot:0,x:120,y:300,hp:3};
+  await _fbPut('mp_rooms/'+code+'/meta',{host:_mpPid,started:false,ts:Date.now()});
+  await _fbPut('mp_rooms/'+code+'/pl/'+_mpPid,me);
+  _mpPlayers={[_mpPid]:me};
+  document.getElementById('mp-code-display').textContent=code;
+  _mpUpdatePlist();_mpShow('lobby');_mpStartStream();
+  if(btn){btn.disabled=false;btn.textContent='⚡ CREATE ROOM';}
 }
 
-function _mpSetErr(msg){const el=document.getElementById('mp-err');if(el)el.textContent=msg;}
+// ── Join room ─────────────────────────────────────────────────────────────────
+async function mpJoin(){
+  const code=(document.getElementById('mp-code-inp').value||'').trim().toUpperCase();
+  if(!code||code.length<4){_mpSetErr('Enter the 4-letter room code');return;}
+  const btn=document.querySelector('#mp-view-main .mp-btn-blue');
+  if(btn){btn.disabled=true;btn.textContent='Joining…';}
+  _mpSetErr('');
+  const meta=await _fbGet('mp_rooms/'+code+'/meta');
+  if(!meta){_mpSetErr('Room not found');if(btn){btn.disabled=false;btn.textContent='JOIN ROOM';}return;}
+  if(meta.started){_mpSetErr('Game already started');if(btn){btn.disabled=false;btn.textContent='JOIN ROOM';}return;}
+  const pl=await _fbGet('mp_rooms/'+code+'/pl')||{};
+  if(Object.keys(pl).length>=4){_mpSetErr('Room is full');if(btn){btn.disabled=false;btn.textContent='JOIN ROOM';}return;}
+  _mpPid=(authUid||'g')+'-'+Math.random().toString(36).slice(2,5);
+  _mpRoomCode=code;_mpIsHost=false;
+  const cs=playerCallsign||authEmail.split('@')[0]||'Pilot';
+  const slot=Object.keys(pl).length;
+  const me={uid:authUid,callsign:cs,slot,x:120,y:300,hp:3};
+  await _fbPut('mp_rooms/'+code+'/pl/'+_mpPid,me);
+  _mpPlayers=await _fbGet('mp_rooms/'+code+'/pl')||{};
+  document.getElementById('mp-code-display').textContent=code;
+  _mpUpdatePlist();_mpShow('lobby');_mpStartStream();
+  if(btn){btn.disabled=false;btn.textContent='JOIN ROOM';}
+}
+
+// ── Start / Leave ─────────────────────────────────────────────────────────────
+function mpStart(){if(_mpIsHost)_fbPut('mp_rooms/'+_mpRoomCode+'/meta/started',true);}
+
+async function mpLeave(){
+  _mpStopStream();
+  if(_mpRoomCode&&_mpPid){
+    await _fbDelete('mp_rooms/'+_mpRoomCode+'/pl/'+_mpPid);
+    if(_mpIsHost){
+      const rem=await _fbGet('mp_rooms/'+_mpRoomCode+'/pl')||{};
+      if(!Object.keys(rem).length)_fbDelete('mp_rooms/'+_mpRoomCode);
+      else _fbPut('mp_rooms/'+_mpRoomCode+'/meta/host',Object.keys(rem)[0]);
+    }
+  }
+  _mpRoomCode='';_mpIsHost=false;_mpPlayers={};_mpPid='';
+  _mpShow('main');document.getElementById('mp-err').textContent='';
+}
+
+// ── Firebase SSE stream ───────────────────────────────────────────────────────
+function _mpStartStream(){
+  _mpStopStream();
+  _mpRoom={};
+  try{
+    _mpStream=new EventSource(FB_URL+'/mp_rooms/'+_mpRoomCode+'.json');
+    _mpStream.addEventListener('put',e=>{try{_mpApply(JSON.parse(e.data));}catch(_){}});
+    _mpStream.addEventListener('patch',e=>{try{_mpApply(JSON.parse(e.data));}catch(_){}});
+  }catch(e){}
+}
+function _mpStopStream(){if(_mpStream){_mpStream.close();_mpStream=null;}}
+
+function _mpApply({path,data}){
+  // Merge event data into local _mpRoom mirror
+  if(path==='/'){_mpRoom=data||{};}
+  else{
+    const parts=path.replace(/^\//,'').split('/');
+    let node=_mpRoom;
+    for(let i=0;i<parts.length-1;i++){
+      if(node[parts[i]]==null)node[parts[i]]={};
+      node=node[parts[i]];
+    }
+    const last=parts[parts.length-1];
+    if(data===null)delete node[last];else node[last]=data;
+  }
+  _mpProcess();
+}
+
+function _mpProcess(){
+  const{meta,pl,en,kills:kd,hits:hd}=_mpRoom||{};
+
+  // Game start
+  if(meta&&meta.started&&!_mpActive){
+    _mpActive=true;mpClose();
+    fadeToScreen(()=>startGame(_mpIsHost?'arcade':'mp_client'));
+    return;
+  }
+
+  // Player list (lobby + in-game remotes)
+  if(pl){
+    _mpPlayers=pl;
+    for(const[pid,p]of Object.entries(pl)){
+      if(pid!==_mpPid&&p)_mpRemotes[pid]=p;
+    }
+    for(const pid of Object.keys(_mpRemotes)){if(!pl[pid])delete _mpRemotes[pid];}
+    _mpUpdatePlist();
+  }
+
+  // Enemy snapshot → ghosts for non-host
+  if(!_mpIsHost&&en!=null){
+    _mpGhosts=Array.isArray(en)?en.filter(Boolean):Object.values(en).filter(Boolean);
+  }
+
+  // Kills broadcast by host → score on non-host
+  if(!_mpIsHost&&kd){
+    for(const[netId,k]of Object.entries(kd)){
+      if(!k||_mpKillsDone[netId])continue;
+      _mpKillsDone[netId]=true;
+      score+=addKill(k.sc||100);kills++;
+      explosions.push(new Explosion(k.x||0,k.y||0,true));SND.boom();
+      _mpGhosts=_mpGhosts.filter(g=>String(g.i)!==String(netId));
+    }
+  }
+
+  // Hit reports from non-hosts → processed by host
+  if(_mpIsHost&&hd){
+    for(const[netId,h]of Object.entries(hd)){
+      if(!h||_mpHitsDone[netId])continue;
+      _mpHitsDone[netId]=true;
+      const e=enemies.find(en=>en._netId===parseInt(netId));
+      if(!e||e.dead)continue;
+      if(e.takeHit()){
+        e.dead=true;score+=addKill(e.score);kills++;
+        explosions.push(new Explosion(e.x,e.y,true));SND.boom();
+        if(e.shouldDrop())powerups.push(new PowerUp(e.x,e.y));
+        _fbPut('mp_rooms/'+_mpRoomCode+'/kills/'+netId,{x:Math.round(e.x),y:Math.round(e.y),sc:e.score});
+      }else{
+        explosions.push(new Explosion(e.x,e.y));
+      }
+    }
+  }
+}
 
 function _mpUpdatePlist(){
   const plist=document.getElementById('mp-plist');
   if(!plist)return;
   plist.innerHTML='';
-  const self=_mpSocket?_mpSocket.id:'';
-  for(const[id,p]of Object.entries(_mpPlayers)){
-    const isHost=p.slot===0,isSelf=id===self;
+  for(const[pid,p]of Object.entries(_mpPlayers)){
+    const isHost=p.slot===0,isSelf=pid===_mpPid;
     const div=document.createElement('div');
     div.className='mp-pitem';
     div.innerHTML=
@@ -4131,51 +4217,27 @@ function _mpUpdatePlist(){
   }
 }
 
-function mpCreate(){
-  if(!_mpSocket||!_mpSocket.connected){_mpConnect();
-    setTimeout(()=>{if(_mpSocket&&_mpSocket.connected)mpCreate();},600);return;}
-  const cs=playerCallsign||authEmail.split('@')[0]||'Pilot';
-  _mpSetErr('');
-  _mpSocket.emit('create_room',{callsign:cs,uid:authUid});
-}
-
-function mpJoin(){
-  if(!_mpSocket||!_mpSocket.connected){_mpConnect();
-    setTimeout(()=>{if(_mpSocket&&_mpSocket.connected)mpJoin();},600);return;}
-  const code=(document.getElementById('mp-code-inp').value||'').trim().toUpperCase();
-  if(!code||code.length<4){_mpSetErr('Enter the 4-letter room code');return;}
-  const cs=playerCallsign||authEmail.split('@')[0]||'Pilot';
-  _mpSetErr('');
-  _mpSocket.emit('join_room',{code,callsign:cs,uid:authUid});
-}
-
-function mpStart(){if(_mpSocket&&_mpIsHost)_mpSocket.emit('start_game');}
-
-function mpLeave(){
-  if(_mpSocket)_mpSocket.emit('leave_room');
-  _mpRoomCode='';_mpIsHost=false;_mpPlayers={};
-  _mpShow('main');
-  document.getElementById('mp-err').textContent='';
-}
-
-// ── In-game MP tick (called from update) ──────────────────────────────────────
+// ── In-game tick (called from update) ─────────────────────────────────────────
 function _mpTick(){
-  if(!_mpSocket||!_mpActive||!player)return;
+  if(!_mpActive||!player)return;
   _mpSendTick++;
-  _mpSocket.emit('ps',{x:player.x,y:player.y,hp:player.health,
-    inv:player.invFrames>0,wpn:player.weapon,shld:player.hasShield,dbl:player.doubleTimer>0});
+  if(_mpSendTick%6!==0)return; // ~10 writes/sec
+  // Write own player state
+  _fbPut('mp_rooms/'+_mpRoomCode+'/pl/'+_mpPid,{
+    uid:authUid,callsign:playerCallsign||'Pilot',slot:(_mpPlayers[_mpPid]||{}).slot||0,
+    x:Math.round(player.x),y:Math.round(player.y),hp:player.health,
+    inv:player.invFrames>0,wpn:player.weapon,shld:player.hasShield,dbl:player.doubleTimer>0
+  });
+  // Host: write enemy snapshot
   if(_mpIsHost){
-    _mpEsTick++;
-    if(_mpEsTick>=6){
-      _mpEsTick=0;
-      const snap=enemies.filter(e=>!e.dead).map(e=>({
-        i:e._netId,k:e.kind||'fighter',x:e.x,y:e.y,hp:e.hp,W:e.W,H:e.H}));
-      _mpSocket.emit('es',snap);
-    }
+    const snap=enemies.filter(e=>!e.dead).map(e=>({
+      i:e._netId,k:e.kind||'fighter',
+      x:Math.round(e.x),y:Math.round(e.y),hp:e.hp,W:e.W,H:e.H}));
+    _fbPut('mp_rooms/'+_mpRoomCode+'/en',snap);
   }
 }
 
-// ── Ghost enemies (non-host) ──────────────────────────────────────────────────
+// ── Ghost enemies draw (non-host) ─────────────────────────────────────────────
 function _mpDrawGhosts(){
   if(_mpIsHost||!_mpActive)return;
   for(const g of _mpGhosts){
@@ -4183,82 +4245,69 @@ function _mpDrawGhosts(){
     ctx.globalAlpha=0.72;
     ctx.fillStyle='#7a2211';ctx.fillRect(x-W/2,y-H/2,W,H);
     ctx.strokeStyle='#ff5533';ctx.lineWidth=1.5;ctx.strokeRect(x-W/2,y-H/2,W,H);
-    if(g.hp>1){
-      ctx.fillStyle='#ff8866';
-      for(let j=0;j<g.hp;j++)ctx.fillRect(x-W/2+3+j*7,y-H/2+3,5,3);
-    }
+    if(g.hp>1){ctx.fillStyle='#ff8866';for(let j=0;j<g.hp;j++)ctx.fillRect(x-W/2+3+j*7,y-H/2+3,5,3);}
     ctx.globalAlpha=1;
-  }
-  for(const b of _mpBullets){
-    ctx.fillStyle='#00ffcc';
-    ctx.beginPath();ctx.arc(Math.round(b.x),Math.round(b.y),4,0,Math.PI*2);ctx.fill();
   }
 }
 
 function _mpCheckGhostHits(){
-  if(!_mpActive||!player||!_mpSocket)return;
+  if(!_mpActive||!player||_mpIsHost)return;
   for(const b of player.bullets){
     if(b.dead)continue;
     for(const g of _mpGhosts){
       if(rectsOverlap(b.rect,{x:g.x-g.W/2,y:g.y-g.H/2,w:g.W,h:g.H})){
-        b.dead=true;
-        explosions.push(new Explosion(b.x,b.y));
-        _mpSocket.emit('eh',{i:g.i});
+        b.dead=true;explosions.push(new Explosion(b.x,b.y));
+        _fbPut('mp_rooms/'+_mpRoomCode+'/hits/'+g.i,{pid:_mpPid,ts:Date.now()});
         break;
       }
     }
   }
 }
 
-function _mpUpdateBullets(){
-  for(const b of _mpBullets){b.x+=b.vx;b.y+=b.vy;b.t--;}
-  _mpBullets=_mpBullets.filter(b=>b.t>0&&b.x<GW+20);
-}
+function _mpUpdateBullets(){}  // no remote bullets in Firebase version
 
-// ── Remote player rendering ───────────────────────────────────────────────────
+// ── Remote players draw ───────────────────────────────────────────────────────
 function _mpDrawRemotes(){
-  if(!_mpActive||!_mpSocket)return;
-  const colors=['#55cc88','#ff9900','#cc44ff','#ff4466'];
-  for(const[id,s]of Object.entries(_mpRemotes)){
+  if(!_mpActive)return;
+  const cols=['#55cc88','#ff9900','#cc44ff','#ff4466'];
+  for(const[pid,s]of Object.entries(_mpRemotes)){
     if(!s)continue;
-    const p=_mpPlayers[id];if(!p)continue;
-    const col=colors[(p.slot||1)%colors.length];
-    const x=Math.round(s.x),y=Math.round(s.y);
+    const p=_mpPlayers[pid];if(!p)continue;
+    const col=cols[(p.slot||1)%cols.length];
+    const x=Math.round(s.x||0),y=Math.round(s.y||0);
     ctx.globalAlpha=s.inv&&Math.floor(Date.now()/100)%2===0?0.3:0.82;
-    if(s.shld){
-      ctx.shadowColor=col;ctx.shadowBlur=16;
-      ctx.strokeStyle=col;ctx.lineWidth=1.5;
-      ctx.beginPath();ctx.arc(x,y,38,0,Math.PI*2);ctx.stroke();ctx.shadowBlur=0;
-    }
+    if(s.shld){ctx.shadowColor=col;ctx.shadowBlur=16;ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x,y,38,0,Math.PI*2);ctx.stroke();ctx.shadowBlur=0;}
     ctx.fillStyle='#1a3a88';
     ctx.beginPath();ctx.moveTo(x-22,y-10);ctx.lineTo(x-5,y-26);ctx.lineTo(x+12,y-6);ctx.closePath();ctx.fill();
     ctx.beginPath();ctx.moveTo(x-22,y+10);ctx.lineTo(x-5,y+26);ctx.lineTo(x+12,y+6);ctx.closePath();ctx.fill();
     ctx.fillStyle=s.dbl?'#ffaa00':col;
     ctx.beginPath();ctx.moveTo(x-28,y+12);ctx.lineTo(x+32,y);ctx.lineTo(x-28,y-12);ctx.closePath();ctx.fill();
-    const fl=6+Math.random()*12;
-    ctx.fillStyle='#ff8c00';
+    const fl=6+Math.random()*12;ctx.fillStyle='#ff8c00';
     ctx.beginPath();ctx.moveTo(x-28,y-4);ctx.lineTo(x-28-fl,y);ctx.lineTo(x-28,y+4);ctx.closePath();ctx.fill();
     ctx.shadowColor=col;ctx.shadowBlur=10;
     ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x+12,y,5,0,Math.PI*2);ctx.fill();
     ctx.fillStyle=col;ctx.beginPath();ctx.arc(x+12,y,3,0,Math.PI*2);ctx.fill();
     ctx.shadowBlur=0;ctx.globalAlpha=1;
-    // Callsign tag
     const cs=(p.callsign||'').slice(0,12);
-    if(cs){
-      ctx.font='11px monospace';ctx.textAlign='center';
+    if(cs){ctx.font='11px monospace';ctx.textAlign='center';
       const tw=ctx.measureText(cs).width;
       ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(x-tw/2-3,y-48,tw+6,14);
-      ctx.fillStyle=col;ctx.fillText(cs,x,y-37);
-    }
+      ctx.fillStyle=col;ctx.fillText(cs,x,y-37);}
   }
 }
 
-// ── MP game cleanup ───────────────────────────────────────────────────────────
+// ── Cleanup on game end / tab close ──────────────────────────────────────────
 function mpEndGame(){
-  _mpActive=false;_mpGhosts=[];_mpRemotes={};_mpBullets=[];
-  if(_mpSocket)_mpSocket.emit('leave_room');
-  _mpRoomCode='';_mpIsHost=false;_mpPlayers={};
+  _mpStopStream();
+  _mpActive=false;_mpGhosts=[];_mpRemotes={};
+  if(_mpRoomCode&&_mpPid)_fbDelete('mp_rooms/'+_mpRoomCode+'/pl/'+_mpPid);
+  _mpRoomCode='';_mpIsHost=false;_mpPlayers={};_mpPid='';
+  _mpKillsDone={};_mpHitsDone={};
 }
+window.addEventListener('beforeunload',()=>{
+  if(_mpRoomCode&&_mpPid)navigator.sendBeacon&&navigator.sendBeacon(
+    FB_URL+'/mp_rooms/'+_mpRoomCode+'/pl/'+_mpPid+'.json','null');
+});
 
 // ── Canvas pos ────────────────────────────────────────────────────────────────
 function canvasPos(cx,cy){
