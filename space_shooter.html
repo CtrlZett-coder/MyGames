@@ -343,7 +343,8 @@ let sessionKills=0; // kills this game session, flushed to FB on game end
 
 async function _fbReq(path,opts){
   if(!_fbOK)return null;
-  try{const r=await fetch(FB_URL+'/'+path+'.json',opts);return await r.json();}catch(e){return null;}
+  const auth=authIdToken?'?auth='+encodeURIComponent(authIdToken):'';
+  try{const r=await fetch(FB_URL+'/'+path+'.json'+auth,opts);return await r.json();}catch(e){return null;}
 }
 async function _fbGet(p){return _fbReq(p);}
 async function _fbPut(p,v){return _fbReq(p,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)});}
