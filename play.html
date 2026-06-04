@@ -438,7 +438,7 @@ function _hideAuthOverlay(){
   const el=document.getElementById('auth-overlay');
   if(el)el.style.display='none';
 }
-let _pendingVerifyToken='',_pendingVerifyEmail='',_pendingCallsign='',_pendingVerifyRefresh='';
+let _pendingVerifyToken='',_pendingVerifyEmail='',_pendingCallsign='',_pendingVerifyRefresh='',_pendingVerifyUid='';
 async function _sendVerificationEmail(idToken){
   return _fbAuthReq('sendOobCode',{requestType:'VERIFY_EMAIL',idToken});
 }
@@ -455,10 +455,10 @@ function _showVerifyScreen(email, sendFailed){
     `Verification link sent to:\n${email}\n\nClick the link in the email,\nthen press "I've verified ✓".`;
 }
 function authBackToSignin(){
-  if(_pendingVerifyToken) _clearAuth(); // sign out unverified user
   _authMode='signin';
   _pendingVerifyToken='';
   _pendingVerifyRefresh='';
+  _pendingVerifyUid='';
   document.getElementById('auth-form').style.display='block';
   document.getElementById('auth-verify-box').style.display='none';
   document.getElementById('auth-reset-box').style.display='none';
@@ -503,8 +503,8 @@ async function authCheckVerified(){
   }
   const verified=await _isEmailVerified(checkToken);
   if(verified){
-    // Save auth and proceed
-    const tempData={idToken:_pendingVerifyToken,localId:authUid,email:_pendingVerifyEmail};
+    // Save auth and proceed — only now do we commit the session
+    const tempData={idToken:checkToken,refreshToken:_pendingVerifyRefresh,localId:_pendingVerifyUid,email:_pendingVerifyEmail};
     _saveAuth(tempData,'email');
     if(_pendingCallsign){
       playerCallsign=_pendingCallsign;
@@ -590,9 +590,9 @@ async function authSubmit(){
     // Save token and send verification email
     _pendingVerifyToken=data.idToken;
     _pendingVerifyRefresh=data.refreshToken||'';
+    _pendingVerifyUid=data.localId||'';
     _pendingVerifyEmail=email;
     _pendingCallsign=call||'Pilot';
-    _saveAuth(data,'email'); // save uid so we can write callsign later
     const vr=await _sendVerificationEmail(data.idToken);
     _showVerifyScreen(email, !!(vr&&vr.error));
   }else{
@@ -600,9 +600,9 @@ async function authSubmit(){
     if(!data.emailVerified){
       _pendingVerifyToken=data.idToken;
       _pendingVerifyRefresh=data.refreshToken||'';
+      _pendingVerifyUid=data.localId||'';
       _pendingVerifyEmail=email;
       _pendingCallsign='';
-      _saveAuth(data,'email');
       const vr2=await _sendVerificationEmail(data.idToken);
       _showVerifyScreen(email, !!(vr2&&vr2.error));
       return;
