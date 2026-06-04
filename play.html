@@ -236,6 +236,7 @@ canvas{display:block;touch-action:none;position:fixed;top:0;left:0}
     <!-- Callsign -->
     <div class="acc-section">
       <div class="acc-section-title">Callsign / Display Name</div>
+      <div style="color:#446655;font-size:11px;margin-bottom:6px">Can be changed once per month</div>
       <div class="acc-row">
         <input class="auth-inp" id="acc-callsign" type="text" maxlength="20" placeholder="Your callsign" onkeydown="if(event.key==='Enter')saveAccountCallsign()">
         <button class="acc-save-btn" onclick="saveAccountCallsign()">Save</button>
@@ -436,7 +437,7 @@ function _hideAuthOverlay(){
   const el=document.getElementById('auth-overlay');
   if(el)el.style.display='none';
 }
-let _pendingVerifyToken='',_pendingVerifyEmail='',_pendingCallsign='';
+let _pendingVerifyToken='',_pendingVerifyEmail='',_pendingCallsign='',_pendingVerifyRefresh='';
 async function _sendVerificationEmail(idToken){
   return _fbAuthReq('sendOobCode',{requestType:'VERIFY_EMAIL',idToken});
 }
@@ -453,8 +454,10 @@ function _showVerifyScreen(email, sendFailed){
     `Verification link sent to:\n${email}\n\nClick the link in the email,\nthen press "I've verified ✓".`;
 }
 function authBackToSignin(){
+  if(_pendingVerifyToken) _clearAuth(); // sign out unverified user
   _authMode='signin';
   _pendingVerifyToken='';
+  _pendingVerifyRefresh='';
   document.getElementById('auth-form').style.display='block';
   document.getElementById('auth-verify-box').style.display='none';
   document.getElementById('auth-reset-box').style.display='none';
@@ -491,7 +494,13 @@ async function authCheckVerified(){
   if(!_pendingVerifyToken)return;
   const btn=document.getElementById('auth-verified-btn');
   btn.disabled=true;btn.textContent='Checking...';
-  const verified=await _isEmailVerified(_pendingVerifyToken);
+  // Refresh the token so Firebase returns the latest emailVerified status
+  let checkToken=_pendingVerifyToken;
+  if(_pendingVerifyRefresh){
+    const refreshed=await _fbTokenRefresh(_pendingVerifyRefresh);
+    if(refreshed.id_token){checkToken=refreshed.id_token;_pendingVerifyToken=checkToken;}
+  }
+  const verified=await _isEmailVerified(checkToken);
   if(verified){
     // Save auth and proceed
     const tempData={idToken:_pendingVerifyToken,localId:authUid,email:_pendingVerifyEmail};
@@ -579,6 +588,7 @@ async function authSubmit(){
   if(_authMode==='signup'){
     // Save token and send verification email
     _pendingVerifyToken=data.idToken;
+    _pendingVerifyRefresh=data.refreshToken||'';
     _pendingVerifyEmail=email;
     _pendingCallsign=call||'Pilot';
     _saveAuth(data,'email'); // save uid so we can write callsign later
@@ -588,6 +598,7 @@ async function authSubmit(){
     // Sign in — check email verified
     if(!data.emailVerified){
       _pendingVerifyToken=data.idToken;
+      _pendingVerifyRefresh=data.refreshToken||'';
       _pendingVerifyEmail=email;
       _pendingCallsign='';
       _saveAuth(data,'email');
@@ -626,11 +637,6 @@ async function authSendReset(){
   const email=document.getElementById('auth-reset-email').value.trim();
   const errEl=document.getElementById('auth-err');
   if(!email){errEl.textContent='Enter your email address';return;}
-  if(!_DEV_EMAILS.includes(email)&&!_canResetPassword()){
-    const d=_resetCooldownDaysLeft();
-    errEl.textContent=`Password reset available in ${d} day${d===1?'':'s'}`;
-    return;
-  }
   const btn=document.getElementById('auth-reset-btn');
   btn.disabled=true;btn.textContent='Sending...';
   errEl.textContent='';
@@ -644,7 +650,6 @@ async function authSendReset(){
     btn.disabled=false;btn.textContent='Send reset link';
     return;
   }
-  _setResetTs();
   document.getElementById('auth-reset-sent').style.display='block';
   btn.textContent='Send again';
   setTimeout(()=>{btn.disabled=false;},4000);
