@@ -160,7 +160,11 @@ canvas{display:block;touch-action:none;position:fixed;top:0;left:0}
         ⚠ Email may land in <b>Spam / Junk</b> folder.<br>From: <span style="color:#ffaa44">Space Shooter &lt;noreply@...firebaseapp.com&gt;</span>
       </div>
       <button class="auth-btn" id="auth-resend" onclick="authResend()" style="background:#00a0cc;color:#fff;margin-bottom:8px">Resend email</button>
-      <button class="auth-btn" id="auth-verified-btn" onclick="authCheckVerified()" style="background:#226644;color:#fff;margin-bottom:8px">I've verified ✓</button>
+      <div id="auth-verify-waiting" style="margin-bottom:10px;padding:10px 0">
+        <div id="auth-verify-status" style="color:#55cc88;font-size:13px;font-weight:600;margin-bottom:4px">⟳ Waiting for verification…</div>
+        <div style="color:#446655;font-size:10px">Page updates automatically when you click the link</div>
+      </div>
+      <button class="auth-btn" id="auth-check-now-btn" onclick="authCheckNow()" style="background:#1a3a2a;color:#55cc88;border:1px solid #335544;margin-bottom:8px;font-size:12px">Check now ↻</button>
       <button class="auth-btn" id="auth-back" onclick="authBackToSignin()" style="background:transparent;color:#88ccff;border:1.5px solid #224466;font-size:12px">Back to sign in</button>
     </div>
     <!-- Password reset — step 1: send email -->
@@ -397,6 +401,7 @@ function _saveAuth(d,provider=''){
 function _clearAuth(){
   authIdToken='';authUid='';authEmail='';authProvider='';
   _pendingVerifyToken='';_pendingVerifyRefresh='';_pendingVerifyUid='';_pendingVerifyEmail='';_pendingCallsign='';
+  _stopVerifyPoll();
   try{['ss_auth_token','ss_auth_uid','ss_auth_email','ss_auth_refresh','ss_auth_provider'].forEach(k=>localStorage.removeItem(k));}catch(e){}
 }
 async function _loadUserCallsign(){
@@ -445,17 +450,82 @@ async function _sendVerificationEmail(idToken){
 }
 async function _isEmailVerified(idToken){
   const r=await _fbAuthReq('lookup',{idToken});
-  return r.users?.[0]?.emailVerified||false;
+  return r.users?.[0]?.emailVerified===true;
 }
-function _showVerifyScreen(email, sendFailed){
+// ── Email verification auto-poll ──────────────────────────────────────────────
+let _verifyPollId=null,_verifyAnimId=null;
+function _startVerifyPoll(){
+  _stopVerifyPoll();
+  _verifyPollId=setInterval(_verifyPollTick,4000);
+  let _f=0;const _frames=['⟳','↻'];
+  const statusEl=document.getElementById('auth-verify-status');
+  _verifyAnimId=setInterval(()=>{
+    _f=(_f+1)%_frames.length;
+    if(statusEl)statusEl.textContent=_frames[_f]+' Waiting for verification…';
+  },700);
+}
+function _stopVerifyPoll(){
+  if(_verifyPollId){clearInterval(_verifyPollId);_verifyPollId=null;}
+  if(_verifyAnimId){clearInterval(_verifyAnimId);_verifyAnimId=null;}
+}
+async function _verifyPollTick(){
+  if(!_pendingVerifyToken){_stopVerifyPoll();return;}
+  let checkToken=_pendingVerifyToken;
+  if(_pendingVerifyRefresh){
+    const refreshed=await _fbTokenRefresh(_pendingVerifyRefresh);
+    if(refreshed.id_token){checkToken=refreshed.id_token;_pendingVerifyToken=checkToken;}
+  }
+  const verified=await _isEmailVerified(checkToken);
+  if(verified){_stopVerifyPoll();await _doVerifiedLogin(checkToken);}
+}
+async function _doVerifiedLogin(checkToken){
+  const tempData={idToken:checkToken,refreshToken:_pendingVerifyRefresh,localId:_pendingVerifyUid,email:_pendingVerifyEmail};
+  _saveAuth(tempData,'email');
+  if(_pendingCallsign){
+    playerCallsign=_pendingCallsign;
+    try{localStorage.setItem('ss_callsign',_pendingCallsign);}catch(e){}
+    await _saveUserCallsign(_pendingCallsign);
+    await _reserveCallsign(_pendingCallsign,authUid,_pendingVerifyEmail);
+    _pendingCallsign='';
+  }else{
+    await _loadUserCallsign();
+    if(!playerCallsign)playerCallsign=_pendingVerifyEmail.split('@')[0]||'Pilot';
+  }
+  _hideAuthOverlay();
+}
+// Manual "Check now" button — same check, just immediate
+async function authCheckNow(){
+  if(!_pendingVerifyToken)return;
+  const btn=document.getElementById('auth-check-now-btn');
+  const errEl=document.getElementById('auth-err');
+  btn.disabled=true;btn.textContent='Checking…';errEl.textContent='';
+  let checkToken=_pendingVerifyToken;
+  if(_pendingVerifyRefresh){
+    const refreshed=await _fbTokenRefresh(_pendingVerifyRefresh);
+    if(refreshed.id_token){checkToken=refreshed.id_token;_pendingVerifyToken=checkToken;}
+  }
+  const verified=await _isEmailVerified(checkToken);
+  if(verified){
+    _stopVerifyPoll();
+    await _doVerifiedLogin(checkToken);
+  }else{
+    btn.disabled=false;btn.textContent='Check now ↻';
+    errEl.textContent='Not verified yet — click the link in your email first.';
+  }
+}
+function _showVerifyScreen(email,sendFailed){
   document.getElementById('auth-form').style.display='none';
   document.getElementById('auth-verify-box').style.display='block';
   document.getElementById('auth-sub').textContent='Verify your email';
   document.getElementById('auth-err').textContent=sendFailed?'⚠ Could not send email — tap "Resend email" to try again':'';
   document.getElementById('auth-verify-msg').textContent=
-    `Verification link sent to:\n${email}\n\nClick the link in the email,\nthen press "I've verified ✓".`;
+    `Verification link sent to:\n${email}\n\nClick the link in the email.\nThis page will log you in automatically.`;
+  const btn=document.getElementById('auth-check-now-btn');
+  if(btn){btn.disabled=false;btn.textContent='Check now ↻';}
+  _startVerifyPoll();
 }
 function authBackToSignin(){
+  _stopVerifyPoll();
   _authMode='signin';
   _pendingVerifyToken='';
   _pendingVerifyRefresh='';
@@ -471,9 +541,6 @@ function authBackToSignin(){
   document.getElementById('auth-call').style.display='none';
   document.getElementById('auth-forgot-link').style.display='inline';
   document.getElementById('auth-err').textContent='';
-  // Reset button states in case user returns mid-flow
-  const vb=document.getElementById('auth-verified-btn');
-  if(vb){vb.disabled=false;vb.textContent="I've verified ✓";}
   const rb=document.getElementById('auth-resend');
   if(rb){rb.disabled=false;rb.textContent='Resend email';}
 }
@@ -491,37 +558,6 @@ async function authResend(){
   }
   btn.textContent='✓ Sent! Check Spam too';
   setTimeout(()=>{btn.disabled=false;btn.textContent='Resend email';},4000);
-}
-async function authCheckVerified(){
-  if(!_pendingVerifyToken)return;
-  const btn=document.getElementById('auth-verified-btn');
-  btn.disabled=true;btn.textContent='Checking...';
-  // Refresh the token so Firebase returns the latest emailVerified status
-  let checkToken=_pendingVerifyToken;
-  if(_pendingVerifyRefresh){
-    const refreshed=await _fbTokenRefresh(_pendingVerifyRefresh);
-    if(refreshed.id_token){checkToken=refreshed.id_token;_pendingVerifyToken=checkToken;}
-  }
-  const verified=await _isEmailVerified(checkToken);
-  if(verified){
-    // Save auth and proceed — only now do we commit the session
-    const tempData={idToken:checkToken,refreshToken:_pendingVerifyRefresh,localId:_pendingVerifyUid,email:_pendingVerifyEmail};
-    _saveAuth(tempData,'email');
-    if(_pendingCallsign){
-      playerCallsign=_pendingCallsign;
-      try{localStorage.setItem('ss_callsign',_pendingCallsign);}catch(e){}
-      await _saveUserCallsign(_pendingCallsign);
-      await _reserveCallsign(_pendingCallsign, authUid, _pendingVerifyEmail);
-      _pendingCallsign='';
-    }else{
-      await _loadUserCallsign();
-      if(!playerCallsign)playerCallsign=_pendingVerifyEmail.split('@')[0]||'Pilot';
-    }
-    _hideAuthOverlay();
-  }else{
-    btn.disabled=false;btn.textContent='I\'ve verified ✓';
-    document.getElementById('auth-err').textContent='Email not yet verified. Please click the link in your inbox.';
-  }
 }
 function authToggleMode(){
   if(_authMode==='verify')return;
