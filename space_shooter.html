@@ -396,6 +396,7 @@ function _saveAuth(d,provider=''){
 }
 function _clearAuth(){
   authIdToken='';authUid='';authEmail='';authProvider='';
+  _pendingVerifyToken='';_pendingVerifyRefresh='';_pendingVerifyUid='';_pendingVerifyEmail='';_pendingCallsign='';
   try{['ss_auth_token','ss_auth_uid','ss_auth_email','ss_auth_refresh','ss_auth_provider'].forEach(k=>localStorage.removeItem(k));}catch(e){}
 }
 async function _loadUserCallsign(){
@@ -965,7 +966,8 @@ async function confirmDeleteAccount(){
 function accSignOut(){
   authBackToSignin();
   _clearAuth();
-  playerCallsign=localStorage.getItem('ss_callsign')||'';
+  playerCallsign='';
+  try{localStorage.removeItem('ss_callsign');}catch(e){}
   hideAccount();
 }
 
@@ -1098,7 +1100,7 @@ async function fetchGlobalData(){
 }
 async function postGlobalEntry(name,sc,date){
   if(!_fbOK)return;
-  _fbPost('leaderboard',{name,score:sc,date});
+  _fbPost('leaderboard',{name,score:sc,date,uid:authUid||deviceId});
   _fbInc('stats/overlords');
 }
 async function postArcadeScore(name,sc,date){if(!_fbOK||sc<=0)return;const uid=authUid||deviceId;_fbPut('arcade_lb/'+uid,{name,score:sc,date,uid});}
@@ -3887,7 +3889,7 @@ function drawStats(){
     }else{
       // Find player's index in full list
       const _myUid=authUid||deviceId;
-      const playerIdx=list.findIndex(e=>e.uid===_myUid||e.name===playerCallsign);
+      const playerIdx=list.findIndex(e=>e.uid===_myUid||(!e.uid&&playerCallsign&&e.name===playerCallsign));
       const totalH=list.length*entH;
       _lbMaxScroll=Math.max(0,totalH-listH);
       _lbScrollY=Math.max(0,Math.min(_lbScrollY,_lbMaxScroll));
@@ -3899,7 +3901,7 @@ function drawStats(){
       list.forEach((e,i)=>{
         const ey=listTop+i*entH-_lbScrollY+entH/2;
         if(ey<listTop-entH||ey>listBot+entH)return;
-        const isYou=e.uid===(authUid||deviceId)||e.name===playerCallsign;
+        const isYou=e.uid===_myUid||(!e.uid&&playerCallsign&&e.name===playerCallsign);
         ctx.fillStyle=isYou?'rgba(180,100,0,0.85)':'rgba(15,28,50,0.75)';
         roundRect(rLbX,ey-12,rLbW,27,5);ctx.fill();
         ctx.strokeStyle=isYou?'#ffcc00':i<3?'#334466':'#1e3050';
