@@ -263,10 +263,31 @@ async def solve_and_reply(query, session: dict):
     await query.edit_message_text(text, reply_markup=markup)
 
 
-def main():
+def _load_token() -> str:
+    """Env var first, then a sibling token.txt, then an interactive prompt.
+
+    The fallbacks exist for environments where setting an env var is awkward
+    (e.g. Pydroid 3 on Android): drop the token in telegram_bot/token.txt or
+    just type it in when prompted.
+    """
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    if token:
+        return token.strip()
+
+    token_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "token.txt")
+    if os.path.exists(token_file):
+        with open(token_file, encoding="utf-8") as f:
+            token = f.read().strip()
+        if token:
+            return token
+
+    return input("Введите токен Telegram-бота (от @BotFather): ").strip()
+
+
+def main():
+    token = _load_token()
     if not token:
-        raise SystemExit("Set TELEGRAM_BOT_TOKEN environment variable before starting the bot.")
+        raise SystemExit("Нужен токен бота: переменная TELEGRAM_BOT_TOKEN, файл token.txt или ввод вручную.")
 
     app = Application.builder().token(token).build()
     app.add_handler(CommandHandler("start", start))
