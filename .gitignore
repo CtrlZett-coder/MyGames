@@ -2,3 +2,5 @@
 __pycache__/
 .claude/worktrees/
 space_shooter/build/
+telegram_bot/token.txt
+telegram_bot/.venv/

@@ -4,6 +4,24 @@
 
 ---
 
+## 🧩 Block Blast Solver (Telegram-бот)
+
+Telegram-бот, который подсказывает лучший ход для паззла Block Blast: отмечаете
+занятые клетки поля 8x8 и выбираете 3 выданные фигуры — бот переберёт все
+варианты порядка и расположения и пришлёт схему ходов с максимумом очков и
+очисток линий.
+
+```bash
+cd telegram_bot
+pip install -r requirements.txt
+export TELEGRAM_BOT_TOKEN=<токен от @BotFather>
+python bot.py
+```
+
+Подробности — в [telegram_bot/README.md](telegram_bot/README.md).
+
+---
+
 ## Space Shooter
 
 Горизонтальный космический шутер — уничтожай вражеские корабли, пока они не добрались до тебя!
