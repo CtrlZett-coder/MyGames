@@ -2,3 +2,4 @@
 __pycache__/
 .claude/worktrees/
 space_shooter/build/
+android_escape/.gradle/

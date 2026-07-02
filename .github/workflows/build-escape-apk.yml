@@ -1,0 +1,79 @@
+name: Build Escape APK & Release
+
+on:
+  push:
+    branches:
+      - main
+      - claude/game-levels-difficulty-kmprut
+    paths:
+      - 'escape.html'
+      - 'android_escape/**'
+      - '.github/workflows/build-escape-apk.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '7.6.1'
+
+      # ── Escape (Побег) APK ──────────────────────────────────────────────────
+      - name: Build Escape APK
+        run: |
+          cp escape.html android_escape/app/src/main/assets/game.html
+          cd android_escape
+          gradle assembleDebug --no-daemon
+          mv app/build/outputs/apk/debug/app-debug.apk ../Escape.apk
+
+      - name: Upload APK as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Escape-APK
+          path: Escape.apk
+          retention-days: 30
+
+      # ── GitHub Release ───────────────────────────────────────────────────────
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="escape-latest"
+          TITLE="Побег — последняя версия"
+          NOTES="## 🏃 Побег — скачать
+
+          | Файл | Описание |
+          |---|---|
+          | \`Escape.apk\` | Android APK — установи и играй |
+          | \`escape.html\` | HTML5 — открой в браузере без интернета |
+
+          10 уровней с нарастающей сложностью: охрана, ловушки, ключи и туман войны.
+
+          **Установка APK:** Настройки → Безопасность → Разрешить из неизвестных источников"
+
+          cp escape.html escape_html5.html
+
+          gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --yes 2>/dev/null || true
+          git push origin ":refs/tags/$TAG" 2>/dev/null || true
+          sleep 2
+
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$TITLE" \
+            --notes "$NOTES" \
+            Escape.apk escape_html5.html
