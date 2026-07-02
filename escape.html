@@ -48,25 +48,24 @@ try{
 function persist(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }catch(e){} }
 
 // ---------------- Level data ----------------
-// 10x10 board. Every level's board is constructed then verified solvable
-// by literally replaying its scramble history in reverse (see gen script,
-// not shipped) -- "par" is the length of that verified solution. Levels
-// escalate via board density, number of vertical blockers seeded directly
-// in the target's row, and how many other blocks get entangled while
-// scrambling, culminating in level 10 which requires 100+ moves with many
-// blocks needing to shuffle back and forth to clear the path.
+// 10x10 board. Every level below is built by an incremental generator that
+// adds one obstacle at a time and re-measures the REAL minimum move count
+// with an A* solver after every single addition (never guessed, never
+// estimated) -- "par" is the true, computer-verified shortest solution,
+// not a scramble length or any other proxy. An earlier version of this
+// game showed inflated "par" numbers that didn't match how many moves the
+// puzzle actually needed; this generation method (and two placement bugs
+// that were masking real difficulty) were fixed to make every number here
+// honest. Difficulty is capped by how long real A* verification takes to
+// run on a 10x10 board (it gets very expensive fast) rather than by
+// design, so there are 5 levels instead of 10 for now.
 const COLS=10, ROWS=10, TARGET_ROW=4, TARGET_LEN=2;
 const LEVELS=[null,
-{level:1,par:5,blocks:[{x:1,y:4,w:2,h:1,t:1},{x:5,y:3,w:1,h:2,t:0},{x:5,y:0,w:1,h:3,t:0},{x:0,y:6,w:2,h:1,t:0},{x:8,y:7,w:2,h:1,t:0},{x:8,y:0,w:1,h:2,t:0},{x:2,y:0,w:1,h:2,t:0},{x:2,y:2,w:2,h:1,t:0},{x:7,y:0,w:1,h:2,t:0}]},
-{level:2,par:10,blocks:[{x:4,y:4,w:2,h:1,t:1},{x:3,y:1,w:1,h:3,t:0},{x:6,y:2,w:1,h:4,t:0},{x:1,y:0,w:1,h:3,t:0},{x:8,y:5,w:2,h:1,t:0},{x:7,y:2,w:2,h:1,t:0},{x:3,y:6,w:1,h:2,t:0},{x:7,y:8,w:1,h:2,t:0},{x:9,y:0,w:1,h:3,t:0},{x:0,y:2,w:1,h:2,t:0},{x:2,y:7,w:1,h:2,t:0},{x:8,y:3,w:2,h:1,t:0},{x:1,y:8,w:1,h:2,t:0}]},
-{level:3,par:17,blocks:[{x:3,y:4,w:2,h:1,t:1},{x:2,y:1,w:1,h:3,t:0},{x:5,y:0,w:1,h:2,t:0},{x:1,y:3,w:1,h:2,t:0},{x:7,y:0,w:1,h:3,t:0},{x:0,y:9,w:3,h:1,t:0},{x:6,y:8,w:1,h:2,t:0},{x:5,y:4,w:1,h:2,t:0},{x:8,y:5,w:1,h:4,t:0},{x:3,y:3,w:2,h:1,t:0},{x:1,y:5,w:3,h:1,t:0},{x:9,y:1,w:1,h:2,t:0},{x:4,y:0,w:1,h:2,t:0},{x:3,y:2,w:2,h:1,t:0},{x:2,y:7,w:2,h:1,t:0},{x:1,y:1,w:1,h:2,t:0},{x:9,y:6,w:1,h:3,t:0}]},
-{level:4,par:25,blocks:[{x:3,y:4,w:2,h:1,t:1},{x:2,y:6,w:1,h:3,t:0},{x:5,y:7,w:1,h:3,t:0},{x:1,y:4,w:1,h:2,t:0},{x:1,y:3,w:4,h:1,t:0},{x:1,y:6,w:1,h:3,t:0},{x:8,y:0,w:1,h:2,t:0},{x:0,y:6,w:1,h:3,t:0},{x:0,y:1,w:3,h:1,t:0},{x:6,y:0,w:1,h:4,t:0},{x:8,y:6,w:1,h:2,t:0},{x:5,y:5,w:3,h:1,t:0},{x:7,y:0,w:1,h:2,t:0},{x:9,y:8,w:1,h:2,t:0},{x:4,y:1,w:1,h:2,t:0},{x:5,y:1,w:1,h:4,t:0},{x:9,y:0,w:1,h:3,t:0},{x:4,y:7,w:1,h:2,t:0},{x:7,y:3,w:2,h:1,t:0},{x:8,y:8,w:1,h:2,t:0}]},
-{level:5,par:47,blocks:[{x:1,y:4,w:2,h:1,t:1},{x:4,y:0,w:1,h:3,t:0},{x:2,y:5,w:1,h:3,t:0},{x:3,y:0,w:1,h:2,t:0},{x:5,y:0,w:1,h:3,t:0},{x:6,y:0,w:1,h:2,t:0},{x:6,y:2,w:1,h:2,t:0},{x:1,y:8,w:1,h:2,t:0},{x:8,y:1,w:1,h:3,t:0},{x:6,y:8,w:1,h:2,t:0},{x:2,y:8,w:4,h:1,t:0},{x:0,y:8,w:1,h:2,t:0},{x:7,y:0,w:1,h:3,t:0},{x:2,y:1,w:1,h:2,t:0},{x:3,y:2,w:1,h:2,t:0},{x:5,y:6,w:2,h:1,t:0},{x:9,y:8,w:1,h:2,t:0},{x:8,y:7,w:2,h:1,t:0},{x:1,y:0,w:1,h:3,t:0},{x:3,y:6,w:2,h:1,t:0},{x:9,y:3,w:1,h:2,t:0},{x:0,y:4,w:1,h:2,t:0},{x:5,y:7,w:2,h:1,t:0}]},
-{level:6,par:53,blocks:[{x:3,y:4,w:2,h:1,t:1},{x:2,y:2,w:1,h:4,t:0},{x:7,y:2,w:1,h:2,t:0},{x:4,y:5,w:1,h:4,t:0},{x:3,y:1,w:1,h:2,t:0},{x:5,y:2,w:1,h:2,t:0},{x:7,y:0,w:1,h:2,t:0},{x:6,y:6,w:3,h:1,t:0},{x:8,y:7,w:1,h:2,t:0},{x:1,y:8,w:1,h:2,t:0},{x:2,y:8,w:1,h:2,t:0},{x:9,y:4,w:1,h:3,t:0},{x:3,y:9,w:2,h:1,t:0},{x:8,y:3,w:2,h:1,t:0},{x:4,y:1,w:2,h:1,t:0},{x:6,y:8,w:1,h:2,t:0},{x:1,y:6,w:3,h:1,t:0},{x:2,y:7,w:2,h:1,t:0},{x:8,y:1,w:1,h:2,t:0},{x:1,y:0,w:1,h:2,t:0},{x:0,y:4,w:2,h:1,t:0},{x:3,y:0,w:3,h:1,t:0},{x:6,y:5,w:2,h:1,t:0},{x:0,y:5,w:1,h:2,t:0},{x:5,y:7,w:1,h:3,t:0}]},
-{level:7,par:66,blocks:[{x:3,y:4,w:2,h:1,t:1},{x:5,y:5,w:1,h:2,t:0},{x:2,y:3,w:1,h:3,t:0},{x:7,y:0,w:1,h:4,t:0},{x:3,y:6,w:1,h:4,t:0},{x:4,y:0,w:1,h:4,t:0},{x:6,y:0,w:1,h:3,t:0},{x:4,y:5,w:1,h:2,t:0},{x:4,y:7,w:1,h:2,t:0},{x:8,y:4,w:1,h:2,t:0},{x:7,y:6,w:1,h:2,t:0},{x:0,y:0,w:1,h:3,t:0},{x:2,y:7,w:1,h:3,t:0},{x:6,y:6,w:1,h:3,t:0},{x:0,y:5,w:2,h:1,t:0},{x:8,y:0,w:1,h:2,t:0},{x:9,y:0,w:1,h:3,t:0},{x:1,y:3,w:1,h:2,t:0},{x:8,y:7,w:1,h:3,t:0},{x:8,y:2,w:1,h:2,t:0},{x:0,y:9,w:2,h:1,t:0},{x:6,y:5,w:2,h:1,t:0},{x:2,y:2,w:2,h:1,t:0},{x:0,y:6,w:1,h:3,t:0},{x:5,y:1,w:1,h:3,t:0},{x:2,y:0,w:2,h:1,t:0},{x:1,y:7,w:1,h:2,t:0}]},
-{level:8,par:86,blocks:[{x:1,y:4,w:2,h:1,t:1},{x:5,y:0,w:1,h:4,t:0},{x:4,y:2,w:1,h:2,t:0},{x:2,y:2,w:1,h:2,t:0},{x:7,y:4,w:1,h:2,t:0},{x:3,y:1,w:1,h:3,t:0},{x:6,y:5,w:1,h:2,t:0},{x:0,y:3,w:1,h:2,t:0},{x:6,y:2,w:3,h:1,t:0},{x:1,y:0,w:3,h:1,t:0},{x:4,y:6,w:1,h:4,t:0},{x:8,y:3,w:2,h:1,t:0},{x:5,y:6,w:1,h:3,t:0},{x:0,y:1,w:3,h:1,t:0},{x:1,y:2,w:1,h:2,t:0},{x:1,y:5,w:1,h:2,t:0},{x:7,y:7,w:1,h:3,t:0},{x:0,y:9,w:3,h:1,t:0},{x:8,y:5,w:1,h:2,t:0},{x:3,y:5,w:1,h:3,t:0},{x:2,y:5,w:1,h:2,t:0},{x:6,y:7,w:1,h:3,t:0},{x:2,y:8,w:2,h:1,t:0},{x:4,y:0,w:1,h:2,t:0},{x:0,y:6,w:1,h:2,t:0},{x:1,y:7,w:1,h:2,t:0},{x:8,y:8,w:2,h:1,t:0},{x:6,y:0,w:1,h:2,t:0}]},
-{level:9,par:108,blocks:[{x:2,y:4,w:2,h:1,t:1},{x:6,y:1,w:1,h:3,t:0},{x:3,y:5,w:1,h:3,t:0},{x:7,y:3,w:1,h:2,t:0},{x:2,y:5,w:1,h:2,t:0},{x:5,y:0,w:1,h:3,t:0},{x:1,y:3,w:1,h:4,t:0},{x:4,y:5,w:1,h:4,t:0},{x:0,y:5,w:1,h:2,t:0},{x:7,y:1,w:2,h:1,t:0},{x:8,y:5,w:1,h:3,t:0},{x:5,y:6,w:1,h:2,t:0},{x:7,y:2,w:2,h:1,t:0},{x:0,y:2,w:1,h:2,t:0},{x:3,y:9,w:4,h:1,t:0},{x:8,y:8,w:2,h:1,t:0},{x:9,y:0,w:1,h:3,t:0},{x:0,y:1,w:3,h:1,t:0},{x:1,y:7,w:2,h:1,t:0},{x:1,y:8,w:3,h:1,t:0},{x:2,y:2,w:1,h:2,t:0},{x:6,y:4,w:1,h:2,t:0},{x:9,y:6,w:1,h:2,t:0},{x:0,y:0,w:2,h:1,t:0},{x:7,y:5,w:1,h:2,t:0},{x:6,y:7,w:1,h:2,t:0},{x:4,y:0,w:1,h:2,t:0},{x:2,y:0,w:2,h:1,t:0},{x:3,y:1,w:1,h:2,t:0}]},
-{level:10,par:165,blocks:[{x:4,y:4,w:2,h:1,t:1},{x:1,y:4,w:1,h:4,t:0},{x:3,y:4,w:1,h:4,t:0},{x:2,y:3,w:1,h:4,t:0},{x:6,y:4,w:1,h:2,t:0},{x:5,y:5,w:1,h:3,t:0},{x:7,y:6,w:1,h:4,t:0},{x:4,y:2,w:1,h:2,t:0},{x:8,y:0,w:1,h:2,t:0},{x:9,y:4,w:1,h:2,t:0},{x:2,y:7,w:1,h:3,t:0},{x:0,y:8,w:2,h:1,t:0},{x:9,y:1,w:1,h:2,t:0},{x:2,y:0,w:1,h:3,t:0},{x:8,y:2,w:1,h:2,t:0},{x:4,y:5,w:1,h:4,t:0},{x:3,y:0,w:3,h:1,t:0},{x:5,y:3,w:2,h:1,t:0},{x:7,y:3,w:1,h:3,t:0},{x:0,y:0,w:1,h:4,t:0},{x:8,y:6,w:2,h:1,t:0},{x:6,y:7,w:1,h:3,t:0},{x:5,y:8,w:1,h:2,t:0},{x:5,y:2,w:3,h:1,t:0},{x:6,y:0,w:1,h:2,t:0},{x:3,y:1,w:1,h:3,t:0},{x:1,y:0,w:1,h:2,t:0},{x:8,y:7,w:1,h:2,t:0},{x:3,y:8,w:1,h:2,t:0}]},
+{level:1,par:2,blocks:[{x:0,y:4,w:2,h:1,t:1},{x:7,y:4,w:1,h:2,t:0}]},
+{level:2,par:4,blocks:[{x:0,y:4,w:2,h:1,t:1},{x:7,y:4,w:1,h:2,t:0},{x:5,y:1,w:2,h:1,t:0},{x:7,y:0,w:1,h:3,t:0},{x:4,y:1,w:1,h:2,t:0},{x:6,y:3,w:1,h:2,t:0},{x:3,y:4,w:1,h:2,t:0}]},
+{level:3,par:7,blocks:[{x:0,y:4,w:2,h:1,t:1},{x:7,y:4,w:1,h:2,t:0},{x:5,y:1,w:2,h:1,t:0},{x:7,y:0,w:1,h:3,t:0},{x:4,y:1,w:1,h:2,t:0},{x:6,y:3,w:1,h:2,t:0},{x:3,y:4,w:1,h:2,t:0},{x:3,y:3,w:3,h:1,t:0},{x:2,y:6,w:4,h:1,t:0},{x:7,y:3,w:2,h:1,t:0},{x:2,y:1,w:1,h:4,t:0},{x:5,y:4,w:1,h:2,t:0}]},
+{level:4,par:11,blocks:[{x:0,y:4,w:2,h:1,t:1},{x:7,y:4,w:1,h:2,t:0},{x:5,y:1,w:2,h:1,t:0},{x:7,y:0,w:1,h:3,t:0},{x:4,y:1,w:1,h:2,t:0},{x:6,y:3,w:1,h:2,t:0},{x:3,y:4,w:1,h:2,t:0},{x:3,y:3,w:3,h:1,t:0},{x:2,y:6,w:4,h:1,t:0},{x:7,y:3,w:2,h:1,t:0},{x:2,y:1,w:1,h:4,t:0},{x:5,y:4,w:1,h:2,t:0},{x:9,y:1,w:1,h:3,t:0},{x:1,y:0,w:2,h:1,t:0},{x:0,y:0,w:1,h:3,t:0},{x:6,y:6,w:2,h:1,t:0},{x:3,y:0,w:2,h:1,t:0},{x:9,y:4,w:1,h:2,t:0},{x:4,y:4,w:1,h:2,t:0}]},
+{level:5,par:16,blocks:[{x:0,y:4,w:2,h:1,t:1},{x:7,y:4,w:1,h:2,t:0},{x:5,y:1,w:2,h:1,t:0},{x:7,y:0,w:1,h:3,t:0},{x:4,y:1,w:1,h:2,t:0},{x:6,y:3,w:1,h:2,t:0},{x:3,y:4,w:1,h:2,t:0},{x:3,y:3,w:3,h:1,t:0},{x:2,y:6,w:4,h:1,t:0},{x:7,y:3,w:2,h:1,t:0},{x:2,y:1,w:1,h:4,t:0},{x:5,y:4,w:1,h:2,t:0},{x:9,y:1,w:1,h:3,t:0},{x:1,y:0,w:2,h:1,t:0},{x:0,y:0,w:1,h:3,t:0},{x:6,y:6,w:2,h:1,t:0},{x:3,y:0,w:2,h:1,t:0},{x:9,y:4,w:1,h:2,t:0},{x:4,y:4,w:1,h:2,t:0},{x:8,y:4,w:1,h:3,t:0},{x:1,y:6,w:1,h:2,t:0},{x:5,y:2,w:2,h:1,t:0},{x:7,y:7,w:1,h:2,t:0},{x:1,y:8,w:3,h:1,t:0}]},
 ];
 const NLEVELS=LEVELS.length-1;
 function blockColor(i){
@@ -318,7 +317,7 @@ function renderMenu(){
   ctx.fillStyle='#8fa3c0';
   ctx.fillText('Перетаскивай блоки и выведи розовый блок к выходу', GW/2, 102);
 
-  const cols=2, rows=5, bw=242, bh=120, gap=16;
+  const cols=1, rows=NLEVELS, bw=380, bh=100, gap=14;
   const gridW=cols*bw+(cols-1)*gap;
   const startX=(GW-gridW)/2, startY=150;
   for(let n=1;n<=NLEVELS;n++){
@@ -330,21 +329,21 @@ function renderMenu(){
     ctx.lineWidth=2;
     roundRect(x,y,bw,bh,12); ctx.fill(); ctx.stroke();
     ctx.fillStyle = unlocked ? '#eaf6ff' : '#555';
-    ctx.font='bold 30px sans-serif';
+    ctx.font='bold 34px sans-serif';
     ctx.textBaseline='middle'; ctx.textAlign='center';
-    ctx.fillText(unlocked?String(n):'🔒', x+bw/2, y+36);
+    ctx.fillText(unlocked?String(n):'🔒', x+70, y+bh/2);
     if(unlocked){
       const st=save.stars[n]||0;
-      drawStars(x+bw/2, y+70, 9, st, 3);
+      drawStars(x+bw*0.62, y+bh/2-16, 9, st, 3);
       ctx.font='12px sans-serif';
       ctx.fillStyle='#8fd6ff';
       const bm=save.bestMoves[n];
-      ctx.fillText(bm?('★ '+bm+' ход.'):'—', x+bw/2, y+96);
+      ctx.fillText(bm?('★ '+bm+' ход.'):'—', x+bw*0.62, y+bh/2+16);
       activeButtons.push({x,y,w:bw,h:bh,action:()=>startLevel(n)});
     } else {
       ctx.font='12px sans-serif';
       ctx.fillStyle='#444';
-      ctx.fillText('заблокирован', x+bw/2, y+82);
+      ctx.fillText('заблокирован', x+bw*0.62, y+bh/2);
     }
   }
   ctx.font='14px sans-serif';
