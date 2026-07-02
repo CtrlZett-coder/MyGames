@@ -6,7 +6,7 @@
 <title>Побег — Escape</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
-html,body{width:100%;height:100%;background:#05060a;overflow:hidden}
+html,body{width:100%;height:100%;background:#05060a;overflow:hidden;display:flex;align-items:center;justify-content:center}
 canvas{display:block;touch-action:none;background:#05060a}
 </style>
 </head>
@@ -16,7 +16,7 @@ canvas{display:block;touch-action:none;background:#05060a}
 (function(){
 'use strict';
 
-const GW=900, GH=600;
+const GW=540, GH=960;
 const cv=document.getElementById('c');
 const ctx=cv.getContext('2d');
 
@@ -165,11 +165,17 @@ let drag=null; // {idx, axis, startClient, startPos, min, max}
 const pauseless=true;
 
 function boardLayout(){
-  const area={x:20,y:62,w:GW-40,h:GH-74};
-  const CELL=Math.min(area.w/COLS, area.h/ROWS);
-  const bw=CELL*COLS, bh=CELL*ROWS;
-  const ox=area.x+(area.w-bw)/2, oy=area.y+(area.h-bh)/2;
+  const area={x:20,y:130,w:GW-40,h:GW-40};
+  const CELL=area.w/COLS;
+  const ox=area.x, oy=area.y;
   return {CELL,ox,oy};
+}
+function buttonRowLayout(){
+  const {CELL,oy}=boardLayout();
+  const boardBottom=oy+CELL*ROWS;
+  const y=boardBottom+28;
+  const gap=12, bw=(GW-40-2*gap)/3, bh=76;
+  return {y,bh,gap,bw,x0:20};
 }
 function pickBlockAt(lx,ly){
   const {CELL,ox,oy}=boardLayout();
@@ -263,7 +269,7 @@ function drawButton(x,y,w,h,label){
   roundRect(x,y,w,h,10);
   ctx.fill(); ctx.stroke();
   ctx.fillStyle='#eaf6ff';
-  ctx.font='bold 19px sans-serif';
+  ctx.font='bold 21px sans-serif';
   ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillText(label, x+w/2, y+h/2);
 }
@@ -304,17 +310,17 @@ function renderMenu(){
   activeButtons=[];
   ctx.textAlign='center'; ctx.textBaseline='alphabetic';
   ctx.fillStyle='#2ee6ff';
-  ctx.font='bold 46px sans-serif';
+  ctx.font='bold 44px sans-serif';
   ctx.shadowColor='#2ee6ff'; ctx.shadowBlur=18;
-  ctx.fillText('ПОБЕГ', GW/2, 78);
+  ctx.fillText('ПОБЕГ', GW/2, 76);
   ctx.shadowBlur=0;
   ctx.font='15px sans-serif';
   ctx.fillStyle='#8fa3c0';
-  ctx.fillText('Сдвигай блоки и выведи розовый блок к выходу', GW/2, 104);
+  ctx.fillText('Перетаскивай блоки и выведи розовый блок к выходу', GW/2, 102);
 
-  const cols=5, rows=2, bw=130, bh=100, gap=16;
+  const cols=2, rows=5, bw=242, bh=120, gap=16;
   const gridW=cols*bw+(cols-1)*gap;
-  const startX=(GW-gridW)/2, startY=140;
+  const startX=(GW-gridW)/2, startY=150;
   for(let n=1;n<=NLEVELS;n++){
     const ci=(n-1)%cols, ri=Math.floor((n-1)/cols);
     const x=startX+ci*(bw+gap), y=startY+ri*(bh+gap);
@@ -324,26 +330,27 @@ function renderMenu(){
     ctx.lineWidth=2;
     roundRect(x,y,bw,bh,12); ctx.fill(); ctx.stroke();
     ctx.fillStyle = unlocked ? '#eaf6ff' : '#555';
-    ctx.font='bold 26px sans-serif';
+    ctx.font='bold 30px sans-serif';
     ctx.textBaseline='middle'; ctx.textAlign='center';
-    ctx.fillText(unlocked?String(n):'🔒', x+bw/2, y+30);
+    ctx.fillText(unlocked?String(n):'🔒', x+bw/2, y+36);
     if(unlocked){
       const st=save.stars[n]||0;
-      drawStars(x+bw/2, y+58, 8, st, 3);
-      ctx.font='11px sans-serif';
+      drawStars(x+bw/2, y+70, 9, st, 3);
+      ctx.font='12px sans-serif';
       ctx.fillStyle='#8fd6ff';
       const bm=save.bestMoves[n];
-      ctx.fillText(bm?('★ '+bm+' ход.'):'—', x+bw/2, y+82);
+      ctx.fillText(bm?('★ '+bm+' ход.'):'—', x+bw/2, y+96);
       activeButtons.push({x,y,w:bw,h:bh,action:()=>startLevel(n)});
     } else {
-      ctx.font='11px sans-serif';
+      ctx.font='12px sans-serif';
       ctx.fillStyle='#444';
-      ctx.fillText('заблокирован', x+bw/2, y+70);
+      ctx.fillText('заблокирован', x+bw/2, y+82);
     }
   }
-  ctx.font='13px sans-serif';
+  ctx.font='14px sans-serif';
   ctx.fillStyle='#5a6b85';
-  ctx.fillText('Перетаскивай блоки мышью/пальцем вдоль их оси. Ctrl+Z — отменить, R — заново.', GW/2, startY+rows*(bh+gap)+16);
+  ctx.fillText('Перетаскивай блок пальцем вдоль его оси и отпусти,', GW/2, startY+rows*(bh+gap)+26);
+  ctx.fillText('чтобы зафиксировать на месте.', GW/2, startY+rows*(bh+gap)+48);
 }
 
 function renderPlay(){
@@ -443,28 +450,22 @@ function drawChevron(cx,cy,dir,size,vertical){
 
 function renderHUD(){
   activeButtons=activeButtons.filter(()=>false);
-  ctx.fillStyle='rgba(6,10,20,0.85)';
-  ctx.fillRect(0,0,GW,54);
-  ctx.textBaseline='middle'; ctx.textAlign='left';
+  ctx.textBaseline='middle'; ctx.textAlign='center';
   ctx.fillStyle='#8fd6ff';
-  ctx.font='bold 17px sans-serif';
-  ctx.fillText('УРОВЕНЬ '+B.level+'/'+NLEVELS, 16, 27);
+  ctx.font='bold 22px sans-serif';
+  ctx.fillText('УРОВЕНЬ '+B.level+'/'+NLEVELS, GW/2, 40);
 
-  ctx.textAlign='center';
   ctx.fillStyle='#eaf6ff';
-  ctx.font='bold 18px sans-serif';
-  ctx.fillText('Ходы: '+B.moves+'  (пар '+B.par+')', GW/2, 27);
+  ctx.font='bold 24px sans-serif';
+  ctx.fillText('Ходы: '+B.moves+'   Пар: '+B.par, GW/2, 84);
 
-  const bw=90,bh=34,gap=10;
-  let bx=GW-16-bw;
-  drawButton(bx,10,bw,bh,'Меню');
-  activeButtons.push({x:bx,y:10,w:bw,h:bh,action:goMenu});
-  bx-=bw+gap;
-  drawButton(bx,10,bw,bh,'Заново');
-  activeButtons.push({x:bx,y:10,w:bw,h:bh,action:restart});
-  bx-=bw+gap;
-  drawButton(bx,10,bw,bh,'Отмена');
-  activeButtons.push({x:bx,y:10,w:bw,h:bh,action:undo});
+  const {y,bh,gap,bw,x0}=buttonRowLayout();
+  drawButton(x0, y, bw, bh, 'Отмена');
+  activeButtons.push({x:x0,y,w:bw,h:bh,action:undo});
+  drawButton(x0+bw+gap, y, bw, bh, 'Заново');
+  activeButtons.push({x:x0+bw+gap,y,w:bw,h:bh,action:restart});
+  drawButton(x0+2*(bw+gap), y, bw, bh, 'Меню');
+  activeButtons.push({x:x0+2*(bw+gap),y,w:bw,h:bh,action:goMenu});
 }
 
 function renderComplete(){
