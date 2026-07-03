@@ -58,7 +58,7 @@ function persist(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }
 // that were masking real difficulty) were fixed to make every number here
 // honest. Difficulty is capped by how long real A* verification takes to
 // run on a 10x10 board (it gets very expensive fast) rather than by
-// design, so there are 5 levels instead of 10 for now.
+// design -- levels are added incrementally as generation time allows.
 const COLS=10, ROWS=10, TARGET_ROW=4, TARGET_LEN=2;
 const LEVELS=[null,
 {level:1,par:2,blocks:[{x:0,y:4,w:2,h:1,t:1},{x:7,y:4,w:1,h:2,t:0}]},
@@ -66,6 +66,7 @@ const LEVELS=[null,
 {level:3,par:7,blocks:[{x:0,y:4,w:2,h:1,t:1},{x:7,y:4,w:1,h:2,t:0},{x:5,y:1,w:2,h:1,t:0},{x:7,y:0,w:1,h:3,t:0},{x:4,y:1,w:1,h:2,t:0},{x:6,y:3,w:1,h:2,t:0},{x:3,y:4,w:1,h:2,t:0},{x:3,y:3,w:3,h:1,t:0},{x:2,y:6,w:4,h:1,t:0},{x:7,y:3,w:2,h:1,t:0},{x:2,y:1,w:1,h:4,t:0},{x:5,y:4,w:1,h:2,t:0}]},
 {level:4,par:11,blocks:[{x:0,y:4,w:2,h:1,t:1},{x:7,y:4,w:1,h:2,t:0},{x:5,y:1,w:2,h:1,t:0},{x:7,y:0,w:1,h:3,t:0},{x:4,y:1,w:1,h:2,t:0},{x:6,y:3,w:1,h:2,t:0},{x:3,y:4,w:1,h:2,t:0},{x:3,y:3,w:3,h:1,t:0},{x:2,y:6,w:4,h:1,t:0},{x:7,y:3,w:2,h:1,t:0},{x:2,y:1,w:1,h:4,t:0},{x:5,y:4,w:1,h:2,t:0},{x:9,y:1,w:1,h:3,t:0},{x:1,y:0,w:2,h:1,t:0},{x:0,y:0,w:1,h:3,t:0},{x:6,y:6,w:2,h:1,t:0},{x:3,y:0,w:2,h:1,t:0},{x:9,y:4,w:1,h:2,t:0},{x:4,y:4,w:1,h:2,t:0}]},
 {level:5,par:16,blocks:[{x:0,y:4,w:2,h:1,t:1},{x:7,y:4,w:1,h:2,t:0},{x:5,y:1,w:2,h:1,t:0},{x:7,y:0,w:1,h:3,t:0},{x:4,y:1,w:1,h:2,t:0},{x:6,y:3,w:1,h:2,t:0},{x:3,y:4,w:1,h:2,t:0},{x:3,y:3,w:3,h:1,t:0},{x:2,y:6,w:4,h:1,t:0},{x:7,y:3,w:2,h:1,t:0},{x:2,y:1,w:1,h:4,t:0},{x:5,y:4,w:1,h:2,t:0},{x:9,y:1,w:1,h:3,t:0},{x:1,y:0,w:2,h:1,t:0},{x:0,y:0,w:1,h:3,t:0},{x:6,y:6,w:2,h:1,t:0},{x:3,y:0,w:2,h:1,t:0},{x:9,y:4,w:1,h:2,t:0},{x:4,y:4,w:1,h:2,t:0},{x:8,y:4,w:1,h:3,t:0},{x:1,y:6,w:1,h:2,t:0},{x:5,y:2,w:2,h:1,t:0},{x:7,y:7,w:1,h:2,t:0},{x:1,y:8,w:3,h:1,t:0}]},
+{level:6,par:19,blocks:[{x:0,y:4,w:2,h:1,t:1},{x:7,y:4,w:1,h:2,t:0},{x:5,y:1,w:2,h:1,t:0},{x:7,y:0,w:1,h:3,t:0},{x:4,y:1,w:1,h:2,t:0},{x:6,y:3,w:1,h:2,t:0},{x:3,y:4,w:1,h:2,t:0},{x:3,y:3,w:3,h:1,t:0},{x:2,y:6,w:4,h:1,t:0},{x:7,y:3,w:2,h:1,t:0},{x:2,y:1,w:1,h:4,t:0},{x:5,y:4,w:1,h:2,t:0},{x:9,y:1,w:1,h:3,t:0},{x:1,y:0,w:2,h:1,t:0},{x:0,y:0,w:1,h:3,t:0},{x:6,y:6,w:2,h:1,t:0},{x:3,y:0,w:2,h:1,t:0},{x:9,y:4,w:1,h:2,t:0},{x:4,y:4,w:1,h:2,t:0},{x:8,y:4,w:1,h:3,t:0},{x:1,y:6,w:1,h:2,t:0},{x:5,y:2,w:2,h:1,t:0},{x:7,y:7,w:1,h:2,t:0},{x:1,y:8,w:3,h:1,t:0},{x:4,y:7,w:2,h:1,t:0},{x:8,y:7,w:2,h:1,t:0},{x:0,y:5,w:2,h:1,t:0},{x:2,y:9,w:3,h:1,t:0},{x:5,y:8,w:1,h:2,t:0},{x:8,y:0,w:2,h:1,t:0},{x:6,y:7,w:1,h:2,t:0}]},
 ];
 const NLEVELS=LEVELS.length-1;
 function blockColor(i){
