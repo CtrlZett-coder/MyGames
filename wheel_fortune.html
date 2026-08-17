@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0d0b1a">
+<title>Колесо Фортуны</title>
+<style>
+  :root{
+    --bg-1:#0d0b1a;
+    --bg-2:#1a1433;
+    --panel:#171331cc;
+    --panel-2:#1f1a3ecc;
+    --border:#3a3266;
+    --text:#f2eeff;
+    --text-dim:#a79fd1;
+    --accent:#ff5fa2;
+    --accent-2:#7c5cff;
+    --accent-3:#33e0c1;
+    --good:#3ddc84;
+    --bad:#ff5f6d;
+    --radius:16px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    min-height:100vh;
+    font-family:"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    color:var(--text);
+    background:
+      radial-gradient(1100px 600px at 15% -10%, #3a1a5c66, transparent 60%),
+      radial-gradient(900px 700px at 110% 10%, #0a3a5c66, transparent 55%),
+      radial-gradient(1000px 800px at 50% 120%, #5c1a3c55, transparent 55%),
+      linear-gradient(160deg, var(--bg-1), var(--bg-2) 60%, #100c24);
+    background-attachment:fixed;
+    overflow-x:hidden;
+    padding-bottom:24px;
+  }
+  ::selection{ background:var(--accent-2); color:#fff; }
+
+  header{
+    padding:22px 18px 10px;
+    text-align:center;
+  }
+  header h1{
+    margin:0;
+    font-size:clamp(22px,5vw,32px);
+    font-weight:800;
+    letter-spacing:.3px;
+    background:linear-gradient(90deg,#ff9dcb,#a98bff 45%,#5ce8ff);
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+    filter:drop-shadow(0 2px 18px #7c5cff44);
+  }
+  header p{
+    margin:6px 0 0;
+    color:var(--text-dim);
+    font-size:13px;
+  }
+
+  .layout{
+    max-width:1180px;
+    margin:0 auto;
+    padding:8px 14px 0;
+    display:grid;
+    grid-template-columns:minmax(300px,460px) 1fr;
+    gap:22px;
+    align-items:start;
+  }
+  @media (max-width: 900px){
+    .layout{ grid-template-columns:1fr; }
+  }
+
+  /* ---------- Wheel column ---------- */
+  .wheel-col{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:14px;
+    position:sticky;
+    top:10px;
+  }
+  @media (max-width:900px){ .wheel-col{ position:static; } }
+
+  .wheel-wrap{
+    position:relative;
+    width:min(88vw,420px);
+    aspect-ratio:1/1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    filter:drop-shadow(0 14px 40px #00000066);
+  }
+  .wheel-ring{
+    position:absolute;
+    inset:-14px;
+    border-radius:50%;
+    background:conic-gradient(from 0deg,#ff5fa2,#ffb35f,#f4ff5f,#5fff8f,#5fe0ff,#7c5cff,#ff5fa2);
+    padding:0;
+    filter:saturate(1.15);
+    box-shadow:0 0 0 3px #ffffff14 inset, 0 0 40px #7c5cff55;
+  }
+  .wheel-ring::after{
+    content:"";
+    position:absolute;
+    inset:10px;
+    border-radius:50%;
+    background:var(--bg-2);
+  }
+  canvas#wheel{
+    position:relative;
+    width:100%;
+    height:100%;
+    border-radius:50%;
+    background:#120f24;
+    box-shadow:0 0 0 2px #ffffff10 inset;
+    transition:transform 5.2s cubic-bezier(.16,.85,.13,1);
+    will-change:transform;
+  }
+  .hub{
+    position:absolute;
+    width:19%;
+    height:19%;
+    border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#fff,#ffe1f3 25%,var(--accent) 65%,#b8367f);
+    box-shadow:0 0 0 5px #1c1735, 0 6px 18px #000a, inset 0 0 10px #ffffffaa;
+    display:flex;align-items:center;justify-content:center;
+    font-size:22px;
+    z-index:5;
+    cursor:pointer;
+    user-select:none;
+    border:none;
+    transition:transform .12s ease;
+  }
+  .hub:active{ transform:scale(0.92); }
+  .hub.spinning{ pointer-events:none; opacity:.75; }
+
+  .pointer{
+    position:absolute;
+    top:-6px;
+    left:50%;
+    transform:translateX(-50%);
+    width:38px;
+    height:46px;
+    z-index:6;
+    filter:drop-shadow(0 4px 8px #000a);
+  }
+  .pointer svg{ width:100%; height:100%; display:block; }
+
+  .spin-btn{
+    appearance:none;border:none;cursor:pointer;
+    padding:14px 40px;
+    font-size:17px;
+    font-weight:800;
+    letter-spacing:.5px;
+    color:#1a0f2b;
+    background:linear-gradient(90deg,var(--accent-3),var(--accent-2) 55%,var(--accent));
+    background-size:200% 100%;
+    border-radius:999px;
+    box-shadow:0 8px 22px #7c5cff55, 0 2px 0 #ffffff55 inset;
+    transition:transform .12s ease, box-shadow .12s ease, background-position .3s;
+  }
+  .spin-btn:hover{ background-position:100% 0; box-shadow:0 10px 26px #7c5cff77, 0 2px 0 #ffffff66 inset; }
+  .spin-btn:active{ transform:translateY(2px) scale(.98); }
+  .spin-btn:disabled{ opacity:.5; cursor:not-allowed; filter:grayscale(.3); }
+
+  .result-banner{
+    min-height:30px;
+    text-align:center;
+    font-size:15px;
+    color:var(--text-dim);
+  }
+  .result-banner b{
+    color:#fff;
+    font-size:17px;
+  }
+
+  .history{
+    width:min(88vw,420px);
+    max-height:120px;
+    overflow-y:auto;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    justify-content:center;
+    padding:2px;
+  }
+  .history .chip{
+    font-size:11.5px;
+    padding:5px 10px;
+    border-radius:999px;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    color:var(--text-dim);
+    white-space:nowrap;
+  }
+  .history .chip:first-child{
+    color:#fff;
+    border-color:var(--accent-2);
+    background:linear-gradient(90deg,#7c5cff33,#ff5fa233);
+  }
+
+  /* ---------- Controls column ---------- */
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:16px;
+    backdrop-filter:blur(10px);
+    margin-bottom:16px;
+  }
+  .panel h2{
+    margin:0 0 12px;
+    font-size:15px;
+    color:var(--text-dim);
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.6px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .panel h2 .cnt{
+    margin-left:auto;
+    background:#ffffff12;
+    color:var(--text);
+    padding:2px 9px;
+    border-radius:999px;
+    font-size:12px;
+    text-transform:none;
+    letter-spacing:0;
+  }
+
+  .add-row{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+  input[type=text], input[type=number]{
+    background:#0f0c22;
+    border:1px solid var(--border);
+    color:var(--text);
+    border-radius:10px;
+    padding:11px 12px;
+    font-size:14.5px;
+    outline:none;
+    transition:border-color .15s, box-shadow .15s;
+    min-width:0;
+  }
+  input[type=text]:focus, input[type=number]:focus{
+    border-color:var(--accent-2);
+    box-shadow:0 0 0 3px #7c5cff33;
+  }
+  .add-row input[type=text]{ flex:1 1 180px; }
+
+  button{ font-family:inherit; }
+  .btn{
+    appearance:none;
+    border:1px solid var(--border);
+    background:#211c40;
+    color:var(--text);
+    padding:11px 16px;
+    border-radius:10px;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    transition:transform .1s, background .15s, border-color .15s;
+    white-space:nowrap;
+  }
+  .btn:hover{ background:#2a2350; border-color:var(--accent-2); }
+  .btn:active{ transform:scale(.96); }
+  .btn.primary{
+    background:linear-gradient(90deg,var(--accent-2),var(--accent));
+    border:none;
+    color:#fff;
+  }
+  .btn.primary:hover{ filter:brightness(1.08); }
+  .btn.ghost{ background:transparent; }
+  .btn.danger{ color:#ffb3ba; border-color:#5c2b34; }
+  .btn.danger:hover{ background:#3a1a20; border-color:var(--bad); }
+  .btn.small{ padding:7px 11px; font-size:12.5px; border-radius:8px; }
+  .btn.icon{ padding:8px 10px; font-size:14px; line-height:1; }
+
+  .bulk-form{
+    margin-top:10px;
+    display:none;
+    gap:8px;
+    flex-wrap:wrap;
+    padding-top:10px;
+    border-top:1px dashed var(--border);
+  }
+  .bulk-form.open{ display:flex; }
+  .bulk-form input[type=text]{ flex:1 1 160px; }
+  .bulk-form .num-field{ width:96px; }
+  .field-label{
+    font-size:11px;
+    color:var(--text-dim);
+    display:block;
+    margin-bottom:4px;
+  }
+  .field-wrap{ display:flex; flex-direction:column; }
+
+  .tools-row{
+    display:flex;
+    gap:8px;
+    margin-top:10px;
+    flex-wrap:wrap;
+  }
+
+  /* items list */
+  .items{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    max-height:520px;
+    overflow-y:auto;
+    padding-right:4px;
+  }
+  .items::-webkit-scrollbar{ width:8px; }
+  .items::-webkit-scrollbar-thumb{ background:#3a3266; border-radius:8px; }
+
+  .item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:9px 10px;
+    animation:pop .18s ease;
+  }
+  @keyframes pop{ from{ transform:scale(.92); opacity:0; } to{ transform:scale(1); opacity:1; } }
+
+  .swatch{
+    width:26px;height:26px;border-radius:50%;
+    flex:none;
+    border:2px solid #ffffff33;
+    cursor:pointer;
+    box-shadow:0 2px 6px #0006;
+    transition:transform .15s;
+  }
+  .swatch:hover{ transform:scale(1.12) rotate(15deg); }
+
+  .item input[type=text]{
+    flex:1 1 auto;
+    min-width:0;
+    background:#0c0a1c;
+    padding:8px 10px;
+    font-size:14px;
+  }
+  .chance-wrap{
+    display:flex;
+    align-items:center;
+    gap:4px;
+    flex:none;
+  }
+  .item input[type=number]{
+    width:88px;
+    padding:8px 8px;
+    font-size:13px;
+    text-align:right;
+  }
+  .pct-badge{
+    font-size:11px;
+    color:var(--accent-3);
+    min-width:52px;
+    text-align:right;
+    font-variant-numeric:tabular-nums;
+  }
+  .item .del{
+    flex:none;
+    background:transparent;
+    border:none;
+    color:#8a80b8;
+    font-size:17px;
+    cursor:pointer;
+    padding:4px 6px;
+    border-radius:8px;
+    transition:color .15s, background .15s;
+  }
+  .item .del:hover{ color:var(--bad); background:#3a1a2033; }
+
+  .empty-hint{
+    text-align:center;
+    color:var(--text-dim);
+    padding:26px 10px;
+    font-size:13.5px;
+    line-height:1.6;
+  }
+
+  footer{
+    text-align:center;
+    color:#665f8f;
+    font-size:11.5px;
+    padding:20px 14px 6px;
+  }
+
+  /* winner modal */
+  .modal-overlay{
+    position:fixed; inset:0;
+    background:#050310cc;
+    backdrop-filter:blur(4px);
+    display:flex; align-items:center; justify-content:center;
+    z-index:50;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .25s;
+    padding:20px;
+  }
+  .modal-overlay.show{ opacity:1; pointer-events:auto; }
+  .modal-card{
+    background:linear-gradient(160deg,#1c1740,#120e28);
+    border:1px solid var(--accent-2);
+    border-radius:20px;
+    padding:34px 30px;
+    text-align:center;
+    max-width:360px;
+    width:100%;
+    transform:scale(.85) translateY(10px);
+    transition:transform .3s cubic-bezier(.2,1.4,.4,1);
+    box-shadow:0 20px 60px #000a, 0 0 0 1px #ffffff10 inset;
+  }
+  .modal-overlay.show .modal-card{ transform:scale(1) translateY(0); }
+  .modal-card .emoji{ font-size:44px; display:block; margin-bottom:6px; }
+  .modal-card h3{
+    margin:0 0 4px;
+    font-size:12.5px;
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+    color:var(--text-dim);
+    font-weight:700;
+  }
+  .modal-card .win-text{
+    font-size:26px;
+    font-weight:800;
+    margin:6px 0 20px;
+    word-break:break-word;
+    color:#fff;
+  }
+  .modal-card .btn{ width:100%; }
+
+  .toast{
+    position:fixed;
+    bottom:18px; left:50%;
+    transform:translateX(-50%) translateY(20px);
+    background:#1c1740; border:1px solid var(--accent-2);
+    color:#fff; padding:10px 18px; border-radius:999px;
+    font-size:13px; opacity:0; pointer-events:none;
+    transition:opacity .25s, transform .25s;
+    z-index:60;
+    box-shadow:0 10px 30px #000a;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎡 Колесо Фортуны</h1>
+  <p>Добавляй призы, задавай шанс каждому и крути колесо</p>
+</header>
+
+<div class="layout">
+
+  <!-- ============ WHEEL COLUMN ============ -->
+  <div class="wheel-col">
+    <div class="wheel-wrap">
+      <div class="wheel-ring"></div>
+      <canvas id="wheel" width="800" height="800"></canvas>
+      <div class="pointer">
+        <svg viewBox="0 0 38 46">
+          <polygon points="19,46 2,8 36,8" fill="#fff" stroke="#1c1735" stroke-width="3"/>
+          <circle cx="19" cy="8" r="7" fill="#ff5fa2" stroke="#1c1735" stroke-width="3"/>
+        </svg>
+      </div>
+      <button class="hub" id="hub" title="Крутить">🎯</button>
+    </div>
+
+    <button class="spin-btn" id="spinBtn">🎰 КРУТИТЬ КОЛЕСО</button>
+    <div class="result-banner" id="resultBanner">Добавь минимум 2 варианта, чтобы начать</div>
+    <div class="history" id="history"></div>
+  </div>
+
+  <!-- ============ CONTROLS COLUMN ============ -->
+  <div class="controls-col">
+
+    <div class="panel">
+      <h2>➕ Добавить вариант</h2>
+      <div class="add-row">
+        <input type="text" id="singleText" placeholder="Например: Главный приз" maxlength="80">
+        <button class="btn primary" id="addSingleBtn">Добавить</button>
+        <button class="btn" id="toggleBulkBtn">🧮 Добавить несколько</button>
+      </div>
+
+      <div class="bulk-form" id="bulkForm">
+        <div class="field-wrap" style="flex:1 1 160px;">
+          <span class="field-label">Текст надписи</span>
+          <input type="text" id="bulkText" placeholder="Например: Пусто" maxlength="80">
+        </div>
+        <div class="field-wrap num-field">
+          <span class="field-label">Количество</span>
+          <input type="number" id="bulkCount" value="5" min="1" max="500" step="1">
+        </div>
+        <div class="field-wrap num-field">
+          <span class="field-label">Шанс каждому, %</span>
+          <input type="number" id="bulkChance" value="1" min="0.0000000001" max="100" step="any">
+        </div>
+        <button class="btn primary" id="bulkAddBtn" style="align-self:flex-end;">Создать</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>🎨 Варианты <span class="cnt" id="itemCount">0</span></h2>
+      <div class="items" id="items"></div>
+      <div class="tools-row">
+        <button class="btn small" id="equalBtn">⚖️ Уравнять шансы</button>
+        <button class="btn small ghost" id="shuffleColorsBtn">🌈 Перемешать цвета</button>
+        <button class="btn small danger" id="clearBtn">🗑 Очистить всё</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<footer>Шансы нормализуются автоматически при вращении — сумма может быть любой. Данные сохраняются на устройстве.</footer>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-card">
+    <span class="emoji">🎉</span>
+    <h3>Выпало</h3>
+    <div class="win-text" id="winText">—</div>
+    <button class="btn primary" id="modalCloseBtn">Отлично!</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  const STORAGE_KEY = "wheelFortuneItems_v1";
+
+  // 12-step vivid rainbow palette (HSL, evenly spaced hues)
+  const PALETTE = Array.from({length:12}, (_,i) => {
+    const hue = Math.round(i * 30);
+    return `hsl(${hue} 78% 56%)`;
+  });
+
+  /** @type {{id:number, text:string, chance:number, color:string}[]} */
+  let items = [];
+  let idSeed = 1;
+  let spinning = false;
+  let currentRotation = 0; // degrees, cumulative
+  let historyLog = [];
+
+  const els = {
+    wheel: document.getElementById('wheel'),
+    items: document.getElementById('items'),
+    itemCount: document.getElementById('itemCount'),
+    singleText: document.getElementById('singleText'),
+    addSingleBtn: document.getElementById('addSingleBtn'),
+    toggleBulkBtn: document.getElementById('toggleBulkBtn'),
+    bulkForm: document.getElementById('bulkForm'),
+    bulkText: document.getElementById('bulkText'),
+    bulkCount: document.getElementById('bulkCount'),
+    bulkChance: document.getElementById('bulkChance'),
+    bulkAddBtn: document.getElementById('bulkAddBtn'),
+    equalBtn: document.getElementById('equalBtn'),
+    shuffleColorsBtn: document.getElementById('shuffleColorsBtn'),
+    clearBtn: document.getElementById('clearBtn'),
+    spinBtn: document.getElementById('spinBtn'),
+    hub: document.getElementById('hub'),
+    resultBanner: document.getElementById('resultBanner'),
+    history: document.getElementById('history'),
+    modalOverlay: document.getElementById('modalOverlay'),
+    winText: document.getElementById('winText'),
+    modalCloseBtn: document.getElementById('modalCloseBtn'),
+    toast: document.getElementById('toast'),
+  };
+
+  // ---------- persistence ----------
+  function save(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({items, idSeed}));
+    }catch(e){ /* storage unavailable — ignore */ }
+  }
+  function load(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return false;
+      const data = JSON.parse(raw);
+      if(Array.isArray(data.items) && data.items.length){
+        items = data.items;
+        idSeed = data.idSeed || (Math.max(...items.map(i=>i.id)) + 1);
+        return true;
+      }
+    }catch(e){ /* corrupted — ignore */ }
+    return false;
+  }
+
+  // ---------- color helper: never repeat the immediately previous color ----------
+  function pickColor(prevColor){
+    let pool = PALETTE;
+    if(prevColor){
+      pool = PALETTE.filter(c => c !== prevColor);
+    }
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  function lastColor(){
+    return items.length ? items[items.length - 1].color : null;
+  }
+
+  // ---------- item management ----------
+  function addItem(text, chance){
+    const clean = (text || '').trim();
+    if(!clean) return null;
+    const item = {
+      id: idSeed++,
+      text: clean,
+      chance: clampChance(chance),
+      color: pickColor(lastColor()),
+    };
+    items.push(item);
+    return item;
+  }
+
+  function clampChance(v){
+    let n = parseFloat(v);
+    if(isNaN(n) || n <= 0) n = 0.0000000001;
+    if(n > 100) n = 100;
+    return n;
+  }
+
+  function removeItem(id){
+    items = items.filter(i => i.id !== id);
+    save();
+    renderAll();
+  }
+
+  function totalWeight(){
+    return items.reduce((s,i) => s + i.chance, 0) || 0;
+  }
+
+  // ---------- rendering: list ----------
+  function renderList(){
+    els.itemCount.textContent = items.length;
+    if(!items.length){
+      els.items.innerHTML = `<div class="empty-hint">Пока пусто 🙈<br>Добавь первый вариант выше — можно вручную или сразу пачкой через «Добавить несколько».</div>`;
+      return;
+    }
+    const total = totalWeight();
+    els.items.innerHTML = '';
+    items.forEach(item => {
+      const pct = total > 0 ? (item.chance / total * 100) : 0;
+      const row = document.createElement('div');
+      row.className = 'item';
+      row.dataset.id = item.id;
+      row.innerHTML = `
+        <div class="swatch" title="Сменить цвет" style="background:${item.color}"></div>
+        <input type="text" class="text-input" value="${escapeAttr(item.text)}" maxlength="80">
+        <div class="chance-wrap">
+          <input type="number" class="chance-input" value="${trimNum(item.chance)}" min="0.0000000001" max="100" step="any" title="Шанс, %">
+          <span class="pct-badge">${formatPct(pct)}</span>
+        </div>
+        <button class="del" title="Удалить">✕</button>
+      `;
+      els.items.appendChild(row);
+
+      row.querySelector('.text-input').addEventListener('input', e => {
+        item.text = e.target.value;
+        save();
+        drawWheel();
+      });
+      row.querySelector('.chance-input').addEventListener('input', e => {
+        item.chance = clampChance(e.target.value);
+        save();
+        renderList();
+        drawWheel();
+      });
+      row.querySelector('.swatch').addEventListener('click', () => {
+        // reroll color, avoiding neighbors immediately before/after this item
+        const idx = items.findIndex(i => i.id === item.id);
+        const prev = idx > 0 ? items[idx-1].color : null;
+        const next = idx < items.length-1 ? items[idx+1].color : null;
+        let pool = PALETTE.filter(c => c !== prev && c !== next);
+        if(!pool.length) pool = PALETTE.filter(c => c !== item.color);
+        item.color = pool[Math.floor(Math.random()*pool.length)];
+        save();
+        renderList();
+        drawWheel();
+      });
+      row.querySelector('.del').addEventListener('click', () => removeItem(item.id));
+    });
+  }
+
+  function formatPct(p){
+    if(p === 0) return '0%';
+    if(p < 0.01) return p.toFixed(6).replace(/0+$/,'').replace(/\.$/,'') + '%';
+    if(p < 1) return p.toFixed(3) + '%';
+    return p.toFixed(1) + '%';
+  }
+  function trimNum(n){
+    if(!isFinite(n)) return '0';
+    let s = n.toFixed(10);
+    s = s.replace(/0+$/,'').replace(/\.$/,'');
+    return s;
+  }
+  function escapeAttr(s){
+    return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  }
+
+  // ---------- rendering: wheel ----------
+  const ctx = els.wheel.getContext('2d');
+  function drawWheel(){
+    const W = els.wheel.width, H = els.wheel.height;
+    const cx = W/2, cy = H/2, r = W/2 - 6;
+    ctx.clearRect(0,0,W,H);
+
+    if(!items.length){
+      ctx.fillStyle = '#8a80b8';
+      ctx.font = '600 26px Segoe UI, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Добавь варианты', cx, cy);
+      return;
+    }
+
+    const total = totalWeight();
+    let angleStart = -Math.PI/2; // start at top
+
+    items.forEach(item => {
+      const frac = total > 0 ? item.chance/total : 1/items.length;
+      const angle = frac * Math.PI * 2;
+      const angleEnd = angleStart + angle;
+
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, r, angleStart, angleEnd);
+      ctx.closePath();
+      ctx.fillStyle = item.color;
+      ctx.fill();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#120f24';
+      ctx.stroke();
+
+      // label — only draw if the slice is wide enough to read
+      if(angle > 0.10){
+        const mid = angleStart + angle/2;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(mid);
+        // slices on the left half would render the text upside-down;
+        // flip 180° there and align left so labels always read normally
+        const normMid = ((mid % (Math.PI*2)) + Math.PI*2) % (Math.PI*2);
+        const flip = normMid > Math.PI/2 && normMid < Math.PI*1.5;
+        if(flip) ctx.rotate(Math.PI);
+        ctx.textAlign = flip ? 'left' : 'right';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = readableTextColor(item.color);
+        const fontSize = Math.max(13, Math.min(24, r*0.075));
+        ctx.font = `700 ${fontSize}px Segoe UI, sans-serif`;
+        let label = item.text;
+        const maxChars = Math.max(6, Math.floor((r*0.72)/(fontSize*0.55)));
+        if(label.length > maxChars) label = label.slice(0, maxChars-1) + '…';
+        ctx.fillText(label, flip ? -r*0.9 : r*0.9, 0);
+        ctx.restore();
+      }
+
+      angleStart = angleEnd;
+    });
+
+    // center ring shadow
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI*2);
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = '#00000030';
+    ctx.stroke();
+  }
+
+  function readableTextColor(hslColor){
+    // parse "hsl(H S% L%)" and pick black/white by lightness
+    const m = /hsl\(\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%\)/.exec(hslColor);
+    if(!m) return '#111';
+    const l = parseFloat(m[3]);
+    return l > 62 ? '#1a1428' : '#fff9ff';
+  }
+
+  // ---------- spin logic ----------
+  let audioCtx = null;
+  function tick(){
+    try{
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = 'square';
+      o.frequency.value = 680;
+      g.gain.value = 0.05;
+      o.connect(g); g.connect(audioCtx.destination);
+      g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.06);
+      o.start();
+      o.stop(audioCtx.currentTime + 0.07);
+    }catch(e){}
+  }
+
+  function weightedPickIndex(){
+    const total = totalWeight();
+    let r = Math.random() * total;
+    for(let i=0;i<items.length;i++){
+      r -= items[i].chance;
+      if(r <= 0) return i;
+    }
+    return items.length - 1;
+  }
+
+  function spin(){
+    if(spinning) return;
+    if(items.length < 2){
+      showToast('Нужно минимум 2 варианта');
+      return;
+    }
+    spinning = true;
+    els.spinBtn.disabled = true;
+    els.hub.classList.add('spinning');
+    els.resultBanner.textContent = 'Крутим...';
+
+    const total = totalWeight();
+    const winnerIdx = weightedPickIndex();
+
+    // compute angle range of winner slice
+    let angleStart = 0;
+    for(let i=0;i<winnerIdx;i++){
+      angleStart += (items[i].chance/total) * 360;
+    }
+    const sliceAngle = (items[winnerIdx].chance/total) * 360;
+    const winnerMid = angleStart + sliceAngle/2;
+
+    // The pointer is fixed at top (0deg / -90 in canvas terms, but our
+    // wheel draw already starts slices at -90deg = top, so 0..360 offset
+    // aligns directly with the top pointer). We rotate the wheel so that
+    // the winner slice ends up under the pointer, landing at a random
+    // offset within the slice (not always dead-center) for realism.
+    const jitter = (Math.random() - 0.5) * sliceAngle * 0.7;
+    const targetOffset = (360 - (winnerMid + jitter)) % 360;
+
+    const fullSpins = 6 + Math.floor(Math.random()*4); // 6..9 extra turns
+    const finalRotation = currentRotation + fullSpins*360 + ((targetOffset - (currentRotation % 360)) + 360) % 360;
+
+    currentRotation = finalRotation;
+    els.wheel.style.transform = `rotate(${finalRotation}deg)`;
+
+    // periodic ticking sound while spinning
+    let ticksPlayed = 0;
+    const tickInterval = setInterval(() => {
+      ticksPlayed++;
+      tick();
+      if(ticksPlayed > 60) clearInterval(tickInterval);
+    }, 90);
+
+    setTimeout(() => {
+      clearInterval(tickInterval);
+      spinning = false;
+      els.spinBtn.disabled = false;
+      els.hub.classList.remove('spinning');
+      const winner = items[winnerIdx];
+      announceWinner(winner);
+    }, 5300);
+  }
+
+  function announceWinner(winner){
+    els.resultBanner.innerHTML = `Выпало: <b>${escapeAttr(winner.text)}</b>`;
+    historyLog.unshift(winner.text);
+    historyLog = historyLog.slice(0, 20);
+    renderHistory();
+    els.winText.textContent = winner.text;
+    els.modalOverlay.classList.add('show');
+  }
+
+  function renderHistory(){
+    els.history.innerHTML = historyLog.map(t => `<span class="chip">${escapeAttr(t)}</span>`).join('');
+  }
+
+  // ---------- toast ----------
+  let toastTimer = null;
+  function showToast(msg){
+    els.toast.textContent = msg;
+    els.toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => els.toast.classList.remove('show'), 2200);
+  }
+
+  // ---------- render all ----------
+  function renderAll(){
+    renderList();
+    drawWheel();
+  }
+
+  // ---------- events ----------
+  els.addSingleBtn.addEventListener('click', () => {
+    const item = addItem(els.singleText.value, 1);
+    if(item){
+      els.singleText.value = '';
+      save();
+      renderAll();
+    }
+  });
+  els.singleText.addEventListener('keydown', e => {
+    if(e.key === 'Enter') els.addSingleBtn.click();
+  });
+
+  els.toggleBulkBtn.addEventListener('click', () => {
+    els.bulkForm.classList.toggle('open');
+  });
+
+  els.bulkAddBtn.addEventListener('click', () => {
+    const text = els.bulkText.value.trim();
+    let count = parseInt(els.bulkCount.value, 10);
+    const chance = els.bulkChance.value;
+    if(!text){ showToast('Введи текст надписи'); return; }
+    if(isNaN(count) || count < 1) count = 1;
+    if(count > 500) count = 500;
+    for(let i=0;i<count;i++){
+      addItem(text, chance);
+    }
+    els.bulkText.value = '';
+    save();
+    renderAll();
+    showToast(`Добавлено: ${count} шт.`);
+  });
+
+  els.equalBtn.addEventListener('click', () => {
+    if(!items.length) return;
+    const eq = +(100/items.length).toFixed(10);
+    items.forEach(i => i.chance = eq);
+    save();
+    renderAll();
+  });
+
+  els.shuffleColorsBtn.addEventListener('click', () => {
+    let prev = null;
+    items.forEach(item => {
+      item.color = pickColor(prev);
+      prev = item.color;
+    });
+    save();
+    renderAll();
+  });
+
+  els.clearBtn.addEventListener('click', () => {
+    if(!items.length) return;
+    if(confirm('Удалить все варианты?')){
+      items = [];
+      save();
+      renderAll();
+    }
+  });
+
+  els.spinBtn.addEventListener('click', spin);
+  els.hub.addEventListener('click', spin);
+
+  els.modalCloseBtn.addEventListener('click', () => {
+    els.modalOverlay.classList.remove('show');
+  });
+  els.modalOverlay.addEventListener('click', e => {
+    if(e.target === els.modalOverlay) els.modalOverlay.classList.remove('show');
+  });
+
+  // ---------- init ----------
+  function seedDefaults(){
+    addItem('Приз 1', 1);
+    addItem('Приз 2', 1);
+    addItem('Приз 3', 1);
+  }
+
+  if(!load()){
+    seedDefaults();
+    save();
+  }
+  renderAll();
+
+})();
+</script>
+</body>
+</html>

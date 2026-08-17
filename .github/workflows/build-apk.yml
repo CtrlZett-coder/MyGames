@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - claude/game-creation-huu9A
+      - claude/fortune-wheel-app-yjgat9
 
 permissions:
   contents: write
@@ -36,12 +37,22 @@ jobs:
           gradle assembleDebug --no-daemon
           mv app/build/outputs/apk/debug/app-debug.apk ../SpaceShooter.apk
 
+      # ── Wheel of Fortune APK ─────────────────────────────────────────────────
+      - name: Build Wheel of Fortune APK
+        run: |
+          cp wheel_fortune.html android-wheel/app/src/main/assets/game.html
+          cd android-wheel
+          gradle assembleDebug --no-daemon
+          mv app/build/outputs/apk/debug/app-debug.apk ../WheelOfFortune.apk
+
       # ── Upload artifacts ─────────────────────────────────────────────────────
       - name: Upload APK as artifact
         uses: actions/upload-artifact@v4
         with:
           name: MyGames-APKs
-          path: SpaceShooter.apk
+          path: |
+            SpaceShooter.apk
+            WheelOfFortune.apk
           retention-days: 30
 
       # ── GitHub Release ───────────────────────────────────────────────────────
@@ -59,9 +70,16 @@ jobs:
           | \`SpaceShooter.apk\` | Android APK — установи и играй |
           | \`SpaceShooterHTML5.html\` | HTML5 — открой в браузере без интернета |
 
+          ### 🎡 Колесо Фортуны
+          | Файл | Описание |
+          |---|---|
+          | \`WheelOfFortune.apk\` | Android APK — установи и играй |
+          | \`WheelOfFortuneHTML5.html\` | HTML5 — открой в браузере без интернета |
+
           **Установка APK:** Настройки → Безопасность → Разрешить из неизвестных источников"
 
           cp space_shooter.html SpaceShooterHTML5.html
+          cp wheel_fortune.html WheelOfFortuneHTML5.html
 
           gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --yes 2>/dev/null || true
           git push origin ":refs/tags/$TAG" 2>/dev/null || true
@@ -72,4 +90,4 @@ jobs:
             --title "$TITLE" \
             --notes "$NOTES" \
             --latest \
-            SpaceShooter.apk SpaceShooterHTML5.html
+            SpaceShooter.apk SpaceShooterHTML5.html WheelOfFortune.apk WheelOfFortuneHTML5.html
