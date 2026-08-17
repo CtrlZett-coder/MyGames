@@ -3,22 +3,23 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#0d0b1a">
-<title>Колесо Фортуны</title>
+<meta name="theme-color" content="#ffffff">
+<title>Колесо Фортуны Таная</title>
 <style>
   :root{
-    --bg-1:#0d0b1a;
-    --bg-2:#1a1433;
-    --panel:#171331cc;
-    --panel-2:#1f1a3ecc;
-    --border:#3a3266;
-    --text:#f2eeff;
-    --text-dim:#a79fd1;
+    --bg-1:#f6f4ff;
+    --bg-2:#ffffff;
+    --panel:#ffffffee;
+    --panel-2:#faf9ff;
+    --border:#e6e1f7;
+    --text:#221c3d;
+    --text-dim:#847ea8;
     --accent:#ff5fa2;
     --accent-2:#7c5cff;
-    --accent-3:#33e0c1;
-    --good:#3ddc84;
-    --bad:#ff5f6d;
+    --accent-3:#12b897;
+    --good:#1fa15c;
+    --bad:#e0344c;
+    --gold:#ffb703;
     --radius:16px;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -29,16 +30,101 @@
     font-family:"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
     color:var(--text);
     background:
-      radial-gradient(1100px 600px at 15% -10%, #3a1a5c66, transparent 60%),
-      radial-gradient(900px 700px at 110% 10%, #0a3a5c66, transparent 55%),
-      radial-gradient(1000px 800px at 50% 120%, #5c1a3c55, transparent 55%),
-      linear-gradient(160deg, var(--bg-1), var(--bg-2) 60%, #100c24);
+      radial-gradient(1100px 600px at 15% -10%, #eee4ff, transparent 60%),
+      radial-gradient(900px 700px at 110% 10%, #e2f6ff, transparent 55%),
+      radial-gradient(1000px 800px at 50% 120%, #ffe6ef, transparent 55%),
+      linear-gradient(160deg, var(--bg-1), var(--bg-2) 55%, #fbfaff);
     background-attachment:fixed;
     overflow-x:hidden;
     padding-bottom:24px;
   }
+  body.no-scroll{ overflow:hidden; height:100vh; }
   ::selection{ background:var(--accent-2); color:#fff; }
 
+  /* ================= SPLASH ================= */
+  .splash{
+    position:fixed; inset:0; z-index:1000;
+    display:flex; align-items:center; justify-content:center;
+    background:
+      radial-gradient(900px 600px at 20% 10%, #ff5fa244, transparent 60%),
+      radial-gradient(900px 700px at 85% 90%, #5ce8ff44, transparent 55%),
+      linear-gradient(150deg, #120c2c, #1a1440 45%, #2a1650 100%);
+    overflow:hidden;
+    transition:opacity .5s ease, visibility .5s;
+  }
+  .splash.hide{ opacity:0; visibility:hidden; pointer-events:none; }
+  .splash-coin{
+    position:absolute;
+    font-size:32px;
+    opacity:.5;
+    filter:drop-shadow(0 0 10px #ffd76688);
+    animation:floaty 6s ease-in-out infinite;
+  }
+  @keyframes floaty{
+    0%,100%{ transform:translateY(0) rotate(0deg); }
+    50%{ transform:translateY(-22px) rotate(14deg); }
+  }
+  .splash-content{
+    position:relative;
+    text-align:center;
+    padding:20px;
+    animation:splashIn 1s cubic-bezier(.2,1.3,.3,1);
+  }
+  @keyframes splashIn{
+    from{ opacity:0; transform:scale(.8) translateY(20px); }
+    to{ opacity:1; transform:scale(1) translateY(0); }
+  }
+  .splash-title{ margin:0; }
+  .splash-title .line1{
+    display:block;
+    font-size:clamp(16px,4vw,24px);
+    letter-spacing:4px;
+    color:#cfc6ff;
+    font-weight:600;
+    text-transform:uppercase;
+    margin-bottom:6px;
+  }
+  .splash-title .line2{
+    display:block;
+    font-size:clamp(46px,13vw,96px);
+    font-weight:900;
+    letter-spacing:4px;
+    background:linear-gradient(90deg,#ffd76e,#ff5fa2 35%,#7c5cff 70%,#5ce8ff);
+    background-size:300% 100%;
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+    animation:shine 4s linear infinite;
+    filter:drop-shadow(0 6px 40px #ff5fa255);
+  }
+  @keyframes shine{
+    0%{ background-position:0% 50%; }
+    100%{ background-position:300% 50%; }
+  }
+  .splash-sub{
+    color:#a79fd1;
+    font-size:14px;
+    margin:14px 0 30px;
+    letter-spacing:.5px;
+  }
+  .splash-enter{
+    appearance:none; border:none; cursor:pointer;
+    padding:15px 44px;
+    font-size:16px; font-weight:800; letter-spacing:.5px;
+    color:#1a0f2b;
+    background:linear-gradient(90deg,#ffd76e,#ff5fa2 60%,#7c5cff);
+    background-size:200% 100%;
+    border-radius:999px;
+    box-shadow:0 10px 30px #ff5fa255, 0 2px 0 #ffffff77 inset;
+    animation:pulse 2.2s ease-in-out infinite;
+  }
+  @keyframes pulse{
+    0%,100%{ transform:scale(1); }
+    50%{ transform:scale(1.05); }
+  }
+  .splash-enter:active{ transform:scale(.95); }
+
+  /* ================= HEADER ================= */
   header{
     padding:22px 18px 10px;
     text-align:center;
@@ -48,11 +134,10 @@
     font-size:clamp(22px,5vw,32px);
     font-weight:800;
     letter-spacing:.3px;
-    background:linear-gradient(90deg,#ff9dcb,#a98bff 45%,#5ce8ff);
+    background:linear-gradient(90deg,#ff5fa2,#7c5cff 45%,#12b897);
     -webkit-background-clip:text;
     background-clip:text;
     color:transparent;
-    filter:drop-shadow(0 2px 18px #7c5cff44);
   }
   header p{
     margin:6px 0 0;
@@ -73,6 +158,23 @@
     .layout{ grid-template-columns:1fr; }
   }
 
+  /* ---------- Balance HUD ---------- */
+  .balance-hud{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    background:linear-gradient(90deg,#fff7e0,#fff1f7);
+    border:1px solid #ffdca3;
+    color:#7a5300;
+    padding:8px 18px;
+    border-radius:999px;
+    font-weight:700;
+    font-size:15px;
+    box-shadow:0 4px 14px #ffb70322;
+    margin:0 auto 14px;
+  }
+  .balance-hud .coin{ font-size:18px; }
+
   /* ---------- Wheel column ---------- */
   .wheel-col{
     display:flex;
@@ -91,7 +193,7 @@
     display:flex;
     align-items:center;
     justify-content:center;
-    filter:drop-shadow(0 14px 40px #00000066);
+    filter:drop-shadow(0 14px 34px #7c5cff22);
   }
   .wheel-ring{
     position:absolute;
@@ -99,8 +201,8 @@
     border-radius:50%;
     background:conic-gradient(from 0deg,#ff5fa2,#ffb35f,#f4ff5f,#5fff8f,#5fe0ff,#7c5cff,#ff5fa2);
     padding:0;
-    filter:saturate(1.15);
-    box-shadow:0 0 0 3px #ffffff14 inset, 0 0 40px #7c5cff55;
+    filter:saturate(1.1);
+    box-shadow:0 0 0 6px #ffffff, 0 0 30px #7c5cff33;
   }
   .wheel-ring::after{
     content:"";
@@ -114,8 +216,8 @@
     width:100%;
     height:100%;
     border-radius:50%;
-    background:#120f24;
-    box-shadow:0 0 0 2px #ffffff10 inset;
+    background:#ffffff;
+    box-shadow:0 0 0 2px #00000008 inset;
     transition:transform 5.2s cubic-bezier(.16,.85,.13,1);
     will-change:transform;
   }
@@ -125,7 +227,7 @@
     height:19%;
     border-radius:50%;
     background:radial-gradient(circle at 35% 30%,#fff,#ffe1f3 25%,var(--accent) 65%,#b8367f);
-    box-shadow:0 0 0 5px #1c1735, 0 6px 18px #000a, inset 0 0 10px #ffffffaa;
+    box-shadow:0 0 0 5px #ffffff, 0 6px 18px #0002, inset 0 0 10px #ffffffaa;
     display:flex;align-items:center;justify-content:center;
     font-size:22px;
     z-index:5;
@@ -145,7 +247,7 @@
     width:38px;
     height:46px;
     z-index:6;
-    filter:drop-shadow(0 4px 8px #000a);
+    filter:drop-shadow(0 4px 10px #0002);
   }
   .pointer svg{ width:100%; height:100%; display:block; }
 
@@ -155,16 +257,16 @@
     font-size:17px;
     font-weight:800;
     letter-spacing:.5px;
-    color:#1a0f2b;
+    color:#fff;
     background:linear-gradient(90deg,var(--accent-3),var(--accent-2) 55%,var(--accent));
     background-size:200% 100%;
     border-radius:999px;
-    box-shadow:0 8px 22px #7c5cff55, 0 2px 0 #ffffff55 inset;
+    box-shadow:0 10px 26px #7c5cff33, 0 2px 0 #ffffff33 inset;
     transition:transform .12s ease, box-shadow .12s ease, background-position .3s;
   }
-  .spin-btn:hover{ background-position:100% 0; box-shadow:0 10px 26px #7c5cff77, 0 2px 0 #ffffff66 inset; }
+  .spin-btn:hover{ background-position:100% 0; box-shadow:0 12px 30px #7c5cff44; }
   .spin-btn:active{ transform:translateY(2px) scale(.98); }
-  .spin-btn:disabled{ opacity:.5; cursor:not-allowed; filter:grayscale(.3); }
+  .spin-btn:disabled{ opacity:.45; cursor:not-allowed; filter:grayscale(.3); }
 
   .result-banner{
     min-height:30px;
@@ -173,7 +275,7 @@
     color:var(--text-dim);
   }
   .result-banner b{
-    color:#fff;
+    color:var(--text);
     font-size:17px;
   }
 
@@ -197,9 +299,37 @@
     white-space:nowrap;
   }
   .history .chip:first-child{
-    color:#fff;
+    color:var(--text);
     border-color:var(--accent-2);
-    background:linear-gradient(90deg,#7c5cff33,#ff5fa233);
+    background:linear-gradient(90deg,#7c5cff1a,#ff5fa21a);
+  }
+  .history .chip.win{ border-color:var(--good); color:var(--good); }
+  .history .chip.lose{ border-color:var(--bad); color:var(--bad); }
+
+  /* ---------- Tabs ---------- */
+  .tabs{
+    display:flex;
+    gap:8px;
+    margin-bottom:14px;
+  }
+  .tab-btn{
+    flex:1;
+    appearance:none;
+    border:1px solid var(--border);
+    background:#fff;
+    color:var(--text-dim);
+    padding:12px 10px;
+    border-radius:12px;
+    font-size:14px;
+    font-weight:700;
+    cursor:pointer;
+    transition:all .15s;
+  }
+  .tab-btn.active{
+    color:#fff;
+    border-color:transparent;
+    background:linear-gradient(90deg,var(--accent-2),var(--accent));
+    box-shadow:0 6px 16px #7c5cff33;
   }
 
   /* ---------- Controls column ---------- */
@@ -208,7 +338,7 @@
     border:1px solid var(--border);
     border-radius:var(--radius);
     padding:16px;
-    backdrop-filter:blur(10px);
+    box-shadow:0 8px 28px #7c5cff0f;
     margin-bottom:16px;
   }
   .panel h2{
@@ -224,8 +354,8 @@
   }
   .panel h2 .cnt{
     margin-left:auto;
-    background:#ffffff12;
-    color:var(--text);
+    background:#7c5cff14;
+    color:var(--accent-2);
     padding:2px 9px;
     border-radius:999px;
     font-size:12px;
@@ -239,7 +369,7 @@
     flex-wrap:wrap;
   }
   input[type=text], input[type=number]{
-    background:#0f0c22;
+    background:#fff;
     border:1px solid var(--border);
     color:var(--text);
     border-radius:10px;
@@ -251,7 +381,7 @@
   }
   input[type=text]:focus, input[type=number]:focus{
     border-color:var(--accent-2);
-    box-shadow:0 0 0 3px #7c5cff33;
+    box-shadow:0 0 0 3px #7c5cff22;
   }
   .add-row input[type=text]{ flex:1 1 180px; }
 
@@ -259,7 +389,7 @@
   .btn{
     appearance:none;
     border:1px solid var(--border);
-    background:#211c40;
+    background:#fff;
     color:var(--text);
     padding:11px 16px;
     border-radius:10px;
@@ -269,19 +399,19 @@
     transition:transform .1s, background .15s, border-color .15s;
     white-space:nowrap;
   }
-  .btn:hover{ background:#2a2350; border-color:var(--accent-2); }
+  .btn:hover{ background:var(--panel-2); border-color:var(--accent-2); }
   .btn:active{ transform:scale(.96); }
   .btn.primary{
     background:linear-gradient(90deg,var(--accent-2),var(--accent));
     border:none;
     color:#fff;
   }
-  .btn.primary:hover{ filter:brightness(1.08); }
+  .btn.primary:hover{ filter:brightness(1.06); }
   .btn.ghost{ background:transparent; }
-  .btn.danger{ color:#ffb3ba; border-color:#5c2b34; }
-  .btn.danger:hover{ background:#3a1a20; border-color:var(--bad); }
+  .btn.danger{ color:var(--bad); border-color:#f7cdd4; }
+  .btn.danger:hover{ background:#fff1f3; border-color:var(--bad); }
   .btn.small{ padding:7px 11px; font-size:12.5px; border-radius:8px; }
-  .btn.icon{ padding:8px 10px; font-size:14px; line-height:1; }
+  .btn:disabled{ opacity:.45; cursor:not-allowed; }
 
   .bulk-form{
     margin-top:10px;
@@ -293,7 +423,6 @@
   }
   .bulk-form.open{ display:flex; }
   .bulk-form input[type=text]{ flex:1 1 160px; }
-  .bulk-form .num-field{ width:96px; }
   .field-label{
     font-size:11px;
     color:var(--text-dim);
@@ -301,6 +430,7 @@
     margin-bottom:4px;
   }
   .field-wrap{ display:flex; flex-direction:column; }
+  .num-field{ width:110px; }
 
   .tools-row{
     display:flex;
@@ -309,17 +439,17 @@
     flex-wrap:wrap;
   }
 
-  /* items list */
+  /* items list (custom tab) */
   .items{
     display:flex;
     flex-direction:column;
     gap:8px;
-    max-height:520px;
+    max-height:420px;
     overflow-y:auto;
     padding-right:4px;
   }
   .items::-webkit-scrollbar{ width:8px; }
-  .items::-webkit-scrollbar-thumb{ background:#3a3266; border-radius:8px; }
+  .items::-webkit-scrollbar-thumb{ background:#e6e1f7; border-radius:8px; }
 
   .item{
     display:flex;
@@ -336,9 +466,9 @@
   .swatch{
     width:26px;height:26px;border-radius:50%;
     flex:none;
-    border:2px solid #ffffff33;
+    border:2px solid #ffffff;
+    box-shadow:0 0 0 1px var(--border), 0 2px 6px #0001;
     cursor:pointer;
-    box-shadow:0 2px 6px #0006;
     transition:transform .15s;
   }
   .swatch:hover{ transform:scale(1.12) rotate(15deg); }
@@ -346,41 +476,31 @@
   .item input[type=text]{
     flex:1 1 auto;
     min-width:0;
-    background:#0c0a1c;
+    background:#fff;
     padding:8px 10px;
     font-size:14px;
   }
-  .chance-wrap{
-    display:flex;
-    align-items:center;
-    gap:4px;
-    flex:none;
-  }
-  .item input[type=number]{
-    width:88px;
-    padding:8px 8px;
-    font-size:13px;
-    text-align:right;
-  }
   .pct-badge{
-    font-size:11px;
+    font-size:11.5px;
     color:var(--accent-3);
-    min-width:52px;
-    text-align:right;
-    font-variant-numeric:tabular-nums;
+    font-weight:700;
+    white-space:nowrap;
+    background:#12b8971a;
+    padding:4px 9px;
+    border-radius:999px;
   }
   .item .del{
     flex:none;
     background:transparent;
     border:none;
-    color:#8a80b8;
+    color:#b8b2d6;
     font-size:17px;
     cursor:pointer;
     padding:4px 6px;
     border-radius:8px;
     transition:color .15s, background .15s;
   }
-  .item .del:hover{ color:var(--bad); background:#3a1a2033; }
+  .item .del:hover{ color:var(--bad); background:#fff1f3; }
 
   .empty-hint{
     text-align:center;
@@ -390,9 +510,50 @@
     line-height:1.6;
   }
 
+  /* ---------- Bet panel ---------- */
+  .bet-info{
+    margin-top:14px;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:12px 14px;
+    font-size:13.5px;
+    line-height:1.9;
+  }
+  .bet-info .row{ display:flex; justify-content:space-between; gap:10px; }
+  .bet-info .row span:first-child{ color:var(--text-dim); }
+  .bet-info .row b{ color:var(--accent-2); }
+  .bet-info .hint{
+    margin-top:6px;
+    font-size:11.5px;
+    color:var(--text-dim);
+    border-top:1px dashed var(--border);
+    padding-top:8px;
+  }
+
+  .payout-preview{
+    margin-top:12px;
+    background:linear-gradient(90deg,#fff7e0,#fff0f7);
+    border:1px solid #ffdca3;
+    border-radius:12px;
+    padding:12px 14px;
+    font-size:13.5px;
+  }
+  .payout-preview .big{
+    font-size:19px;
+    font-weight:800;
+    color:#7a5300;
+  }
+  .payout-preview .sub{
+    font-size:12px;
+    color:var(--text-dim);
+    margin-top:2px;
+  }
+  .payout-preview.negative .big{ color:var(--bad); }
+
   footer{
     text-align:center;
-    color:#665f8f;
+    color:#b8b2d6;
     font-size:11.5px;
     padding:20px 14px 6px;
   }
@@ -400,7 +561,7 @@
   /* winner modal */
   .modal-overlay{
     position:fixed; inset:0;
-    background:#050310cc;
+    background:#22193355;
     backdrop-filter:blur(4px);
     display:flex; align-items:center; justify-content:center;
     z-index:50;
@@ -411,8 +572,8 @@
   }
   .modal-overlay.show{ opacity:1; pointer-events:auto; }
   .modal-card{
-    background:linear-gradient(160deg,#1c1740,#120e28);
-    border:1px solid var(--accent-2);
+    background:#fff;
+    border:1px solid var(--border);
     border-radius:20px;
     padding:34px 30px;
     text-align:center;
@@ -420,7 +581,7 @@
     width:100%;
     transform:scale(.85) translateY(10px);
     transition:transform .3s cubic-bezier(.2,1.4,.4,1);
-    box-shadow:0 20px 60px #000a, 0 0 0 1px #ffffff10 inset;
+    box-shadow:0 30px 70px #7c5cff22, 0 0 0 1px #ffffff inset;
   }
   .modal-overlay.show .modal-card{ transform:scale(1) translateY(0); }
   .modal-card .emoji{ font-size:44px; display:block; margin-bottom:6px; }
@@ -435,9 +596,17 @@
   .modal-card .win-text{
     font-size:26px;
     font-weight:800;
-    margin:6px 0 20px;
+    margin:6px 0 4px;
     word-break:break-word;
-    color:#fff;
+    color:var(--text);
+  }
+  .modal-card .win-text.good{ color:var(--good); }
+  .modal-card .win-text.bad{ color:var(--bad); }
+  .modal-card .modal-sub{
+    font-size:13px;
+    color:var(--text-dim);
+    margin-bottom:20px;
+    min-height:1px;
   }
   .modal-card .btn{ width:100%; }
 
@@ -445,48 +614,96 @@
     position:fixed;
     bottom:18px; left:50%;
     transform:translateX(-50%) translateY(20px);
-    background:#1c1740; border:1px solid var(--accent-2);
-    color:#fff; padding:10px 18px; border-radius:999px;
+    background:#fff; border:1px solid var(--accent-2);
+    color:var(--text); padding:10px 18px; border-radius:999px;
     font-size:13px; opacity:0; pointer-events:none;
     transition:opacity .25s, transform .25s;
     z-index:60;
-    box-shadow:0 10px 30px #000a;
+    box-shadow:0 14px 34px #7c5cff22;
   }
   .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
 </style>
 </head>
-<body>
+<body class="no-scroll">
+
+<!-- ============ EPIC SPLASH ============ -->
+<div class="splash" id="splash">
+  <span class="splash-coin" style="top:14%; left:12%;">🪙</span>
+  <span class="splash-coin" style="top:22%; left:82%; animation-delay:.6s;">🪙</span>
+  <span class="splash-coin" style="top:74%; left:18%; animation-delay:1.2s;">🎡</span>
+  <span class="splash-coin" style="top:70%; left:80%; animation-delay:1.8s;">✨</span>
+  <span class="splash-coin" style="top:10%; left:50%; animation-delay:2.4s;">✨</span>
+  <div class="splash-content">
+    <h1 class="splash-title">
+      <span class="line1">Колесо Фортуны</span>
+      <span class="line2">ТАНАЯ</span>
+    </h1>
+    <p class="splash-sub">Крути, рискуй, выигрывай танайчики</p>
+    <button class="splash-enter" id="splashEnter">Войти ✨</button>
+  </div>
+</div>
 
 <header>
   <h1>🎡 Колесо Фортуны</h1>
-  <p>Добавляй призы, задавай шанс каждому и крути колесо</p>
+  <p>Играй на танайчики или собери свой список призов</p>
 </header>
 
 <div class="layout">
 
   <!-- ============ WHEEL COLUMN ============ -->
   <div class="wheel-col">
+    <div class="balance-hud"><span class="coin">💰</span><span id="balanceVal">100</span> <span id="balanceLabel">танайчиков</span></div>
+
     <div class="wheel-wrap">
       <div class="wheel-ring"></div>
       <canvas id="wheel" width="800" height="800"></canvas>
       <div class="pointer">
         <svg viewBox="0 0 38 46">
-          <polygon points="19,46 2,8 36,8" fill="#fff" stroke="#1c1735" stroke-width="3"/>
-          <circle cx="19" cy="8" r="7" fill="#ff5fa2" stroke="#1c1735" stroke-width="3"/>
+          <polygon points="19,46 2,8 36,8" fill="#7c5cff" stroke="#fff" stroke-width="3"/>
+          <circle cx="19" cy="8" r="7" fill="#ff5fa2" stroke="#fff" stroke-width="3"/>
         </svg>
       </div>
       <button class="hub" id="hub" title="Крутить">🎯</button>
     </div>
 
     <button class="spin-btn" id="spinBtn">🎰 КРУТИТЬ КОЛЕСО</button>
-    <div class="result-banner" id="resultBanner">Добавь минимум 2 варианта, чтобы начать</div>
+    <div class="result-banner" id="resultBanner">Выбери режим справа и приготовься крутить</div>
     <div class="history" id="history"></div>
   </div>
 
   <!-- ============ CONTROLS COLUMN ============ -->
   <div class="controls-col">
 
-    <div class="panel">
+    <div class="tabs">
+      <button class="tab-btn active" id="tabBet" data-mode="bet">🎰 Ставка на удачу</button>
+      <button class="tab-btn" id="tabCustom" data-mode="custom">🎡 Свой список</button>
+    </div>
+
+    <!-- ---- BET MODE PANEL ---- -->
+    <div class="panel" id="betPanel">
+      <h2>🎰 Ставка на удачу</h2>
+      <div class="add-row">
+        <div class="field-wrap" style="flex:1 1 140px;">
+          <span class="field-label">Количество ячеек (1 выигрышная + остальные пустые)</span>
+          <input type="number" id="betCells" min="2" max="300" step="1" value="10">
+        </div>
+        <button class="btn primary" id="genWheelBtn" style="align-self:flex-end;">🎲 Сгенерировать колесо</button>
+      </div>
+
+      <div class="bet-info" id="betInfo"></div>
+
+      <div class="add-row" style="margin-top:12px;">
+        <div class="field-wrap" style="flex:1 1 140px;">
+          <span class="field-label">Ставка, танайчиков</span>
+          <input type="number" id="stakeInput" min="1" step="1" value="10">
+        </div>
+      </div>
+
+      <div class="payout-preview" id="payoutPreview"></div>
+    </div>
+
+    <!-- ---- CUSTOM MODE PANEL ---- -->
+    <div class="panel" id="customAddPanel" style="display:none;">
       <h2>➕ Добавить вариант</h2>
       <div class="add-row">
         <input type="text" id="singleText" placeholder="Например: Главный приз" maxlength="80">
@@ -503,19 +720,14 @@
           <span class="field-label">Количество</span>
           <input type="number" id="bulkCount" value="5" min="1" max="500" step="1">
         </div>
-        <div class="field-wrap num-field">
-          <span class="field-label">Шанс каждому, %</span>
-          <input type="number" id="bulkChance" value="1" min="0.0000000001" max="100" step="any">
-        </div>
         <button class="btn primary" id="bulkAddBtn" style="align-self:flex-end;">Создать</button>
       </div>
     </div>
 
-    <div class="panel">
+    <div class="panel" id="customListPanel" style="display:none;">
       <h2>🎨 Варианты <span class="cnt" id="itemCount">0</span></h2>
       <div class="items" id="items"></div>
       <div class="tools-row">
-        <button class="btn small" id="equalBtn">⚖️ Уравнять шансы</button>
         <button class="btn small ghost" id="shuffleColorsBtn">🌈 Перемешать цвета</button>
         <button class="btn small danger" id="clearBtn">🗑 Очистить всё</button>
       </div>
@@ -524,13 +736,14 @@
   </div>
 </div>
 
-<footer>Шансы нормализуются автоматически при вращении — сумма может быть любой. Данные сохраняются на устройстве.</footer>
+<footer>Каждый вариант на колесе имеет равный шанс: 1/N, где N — число ячеек. Данные и баланс сохраняются на устройстве.</footer>
 
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal-card">
-    <span class="emoji">🎉</span>
-    <h3>Выпало</h3>
+    <span class="emoji" id="modalEmoji">🎉</span>
+    <h3 id="modalTitle">Выпало</h3>
     <div class="win-text" id="winText">—</div>
+    <div class="modal-sub" id="modalSub"></div>
     <button class="btn primary" id="modalCloseBtn">Отлично!</button>
   </div>
 </div>
@@ -541,23 +754,43 @@
 (function(){
   "use strict";
 
-  const STORAGE_KEY = "wheelFortuneItems_v1";
+  const STORAGE_KEY = "wheelFortuneState_v2";
+  const RED_COLOR = "#ef4056";
+  const GOLD_COLOR = "#ffb703";
 
-  // 12-step vivid rainbow palette (HSL, evenly spaced hues)
+  // 12-step vivid rainbow palette (HSL, evenly spaced hues) — custom mode only
   const PALETTE = Array.from({length:12}, (_,i) => {
     const hue = Math.round(i * 30);
     return `hsl(${hue} 78% 56%)`;
   });
 
-  /** @type {{id:number, text:string, chance:number, color:string}[]} */
-  let items = [];
-  let idSeed = 1;
+  const state = {
+    mode: 'bet',            // 'bet' | 'custom'
+    balance: 100,
+    betItems: [],           // {id,text,color,isWin}
+    customItems: [],        // {id,text,color}
+    idSeed: 1,
+  };
+
   let spinning = false;
   let currentRotation = 0; // degrees, cumulative
-  let historyLog = [];
+  let historyLog = []; // {text, kind: 'win'|'lose'|'plain'}
 
   const els = {
+    splash: document.getElementById('splash'),
+    splashEnter: document.getElementById('splashEnter'),
     wheel: document.getElementById('wheel'),
+    balanceVal: document.getElementById('balanceVal'),
+    tabBet: document.getElementById('tabBet'),
+    tabCustom: document.getElementById('tabCustom'),
+    betPanel: document.getElementById('betPanel'),
+    customAddPanel: document.getElementById('customAddPanel'),
+    customListPanel: document.getElementById('customListPanel'),
+    betCells: document.getElementById('betCells'),
+    genWheelBtn: document.getElementById('genWheelBtn'),
+    betInfo: document.getElementById('betInfo'),
+    stakeInput: document.getElementById('stakeInput'),
+    payoutPreview: document.getElementById('payoutPreview'),
     items: document.getElementById('items'),
     itemCount: document.getElementById('itemCount'),
     singleText: document.getElementById('singleText'),
@@ -566,9 +799,7 @@
     bulkForm: document.getElementById('bulkForm'),
     bulkText: document.getElementById('bulkText'),
     bulkCount: document.getElementById('bulkCount'),
-    bulkChance: document.getElementById('bulkChance'),
     bulkAddBtn: document.getElementById('bulkAddBtn'),
-    equalBtn: document.getElementById('equalBtn'),
     shuffleColorsBtn: document.getElementById('shuffleColorsBtn'),
     clearBtn: document.getElementById('clearBtn'),
     spinBtn: document.getElementById('spinBtn'),
@@ -576,15 +807,24 @@
     resultBanner: document.getElementById('resultBanner'),
     history: document.getElementById('history'),
     modalOverlay: document.getElementById('modalOverlay'),
+    modalEmoji: document.getElementById('modalEmoji'),
+    modalTitle: document.getElementById('modalTitle'),
     winText: document.getElementById('winText'),
+    modalSub: document.getElementById('modalSub'),
     modalCloseBtn: document.getElementById('modalCloseBtn'),
     toast: document.getElementById('toast'),
   };
 
+  // ---------- splash ----------
+  els.splashEnter.addEventListener('click', () => {
+    els.splash.classList.add('hide');
+    document.body.classList.remove('no-scroll');
+  });
+
   // ---------- persistence ----------
   function save(){
     try{
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({items, idSeed}));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     }catch(e){ /* storage unavailable — ignore */ }
   }
   function load(){
@@ -592,16 +832,39 @@
       const raw = localStorage.getItem(STORAGE_KEY);
       if(!raw) return false;
       const data = JSON.parse(raw);
-      if(Array.isArray(data.items) && data.items.length){
-        items = data.items;
-        idSeed = data.idSeed || (Math.max(...items.map(i=>i.id)) + 1);
-        return true;
-      }
+      if(typeof data.balance === 'number') state.balance = data.balance;
+      if(Array.isArray(data.betItems)) state.betItems = data.betItems;
+      if(Array.isArray(data.customItems)) state.customItems = data.customItems;
+      if(data.mode === 'bet' || data.mode === 'custom') state.mode = data.mode;
+      if(typeof data.idSeed === 'number') state.idSeed = data.idSeed;
+      return true;
     }catch(e){ /* corrupted — ignore */ }
     return false;
   }
 
-  // ---------- color helper: never repeat the immediately previous color ----------
+  function currentItems(){
+    return state.mode === 'bet' ? state.betItems : state.customItems;
+  }
+
+  // ---------- coin pluralization (Russian) ----------
+  function pluralCoins(n){
+    n = Math.abs(Math.round(n));
+    const mod10 = n % 10, mod100 = n % 100;
+    if(mod10 === 1 && mod100 !== 11) return 'танайчик';
+    if(mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14)) return 'танайчика';
+    return 'танайчиков';
+  }
+
+  // ---------- payout multiplier formula ----------
+  // Anchors: N=2 -> x1.00 (breakeven only), N=10 -> x1.20 (small profit),
+  // then accelerating growth for larger N so bigger risk pays off much more.
+  function computeMultiplier(n){
+    if(n <= 2) return 1;
+    const k = 0.2 / Math.pow(8, 1.2); // calibrated so N=10 gives x1.20
+    return 1 + k * Math.pow(n - 2, 1.2);
+  }
+
+  // ---------- color helpers (custom mode: never repeat the immediately previous color) ----------
   function pickColor(prevColor){
     let pool = PALETTE;
     if(prevColor){
@@ -609,63 +872,108 @@
     }
     return pool[Math.floor(Math.random() * pool.length)];
   }
-
   function lastColor(){
-    return items.length ? items[items.length - 1].color : null;
+    return state.customItems.length ? state.customItems[state.customItems.length - 1].color : null;
   }
 
-  // ---------- item management ----------
-  function addItem(text, chance){
+  // ---------- custom item management ----------
+  function addCustomItem(text){
     const clean = (text || '').trim();
     if(!clean) return null;
-    const item = {
-      id: idSeed++,
-      text: clean,
-      chance: clampChance(chance),
-      color: pickColor(lastColor()),
-    };
-    items.push(item);
+    const item = { id: state.idSeed++, text: clean, color: pickColor(lastColor()) };
+    state.customItems.push(item);
     return item;
   }
-
-  function clampChance(v){
-    let n = parseFloat(v);
-    if(isNaN(n) || n <= 0) n = 0.0000000001;
-    if(n > 100) n = 100;
-    return n;
-  }
-
-  function removeItem(id){
-    items = items.filter(i => i.id !== id);
+  function removeCustomItem(id){
+    state.customItems = state.customItems.filter(i => i.id !== id);
     save();
     renderAll();
   }
 
-  function totalWeight(){
-    return items.reduce((s,i) => s + i.chance, 0) || 0;
+  // ---------- bet wheel generator ----------
+  function generateBetWheel(n){
+    n = Math.max(2, Math.min(300, Math.round(n) || 2));
+    const winIndex = Math.floor(Math.random() * n);
+    const arr = [];
+    for(let i = 0; i < n; i++){
+      arr.push({
+        id: state.idSeed++,
+        text: i === winIndex ? 'Выигрыш' : 'Пусто',
+        color: i === winIndex ? GOLD_COLOR : RED_COLOR,
+        isWin: i === winIndex,
+      });
+    }
+    state.betItems = arr;
   }
 
-  // ---------- rendering: list ----------
-  function renderList(){
-    els.itemCount.textContent = items.length;
-    if(!items.length){
-      els.items.innerHTML = `<div class="empty-hint">Пока пусто 🙈<br>Добавь первый вариант выше — можно вручную или сразу пачкой через «Добавить несколько».</div>`;
+  // ---------- rendering: balance ----------
+  function renderBalance(){
+    els.balanceVal.textContent = state.balance;
+    document.getElementById('balanceLabel').textContent = pluralCoins(state.balance);
+  }
+
+  // ---------- rendering: bet panel ----------
+  function renderBetPanel(){
+    const items = state.betItems;
+    const n = items.length;
+    if(n < 2){
+      els.betInfo.innerHTML = `<div class="empty-hint" style="padding:6px 0;">Задай количество ячеек и нажми «Сгенерировать колесо»</div>`;
+      els.payoutPreview.innerHTML = '';
       return;
     }
-    const total = totalWeight();
+    const chance = 1 / n;
+    const mult = computeMultiplier(n);
+    els.betInfo.innerHTML = `
+      <div class="row"><span>Ячеек на колесе</span><b>${n}</b></div>
+      <div class="row"><span>Шанс на победу</span><b>1/${n} (${(chance*100).toFixed(chance*100 < 1 ? 3 : 1)}%)</b></div>
+      <div class="row"><span>Множитель при победе</span><b>×${mult.toFixed(2)}</b></div>
+      <div class="hint">Чем больше ячеек — тем выше риск и множитель. От 10 ячеек ставка уже приносит прибыль при победе.</div>
+    `;
+    renderPayoutPreview();
+  }
+
+  function renderPayoutPreview(){
+    const items = state.betItems;
+    const n = items.length;
+    if(n < 2){ els.payoutPreview.innerHTML = ''; return; }
+    const mult = computeMultiplier(n);
+    let stake = parseInt(els.stakeInput.value, 10);
+    if(isNaN(stake) || stake < 1) stake = 1;
+    const payout = Math.round(stake * mult);
+    const profit = payout - stake;
+    els.payoutPreview.className = 'payout-preview' + (profit < 0 ? ' negative' : '');
+    els.payoutPreview.innerHTML = `
+      <div class="big">При победе: +${profit} ${pluralCoins(profit)}</div>
+      <div class="sub">Ставка ${stake} → выплата ${payout} танайчиков (×${mult.toFixed(2)})</div>
+    `;
+  }
+
+  function clampStakeInput(){
+    let v = parseInt(els.stakeInput.value, 10);
+    if(isNaN(v) || v < 1) v = 1;
+    if(v > state.balance) v = Math.max(1, state.balance);
+    els.stakeInput.value = v;
+    return v;
+  }
+
+  // ---------- rendering: custom list ----------
+  function renderCustomList(){
+    const items = state.customItems;
+    els.itemCount.textContent = items.length;
+    if(!items.length){
+      els.items.innerHTML = `<div class="empty-hint">Пока пусто 🙈<br>Добавь первый вариант выше — можно вручную или сразу пачкой через «Добавить несколько». У каждого варианта будет равный шанс.</div>`;
+      return;
+    }
+    const pct = 100 / items.length;
     els.items.innerHTML = '';
     items.forEach(item => {
-      const pct = total > 0 ? (item.chance / total * 100) : 0;
       const row = document.createElement('div');
       row.className = 'item';
       row.dataset.id = item.id;
       row.innerHTML = `
         <div class="swatch" title="Сменить цвет" style="background:${item.color}"></div>
         <input type="text" class="text-input" value="${escapeAttr(item.text)}" maxlength="80">
-        <div class="chance-wrap">
-          <input type="number" class="chance-input" value="${trimNum(item.chance)}" min="0.0000000001" max="100" step="any" title="Шанс, %">
-          <span class="pct-badge">${formatPct(pct)}</span>
-        </div>
+        <span class="pct-badge">1/${items.length}</span>
         <button class="del" title="Удалить">✕</button>
       `;
       els.items.appendChild(row);
@@ -675,14 +983,7 @@
         save();
         drawWheel();
       });
-      row.querySelector('.chance-input').addEventListener('input', e => {
-        item.chance = clampChance(e.target.value);
-        save();
-        renderList();
-        drawWheel();
-      });
       row.querySelector('.swatch').addEventListener('click', () => {
-        // reroll color, avoiding neighbors immediately before/after this item
         const idx = items.findIndex(i => i.id === item.id);
         const prev = idx > 0 ? items[idx-1].color : null;
         const next = idx < items.length-1 ? items[idx+1].color : null;
@@ -690,25 +991,13 @@
         if(!pool.length) pool = PALETTE.filter(c => c !== item.color);
         item.color = pool[Math.floor(Math.random()*pool.length)];
         save();
-        renderList();
+        renderCustomList();
         drawWheel();
       });
-      row.querySelector('.del').addEventListener('click', () => removeItem(item.id));
+      row.querySelector('.del').addEventListener('click', () => removeCustomItem(item.id));
     });
   }
 
-  function formatPct(p){
-    if(p === 0) return '0%';
-    if(p < 0.01) return p.toFixed(6).replace(/0+$/,'').replace(/\.$/,'') + '%';
-    if(p < 1) return p.toFixed(3) + '%';
-    return p.toFixed(1) + '%';
-  }
-  function trimNum(n){
-    if(!isFinite(n)) return '0';
-    let s = n.toFixed(10);
-    s = s.replace(/0+$/,'').replace(/\.$/,'');
-    return s;
-  }
   function escapeAttr(s){
     return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
   }
@@ -716,12 +1005,13 @@
   // ---------- rendering: wheel ----------
   const ctx = els.wheel.getContext('2d');
   function drawWheel(){
+    const items = currentItems();
     const W = els.wheel.width, H = els.wheel.height;
     const cx = W/2, cy = H/2, r = W/2 - 6;
     ctx.clearRect(0,0,W,H);
 
     if(!items.length){
-      ctx.fillStyle = '#8a80b8';
+      ctx.fillStyle = '#c3bde3';
       ctx.font = '600 26px Segoe UI, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -729,13 +1019,12 @@
       return;
     }
 
-    const total = totalWeight();
+    const n = items.length;
+    const sliceAngle = (Math.PI * 2) / n;
     let angleStart = -Math.PI/2; // start at top
 
     items.forEach(item => {
-      const frac = total > 0 ? item.chance/total : 1/items.length;
-      const angle = frac * Math.PI * 2;
-      const angleEnd = angleStart + angle;
+      const angleEnd = angleStart + sliceAngle;
 
       ctx.beginPath();
       ctx.moveTo(cx, cy);
@@ -744,17 +1033,16 @@
       ctx.fillStyle = item.color;
       ctx.fill();
       ctx.lineWidth = 3;
-      ctx.strokeStyle = '#120f24';
+      ctx.strokeStyle = '#ffffff';
       ctx.stroke();
 
-      // label — only draw if the slice is wide enough to read
-      if(angle > 0.10){
-        const mid = angleStart + angle/2;
+      const isThin = sliceAngle <= 0.10;
+      const mid = angleStart + sliceAngle/2;
+
+      if(!isThin){
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(mid);
-        // slices on the left half would render the text upside-down;
-        // flip 180° there and align left so labels always read normally
         const normMid = ((mid % (Math.PI*2)) + Math.PI*2) % (Math.PI*2);
         const flip = normMid > Math.PI/2 && normMid < Math.PI*1.5;
         if(flip) ctx.rotate(Math.PI);
@@ -768,25 +1056,63 @@
         if(label.length > maxChars) label = label.slice(0, maxChars-1) + '…';
         ctx.fillText(label, flip ? -r*0.9 : r*0.9, 0);
         ctx.restore();
+      } else if(item.isWin){
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(mid);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = `${Math.max(14, r*0.05)}px sans-serif`;
+        ctx.fillText('🏆', r*0.86, 0);
+        ctx.restore();
       }
 
       angleStart = angleEnd;
     });
 
-    // center ring shadow
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI*2);
-    ctx.lineWidth = 6;
-    ctx.strokeStyle = '#00000030';
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#00000010';
     ctx.stroke();
   }
 
-  function readableTextColor(hslColor){
-    // parse "hsl(H S% L%)" and pick black/white by lightness
-    const m = /hsl\(\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%\)/.exec(hslColor);
-    if(!m) return '#111';
-    const l = parseFloat(m[3]);
-    return l > 62 ? '#1a1428' : '#fff9ff';
+  function hslToRgb(h, s, l){
+    let r, g, b;
+    if(s === 0){ r = g = b = l; }
+    else{
+      const hue2rgb = (p, q, t) => {
+        if(t < 0) t += 1;
+        if(t > 1) t -= 1;
+        if(t < 1/6) return p + (q - p) * 6 * t;
+        if(t < 1/2) return q;
+        if(t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+        return p;
+      };
+      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+      const p = 2 * l - q;
+      r = hue2rgb(p, q, h + 1/3);
+      g = hue2rgb(p, q, h);
+      b = hue2rgb(p, q, h - 1/3);
+    }
+    return [Math.round(r*255), Math.round(g*255), Math.round(b*255)];
+  }
+
+  function readableTextColor(color){
+    let r, g, b;
+    if(color.startsWith('#')){
+      const hex = color.replace('#','');
+      r = parseInt(hex.substring(0,2),16);
+      g = parseInt(hex.substring(2,4),16);
+      b = parseInt(hex.substring(4,6),16);
+    } else {
+      const m = /hsl\(\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%\)/.exec(color);
+      if(!m) return '#1a1428';
+      const rgb = hslToRgb(parseFloat(m[1])/360, parseFloat(m[2])/100, parseFloat(m[3])/100);
+      r = rgb[0]; g = rgb[1]; b = rgb[2];
+    }
+    const luminance = (0.299*r + 0.587*g + 0.114*b) / 255;
+    return luminance > 0.62 ? '#1a1428' : '#ffffff';
   }
 
   // ---------- spin logic ----------
@@ -806,43 +1132,35 @@
     }catch(e){}
   }
 
-  function weightedPickIndex(){
-    const total = totalWeight();
-    let r = Math.random() * total;
-    for(let i=0;i<items.length;i++){
-      r -= items[i].chance;
-      if(r <= 0) return i;
-    }
-    return items.length - 1;
-  }
-
   function spin(){
     if(spinning) return;
+    const items = currentItems();
     if(items.length < 2){
-      showToast('Нужно минимум 2 варианта');
+      showToast(state.mode === 'bet' ? 'Сначала сгенерируй колесо' : 'Нужно минимум 2 варианта');
       return;
     }
+
+    let stake = 0, multiplier = 1;
+    if(state.mode === 'bet'){
+      stake = clampStakeInput();
+      if(state.balance < 1){ showToast('Недостаточно танайчиков'); return; }
+      if(stake > state.balance){ showToast('Ставка больше баланса'); return; }
+      multiplier = computeMultiplier(items.length);
+      state.balance -= stake;
+      renderBalance();
+      save();
+    }
+
     spinning = true;
     els.spinBtn.disabled = true;
     els.hub.classList.add('spinning');
     els.resultBanner.textContent = 'Крутим...';
 
-    const total = totalWeight();
-    const winnerIdx = weightedPickIndex();
+    const n = items.length;
+    const sliceAngle = 360 / n;
+    const winnerIdx = Math.floor(Math.random() * n);
+    const winnerMid = winnerIdx * sliceAngle + sliceAngle/2;
 
-    // compute angle range of winner slice
-    let angleStart = 0;
-    for(let i=0;i<winnerIdx;i++){
-      angleStart += (items[i].chance/total) * 360;
-    }
-    const sliceAngle = (items[winnerIdx].chance/total) * 360;
-    const winnerMid = angleStart + sliceAngle/2;
-
-    // The pointer is fixed at top (0deg / -90 in canvas terms, but our
-    // wheel draw already starts slices at -90deg = top, so 0..360 offset
-    // aligns directly with the top pointer). We rotate the wheel so that
-    // the winner slice ends up under the pointer, landing at a random
-    // offset within the slice (not always dead-center) for realism.
     const jitter = (Math.random() - 0.5) * sliceAngle * 0.7;
     const targetOffset = (360 - (winnerMid + jitter)) % 360;
 
@@ -852,7 +1170,6 @@
     currentRotation = finalRotation;
     els.wheel.style.transform = `rotate(${finalRotation}deg)`;
 
-    // periodic ticking sound while spinning
     let ticksPlayed = 0;
     const tickInterval = setInterval(() => {
       ticksPlayed++;
@@ -865,22 +1182,66 @@
       spinning = false;
       els.spinBtn.disabled = false;
       els.hub.classList.remove('spinning');
+
       const winner = items[winnerIdx];
-      announceWinner(winner);
+      if(state.mode === 'bet'){
+        if(winner.isWin){
+          const payout = Math.round(stake * multiplier);
+          state.balance += payout;
+          announceBetResult(true, stake, payout, multiplier);
+        } else {
+          announceBetResult(false, stake, 0, multiplier);
+        }
+        renderBalance();
+        save();
+      } else {
+        announceCustomWinner(winner);
+      }
     }, 5300);
   }
 
-  function announceWinner(winner){
-    els.resultBanner.innerHTML = `Выпало: <b>${escapeAttr(winner.text)}</b>`;
-    historyLog.unshift(winner.text);
+  function announceBetResult(won, stake, payout, multiplier){
+    const profit = payout - stake;
+    if(won){
+      els.resultBanner.innerHTML = `🎉 Победа! <b>+${profit} ${pluralCoins(profit)}</b>`;
+      historyLog.unshift({ text: `🏆 +${profit} (×${multiplier.toFixed(2)})`, kind: 'win' });
+      els.modalEmoji.textContent = '🎉';
+      els.modalTitle.textContent = 'Победа';
+      els.winText.textContent = `+${profit} ${pluralCoins(profit)}`;
+      els.winText.className = 'win-text good';
+      els.modalSub.textContent = `Ставка ${stake} → выплата ${payout} (×${multiplier.toFixed(2)})`;
+    } else {
+      els.resultBanner.innerHTML = `😢 Не повезло: <b>-${stake} ${pluralCoins(stake)}</b>`;
+      historyLog.unshift({ text: `💀 -${stake}`, kind: 'lose' });
+      els.modalEmoji.textContent = '💀';
+      els.modalTitle.textContent = 'Не повезло';
+      els.winText.textContent = `-${stake} ${pluralCoins(stake)}`;
+      els.winText.className = 'win-text bad';
+      els.modalSub.textContent = 'Попробуй ещё раз!';
+    }
     historyLog = historyLog.slice(0, 20);
     renderHistory();
+    els.modalOverlay.classList.add('show');
+    renderPayoutPreview();
+  }
+
+  function announceCustomWinner(winner){
+    els.resultBanner.innerHTML = `Выпало: <b>${escapeAttr(winner.text)}</b>`;
+    historyLog.unshift({ text: winner.text, kind: 'plain' });
+    historyLog = historyLog.slice(0, 20);
+    renderHistory();
+    els.modalEmoji.textContent = '🎉';
+    els.modalTitle.textContent = 'Выпало';
     els.winText.textContent = winner.text;
+    els.winText.className = 'win-text';
+    els.modalSub.textContent = '';
     els.modalOverlay.classList.add('show');
   }
 
   function renderHistory(){
-    els.history.innerHTML = historyLog.map(t => `<span class="chip">${escapeAttr(t)}</span>`).join('');
+    els.history.innerHTML = historyLog.map(h =>
+      `<span class="chip ${h.kind === 'win' ? 'win' : h.kind === 'lose' ? 'lose' : ''}">${escapeAttr(h.text)}</span>`
+    ).join('');
   }
 
   // ---------- toast ----------
@@ -892,15 +1253,63 @@
     toastTimer = setTimeout(() => els.toast.classList.remove('show'), 2200);
   }
 
+  // ---------- tab switching ----------
+  function resetWheelRotation(){
+    currentRotation = 0;
+    els.wheel.style.transition = 'none';
+    els.wheel.style.transform = 'rotate(0deg)';
+    void els.wheel.offsetWidth; // force reflow so the transition removal takes effect
+    els.wheel.style.transition = '';
+  }
+
+  function setMode(mode){
+    if(spinning) return;
+    state.mode = mode;
+    els.tabBet.classList.toggle('active', mode === 'bet');
+    els.tabCustom.classList.toggle('active', mode === 'custom');
+    els.betPanel.style.display = mode === 'bet' ? '' : 'none';
+    els.customAddPanel.style.display = mode === 'custom' ? '' : 'none';
+    els.customListPanel.style.display = mode === 'custom' ? '' : 'none';
+    resetWheelRotation();
+    save();
+    renderAll();
+  }
+
   // ---------- render all ----------
   function renderAll(){
-    renderList();
+    renderBalance();
+    if(state.mode === 'bet'){
+      els.betCells.value = state.betItems.length || els.betCells.value;
+      renderBetPanel();
+    } else {
+      renderCustomList();
+    }
     drawWheel();
   }
 
   // ---------- events ----------
+  els.tabBet.addEventListener('click', () => setMode('bet'));
+  els.tabCustom.addEventListener('click', () => setMode('custom'));
+
+  els.genWheelBtn.addEventListener('click', () => {
+    if(spinning) return;
+    let n = parseInt(els.betCells.value, 10);
+    if(isNaN(n) || n < 2) n = 2;
+    if(n > 300) n = 300;
+    els.betCells.value = n;
+    generateBetWheel(n);
+    resetWheelRotation();
+    save();
+    renderAll();
+    showToast(`Колесо на ${n} ячеек готово`);
+  });
+
+  els.stakeInput.addEventListener('input', () => {
+    renderPayoutPreview();
+  });
+
   els.addSingleBtn.addEventListener('click', () => {
-    const item = addItem(els.singleText.value, 1);
+    const item = addCustomItem(els.singleText.value);
     if(item){
       els.singleText.value = '';
       save();
@@ -918,12 +1327,11 @@
   els.bulkAddBtn.addEventListener('click', () => {
     const text = els.bulkText.value.trim();
     let count = parseInt(els.bulkCount.value, 10);
-    const chance = els.bulkChance.value;
     if(!text){ showToast('Введи текст надписи'); return; }
     if(isNaN(count) || count < 1) count = 1;
     if(count > 500) count = 500;
     for(let i=0;i<count;i++){
-      addItem(text, chance);
+      addCustomItem(text);
     }
     els.bulkText.value = '';
     save();
@@ -931,17 +1339,9 @@
     showToast(`Добавлено: ${count} шт.`);
   });
 
-  els.equalBtn.addEventListener('click', () => {
-    if(!items.length) return;
-    const eq = +(100/items.length).toFixed(10);
-    items.forEach(i => i.chance = eq);
-    save();
-    renderAll();
-  });
-
   els.shuffleColorsBtn.addEventListener('click', () => {
     let prev = null;
-    items.forEach(item => {
+    state.customItems.forEach(item => {
       item.color = pickColor(prev);
       prev = item.color;
     });
@@ -950,9 +1350,10 @@
   });
 
   els.clearBtn.addEventListener('click', () => {
-    if(!items.length) return;
+    if(!state.customItems.length) return;
     if(confirm('Удалить все варианты?')){
-      items = [];
+      state.customItems = [];
+      resetWheelRotation();
       save();
       renderAll();
     }
@@ -970,16 +1371,21 @@
 
   // ---------- init ----------
   function seedDefaults(){
-    addItem('Приз 1', 1);
-    addItem('Приз 2', 1);
-    addItem('Приз 3', 1);
+    state.balance = 100;
+    generateBetWheel(10);
+    state.customItems = [];
+    addCustomItem('Приз 1');
+    addCustomItem('Приз 2');
+    addCustomItem('Приз 3');
   }
 
   if(!load()){
     seedDefaults();
     save();
   }
-  renderAll();
+  if(!state.betItems.length) generateBetWheel(10);
+
+  setMode(state.mode);
 
 })();
 </script>
