@@ -885,10 +885,11 @@
   }
 
   // ---------- payout multiplier formula ----------
-  // Linear between the two anchors: N=2 -> x1.05, N=20 -> x4.00.
+  // Piecewise linear through the three anchors: N=2 -> x1.05, N=10 -> x2.00, N=20 -> x3.00.
   function computeMultiplier(n){
     n = Math.max(2, Math.min(20, n));
-    return 1.05 + (n - 2) * (4 - 1.05) / (20 - 2);
+    if(n <= 10) return 1.05 + (n - 2) * (2 - 1.05) / (10 - 2);
+    return 2 + (n - 10) * (3 - 2) / (20 - 10);
   }
 
   // ---------- color helpers (custom mode: never repeat the immediately previous color) ----------
@@ -948,7 +949,7 @@
       <div class="row"><span>Ячеек на колесе</span><b>${n}</b></div>
       <div class="row"><span>Шанс на победу</span><b>1/${n} (${(chance*100).toFixed(chance*100 < 1 ? 3 : 1)}%)</b></div>
       <div class="row"><span>Множитель при победе</span><b>×${mult.toFixed(2)}</b></div>
-      <div class="hint">Множитель растёт вместе с числом ячеек: от ×1.05 при 2 ячейках до ×4 при 20.</div>
+      <div class="hint">Множитель растёт вместе с числом ячеек: ×1.05 при 2, ×2.00 при 10, ×3.00 при 20.</div>
     `;
     renderPayoutPreview();
   }
