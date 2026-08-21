@@ -686,8 +686,8 @@
       <h2>🎰 Ставка на удачу</h2>
       <div class="add-row">
         <div class="field-wrap" style="flex:1 1 140px;">
-          <span class="field-label">Количество ячеек (1 выигрышная + остальные пустые)</span>
-          <input type="number" id="betCells" min="2" max="300" step="1" value="10">
+          <span class="field-label">Количество выигрышных ячеек (шанс всегда 5%)</span>
+          <input type="number" id="betCells" min="4" max="20" step="1" value="5">
         </div>
         <button class="btn primary" id="genWheelBtn" style="align-self:flex-end;">🎲 Сгенерировать колесо</button>
       </div>
@@ -920,46 +920,60 @@
   }
 
   // ---------- bet wheel generator ----------
-  function generateBetWheel(n){
-    n = Math.max(2, Math.min(300, Math.round(n) || 2));
-    const winIndex = Math.floor(Math.random() * n);
+  const FIXED_WIN_CHANCE = 0.05; // win probability never changes, regardless of win-cell count
+
+  function generateBetWheel(winCount){
+    winCount = Math.max(4, Math.min(20, Math.round(winCount) || 4));
+    const total = Math.round(winCount / FIXED_WIN_CHANCE); // keeps odds pinned at 5%
+    const winIndices = new Set();
+    while(winIndices.size < winCount){
+      winIndices.add(Math.floor(Math.random() * total));
+    }
     const arr = [];
-    for(let i = 0; i < n; i++){
+    for(let i = 0; i < total; i++){
+      const isWin = winIndices.has(i);
       arr.push({
         id: state.idSeed++,
-        text: i === winIndex ? 'Выигрыш' : 'Пусто',
-        color: i === winIndex ? GOLD_COLOR : RED_COLOR,
-        isWin: i === winIndex,
+        text: isWin ? 'Выигрыш' : 'Пусто',
+        color: isWin ? GOLD_COLOR : RED_COLOR,
+        isWin,
       });
     }
     state.betItems = arr;
   }
 
+  // odds/multiplier are derived from the fixed 5% chance, not from the raw cell count
+  function betOddsInfo(){
+    const items = state.betItems;
+    const total = items.length;
+    if(total < 2) return null;
+    const winCells = items.reduce((s,i) => s + (i.isWin ? 1 : 0), 0);
+    const chance = winCells / total;
+    const mult = computeMultiplier(Math.round(1 / chance));
+    return { total, winCells, chance, mult };
+  }
+
   // ---------- rendering: bet panel ----------
   function renderBetPanel(){
-    const items = state.betItems;
-    const n = items.length;
-    if(n < 2){
-      els.betInfo.innerHTML = `<div class="empty-hint" style="padding:6px 0;">Задай количество ячеек и нажми «Сгенерировать колесо»</div>`;
+    const info = betOddsInfo();
+    if(!info){
+      els.betInfo.innerHTML = `<div class="empty-hint" style="padding:6px 0;">Задай количество выигрышных ячеек и нажми «Сгенерировать колесо»</div>`;
       els.payoutPreview.innerHTML = '';
       return;
     }
-    const chance = 1 / n;
-    const mult = computeMultiplier(n);
     els.betInfo.innerHTML = `
-      <div class="row"><span>Ячеек на колесе</span><b>${n}</b></div>
-      <div class="row"><span>Шанс на победу</span><b>1/${n} (${(chance*100).toFixed(chance*100 < 1 ? 3 : 1)}%)</b></div>
-      <div class="row"><span>Множитель при победе</span><b>×${mult.toFixed(2)}</b></div>
-      <div class="hint">Чем больше ячеек — тем выше риск и множитель. От 10 ячеек ставка уже приносит прибыль при победе.</div>
+      <div class="row"><span>Выигрышных ячеек</span><b>${info.winCells} из ${info.total}</b></div>
+      <div class="row"><span>Шанс на победу</span><b>${(info.chance*100).toFixed(1)}%</b></div>
+      <div class="row"><span>Множитель при победе</span><b>×${info.mult.toFixed(2)}</b></div>
+      <div class="hint">Шанс всегда фиксирован на 5% — больше золотых ячеек просто гуще разбросаны по колесу, риск и выплата не меняются.</div>
     `;
     renderPayoutPreview();
   }
 
   function renderPayoutPreview(){
-    const items = state.betItems;
-    const n = items.length;
-    if(n < 2){ els.payoutPreview.innerHTML = ''; return; }
-    const mult = computeMultiplier(n);
+    const info = betOddsInfo();
+    if(!info){ els.payoutPreview.innerHTML = ''; return; }
+    const mult = info.mult;
     let stake = parseInt(els.stakeInput.value, 10);
     if(isNaN(stake) || stake < 1) stake = 1;
     const payout = Math.round(stake * mult);
@@ -1214,7 +1228,7 @@
     let stake = 0, multiplier = 1;
     if(state.mode === 'bet'){
       stake = clampStakeInput();
-      multiplier = computeMultiplier(items.length);
+      multiplier = betOddsInfo().mult;
     }
 
     spinning = true;
@@ -1339,7 +1353,8 @@
   // ---------- render all ----------
   function renderAll(){
     if(state.mode === 'bet'){
-      els.betCells.value = state.betItems.length || els.betCells.value;
+      const winCount = state.betItems.reduce((s,i) => s + (i.isWin ? 1 : 0), 0);
+      els.betCells.value = winCount || els.betCells.value;
       renderBetPanel();
     } else {
       renderCustomList();
@@ -1354,14 +1369,14 @@
   els.genWheelBtn.addEventListener('click', () => {
     if(spinning) return;
     let n = parseInt(els.betCells.value, 10);
-    if(isNaN(n) || n < 2) n = 2;
-    if(n > 300) n = 300;
+    if(isNaN(n) || n < 4) n = 4;
+    if(n > 20) n = 20;
     els.betCells.value = n;
     generateBetWheel(n);
     resetWheelRotation();
     save();
     renderAll();
-    showToast(`Колесо на ${n} ячеек готово`);
+    showToast(`Колесо с ${n} выигрышными ячейками готово`);
   });
 
   els.stakeInput.addEventListener('input', () => {
@@ -1431,7 +1446,7 @@
 
   // ---------- init ----------
   function seedDefaults(){
-    generateBetWheel(10);
+    generateBetWheel(5);
     state.customItems = [];
     addCustomItem('Приз 1');
     addCustomItem('Приз 2');
@@ -1442,7 +1457,7 @@
     seedDefaults();
     save();
   }
-  if(!state.betItems.length) generateBetWheel(10);
+  if(!state.betItems.length) generateBetWheel(5);
 
   setMode(state.mode);
 
