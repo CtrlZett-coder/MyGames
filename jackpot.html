@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Счастливая Кнопка — 1 к 10 000</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+html,body{width:100%;min-height:100%;overflow-x:hidden}
+body{
+  background:
+    radial-gradient(circle at 50% 0%,#2a1a4a 0%,#150e2b 40%,#0a0714 100%);
+  color:#fff;font-family:"Segoe UI",Roboto,Arial,sans-serif;
+  min-height:100vh;display:flex;flex-direction:column;align-items:center;
+  padding:24px 16px 60px;position:relative;
+}
+
+/* ── stars ──────────────────────────────────────────────────────────── */
+.stars{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:0}
+.star{position:absolute;background:#fff;border-radius:50%;
+  animation:twinkle 3s ease-in-out infinite;}
+@keyframes twinkle{0%,100%{opacity:.15}50%{opacity:1}}
+
+/* ── layout ─────────────────────────────────────────────────────────── */
+.wrap{position:relative;z-index:1;max-width:520px;width:100%;text-align:center}
+
+header h1{
+  font-size:clamp(1.6em,6vw,2.4em);
+  background:linear-gradient(90deg,#ffd76a,#fff3c4,#ffd76a);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  text-shadow:0 0 30px rgba(255,215,90,.35);
+  letter-spacing:1px;
+}
+header .sub{margin-top:8px;color:#c9c1e8;font-size:.95em;line-height:1.4}
+header .sub b{color:#ffd76a}
+
+.stage{margin:40px 0 28px;display:flex;justify-content:center}
+
+.jackpot-btn{
+  position:relative;width:220px;height:220px;border-radius:50%;
+  border:6px solid #ffe082;cursor:pointer;
+  background:radial-gradient(circle at 35% 30%,#ff8a3d,#e6432b 60%,#a3151c 100%);
+  color:#fff8e1;font-size:1.5em;font-weight:800;letter-spacing:2px;
+  box-shadow:0 0 0 8px rgba(255,224,130,.08),
+             0 0 40px 6px rgba(255,140,60,.55),
+             inset 0 -8px 18px rgba(0,0,0,.35),
+             inset 0 8px 14px rgba(255,255,255,.25);
+  animation:pulse 1.8s ease-in-out infinite;
+  transition:transform .12s ease;
+}
+.jackpot-btn:active{transform:scale(.94)}
+.jackpot-btn.shake{animation:shake .22s ease}
+.jackpot-btn.turbo-spin{animation:turboSpin .35s linear infinite}
+@keyframes pulse{
+  0%,100%{box-shadow:0 0 0 8px rgba(255,224,130,.08),0 0 40px 6px rgba(255,140,60,.55),inset 0 -8px 18px rgba(0,0,0,.35),inset 0 8px 14px rgba(255,255,255,.25)}
+  50%{box-shadow:0 0 0 14px rgba(255,224,130,.14),0 0 70px 16px rgba(255,140,60,.85),inset 0 -8px 18px rgba(0,0,0,.35),inset 0 8px 14px rgba(255,255,255,.25)}
+}
+@keyframes shake{
+  0%,100%{transform:translate(0,0)}
+  20%{transform:translate(-6px,2px) rotate(-2deg)}
+  40%{transform:translate(6px,-2px) rotate(2deg)}
+  60%{transform:translate(-4px,1px) rotate(-1deg)}
+  80%{transform:translate(4px,-1px) rotate(1deg)}
+}
+@keyframes turboSpin{0%{filter:hue-rotate(0deg) brightness(1)}50%{filter:hue-rotate(25deg) brightness(1.3)}100%{filter:hue-rotate(0deg) brightness(1)}}
+
+/* ── stats ──────────────────────────────────────────────────────────── */
+.stats{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:20px}
+.stat{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
+  border-radius:12px;padding:10px 16px;min-width:96px}
+.stat-val{display:block;font-size:1.3em;font-weight:800;color:#ffd76a}
+.stat-lbl{display:block;font-size:.72em;color:#a89dcf;margin-top:2px}
+
+/* ── turbo ──────────────────────────────────────────────────────────── */
+.turbo{margin-bottom:18px;font-size:.9em;color:#c9c1e8}
+.turbo label{display:block;margin-bottom:8px}
+.speed-btn{
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);
+  color:#e8e2ff;padding:7px 14px;border-radius:20px;margin:0 4px;cursor:pointer;
+  font-size:.85em;transition:.15s;
+}
+.speed-btn:hover{background:rgba(255,255,255,.16)}
+.speed-btn.active{background:#ffd76a;color:#3a2400;border-color:#ffd76a;font-weight:700}
+
+.msg{min-height:1.6em;font-size:.95em;color:#ffb3b3;margin-top:4px;transition:opacity .2s}
+.msg.milestone{color:#8fe3ff}
+
+/* ── history ────────────────────────────────────────────────────────── */
+.history{margin-top:26px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);
+  border-radius:14px;padding:14px 18px;text-align:left}
+.history h3{color:#ffd76a;font-size:1em;margin-bottom:8px;text-align:center}
+.history ul{list-style:none;max-height:180px;overflow-y:auto}
+.history li{font-size:.85em;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.08);color:#e8e2ff}
+.history li:last-child{border-bottom:none}
+.history .h-date{color:#8f86ad;font-size:.85em;display:block}
+
+.reset{margin-top:22px}
+.reset button{background:none;border:1px solid rgba(255,255,255,.2);color:#8f86ad;
+  padding:6px 14px;border-radius:16px;font-size:.78em;cursor:pointer}
+.reset button:hover{color:#fff;border-color:#fff}
+
+/* ── confetti canvas ───────────────────────────────────────────────── */
+#confetti{position:fixed;inset:0;pointer-events:none;z-index:50;display:none}
+
+/* ── win modal ─────────────────────────────────────────────────────── */
+.modal{position:fixed;inset:0;z-index:100;background:rgba(5,2,15,.85);
+  display:flex;align-items:center;justify-content:center;padding:20px;
+  animation:fadeIn .3s ease}
+.modal[hidden]{display:none}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.prize-card{
+  background:linear-gradient(160deg,#2b1a4d,#160c2b);
+  border:2px solid #ffd76a;border-radius:22px;padding:36px 28px;max-width:380px;width:100%;
+  text-align:center;box-shadow:0 0 60px rgba(255,215,90,.5);
+  animation:pop .45s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes pop{0%{transform:scale(.4);opacity:0}100%{transform:scale(1);opacity:1}}
+.prize-emoji{font-size:4.5em;filter:drop-shadow(0 0 20px rgba(255,215,90,.7))}
+.prize-card h2{
+  margin:6px 0 14px;font-size:1.8em;letter-spacing:2px;
+  background:linear-gradient(90deg,#ffd76a,#fff,#ffd76a);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.prize-name{font-size:1.25em;font-weight:800;color:#fff}
+.prize-desc{color:#c9c1e8;font-size:.92em;margin:8px 0 16px}
+.cert{font-size:.75em;color:#8f86ad;border-top:1px dashed rgba(255,255,255,.2);padding-top:10px;line-height:1.5}
+.prize-card button{
+  margin-top:20px;background:linear-gradient(90deg,#ffd76a,#ffb347);border:none;
+  color:#3a2400;font-weight:800;padding:12px 26px;border-radius:24px;cursor:pointer;font-size:.95em;
+}
+.prize-card button:hover{filter:brightness(1.08)}
+
+.flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:90}
+.flash.go{animation:flashAnim .5s ease}
+@keyframes flashAnim{0%{opacity:0}15%{opacity:.9}100%{opacity:0}}
+</style>
+</head>
+<body>
+
+<div class="stars" id="stars"></div>
+<div class="flash" id="flash"></div>
+<canvas id="confetti"></canvas>
+
+<div class="wrap">
+  <header>
+    <h1>🎰 СУПЕР ПРИЗ</h1>
+    <p class="sub">Жми на кнопку. Шанс на джекпот — <b>1 из 10 000</b>.<br>Кто-то же должен выиграть — почему бы не ты?</p>
+  </header>
+
+  <div class="stage">
+    <button id="btn" class="jackpot-btn">ЖМИ!</button>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><span class="stat-val" id="attempts">0</span><span class="stat-lbl">попыток</span></div>
+    <div class="stat"><span class="stat-val" id="winsCount">0</span><span class="stat-lbl">призов</span></div>
+    <div class="stat"><span class="stat-val" id="oddsSoFar">0%</span><span class="stat-lbl">шанс уже выиграть</span></div>
+  </div>
+
+  <div class="turbo">
+    <label>⚡ Турбо-режим (авто-нажатия)</label>
+    <button class="speed-btn active" data-speed="0">Выкл</button>
+    <button class="speed-btn" data-speed="25">×25/сек</button>
+    <button class="speed-btn" data-speed="400">×400/сек</button>
+  </div>
+
+  <p class="msg" id="msg"></p>
+
+  <div class="history" id="history" hidden>
+    <h3>🏆 Твои призы</h3>
+    <ul id="historyList"></ul>
+  </div>
+
+  <div class="reset">
+    <button id="resetBtn">Сбросить статистику</button>
+  </div>
+</div>
+
+<div class="modal" id="winModal" hidden>
+  <div class="prize-card">
+    <div class="prize-emoji" id="prizeEmoji">🏆</div>
+    <h2>ДЖЕКПОТ!</h2>
+    <p class="prize-name" id="prizeName"></p>
+    <p class="prize-desc" id="prizeDesc"></p>
+    <p class="cert">Сертификат № <span id="certNum"></span><br>Выигрышная попытка: №<span id="winAttempt"></span></p>
+    <button id="closeModal">Играть дальше</button>
+  </div>
+</div>
+
+<script>
+// ── Background stars ─────────────────────────────────────────────────────────
+(function(){
+  const starsEl = document.getElementById('stars');
+  const n = 70;
+  let html = '';
+  for (let i = 0; i < n; i++) {
+    const size = (Math.random() * 2 + 1).toFixed(1);
+    const top = (Math.random() * 100).toFixed(2);
+    const left = (Math.random() * 100).toFixed(2);
+    const delay = (Math.random() * 3).toFixed(2);
+    const dur = (2 + Math.random() * 3).toFixed(2);
+    html += `<div class="star" style="width:${size}px;height:${size}px;top:${top}%;left:${left}%;animation-duration:${dur}s;animation-delay:${delay}s"></div>`;
+  }
+  starsEl.innerHTML = html;
+})();
+
+// ── Audio (procedural, no files) ─────────────────────────────────────────────
+let actx = null, masterGain = null;
+function initAudio() {
+  if (actx) return;
+  try {
+    actx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = actx.createGain();
+    masterGain.gain.value = 0.6;
+    masterGain.connect(actx.destination);
+  } catch (e) {}
+}
+function playTone(f, dur, vol = 0.3, type = 'sine', delay = 0) {
+  if (!actx) return;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.value = f;
+  const t0 = actx.currentTime + delay;
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  o.connect(g); g.connect(masterGain);
+  o.start(t0); o.stop(t0 + dur + 0.02);
+}
+function playNoise(dur, vol = 0.25) {
+  if (!actx) return;
+  const buf = actx.createBuffer(1, Math.floor(actx.sampleRate * dur), actx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+  const s = actx.createBufferSource(), g = actx.createGain();
+  s.buffer = buf;
+  g.gain.setValueAtTime(vol, actx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + dur);
+  s.connect(g); g.connect(masterGain);
+  s.start();
+}
+const SND = {
+  click: () => playTone(420, 0.08, 0.18, 'square'),
+  lose: () => playTone(180, 0.18, 0.16, 'sawtooth'),
+  milestone: () => { playTone(660, 0.1, 0.2); playTone(880, 0.12, 0.2, 'sine', 0.08); },
+  win: () => {
+    [523, 659, 784, 1046, 1318].forEach((f, i) => playTone(f, 0.35, 0.3, 'triangle', i * 0.12));
+    playNoise(0.6, 0.15);
+  },
+};
+
+// ── Prizes ────────────────────────────────────────────────────────────────────
+const PRIZES = [
+  { emoji: '🚀', name: 'Личный космический корабль', desc: 'До Марса — без пересадок и без очередей.' },
+  { emoji: '👑', name: 'Корона Императора Вселенной', desc: 'Отныне вся галактика кланяется тебе.' },
+  { emoji: '🐉', name: 'Ручной дракон', desc: 'Дышит огнём строго по расписанию и только по команде.' },
+  { emoji: '💎', name: 'Сундук бриллиантов', desc: 'Хватит на три жизни вперёд, если жить экономно.' },
+  { emoji: '🏝', name: 'Необитаемый остров', desc: 'С пальмами, попугаями и бесплатным Wi-Fi.' },
+  { emoji: '🛸', name: 'НЛО с автопилотом', desc: 'Похищения инопланетян — строго по расписанию.' },
+  { emoji: '🎮', name: 'Игровой ПК из будущего', desc: 'Никогда не тормозит. Никогда. Вообще.' },
+  { emoji: '🍀', name: 'Клевер вселенской удачи', desc: 'С этого момента удача — твой постоянный спутник.' },
+  { emoji: '🏆', name: 'Кубок Главного Везунчика', desc: 'Единственный экземпляр во всей мультивселенной.' },
+  { emoji: '🌈', name: 'Ключ от конца радуги', desc: 'Спойлер: там правда есть золото.' },
+];
+
+const LOSE_MSGS = [
+  'Мимо! Попробуй ещё раз.',
+  'Почти... но нет 😅',
+  'Не в этот раз — удача где-то рядом.',
+  'Пусто. Но кто-то же выигрывает!',
+  '0 из 10 000 — статистика есть статистика.',
+  'Фортуна отвернулась. Пока.',
+  'Ещё разок?',
+  'Шанс не меняется — но настойчивость важна 😉',
+];
+
+// ── State (persisted) ─────────────────────────────────────────────────────────
+const CHANCE = 1 / 10000;
+let attempts = parseInt(localStorage.getItem('jackpot_attempts') || '0', 10);
+let wins = JSON.parse(localStorage.getItem('jackpot_wins') || '[]');
+let spinning = false;
+let turboRate = 0; // attempts per second, 0 = off
+
+const btn = document.getElementById('btn');
+const attemptsEl = document.getElementById('attempts');
+const winsCountEl = document.getElementById('winsCount');
+const oddsSoFarEl = document.getElementById('oddsSoFar');
+const msgEl = document.getElementById('msg');
+const historyEl = document.getElementById('history');
+const historyListEl = document.getElementById('historyList');
+const flashEl = document.getElementById('flash');
+
+function saveState() {
+  localStorage.setItem('jackpot_attempts', String(attempts));
+  localStorage.setItem('jackpot_wins', JSON.stringify(wins));
+}
+
+function updateStats() {
+  attemptsEl.textContent = attempts.toLocaleString('ru-RU');
+  winsCountEl.textContent = wins.length;
+  const p = 1 - Math.pow(1 - CHANCE, attempts);
+  oddsSoFarEl.textContent = (p * 100).toFixed(attempts > 3000 ? 1 : 3) + '%';
+}
+
+function renderHistory() {
+  if (!wins.length) { historyEl.hidden = true; return; }
+  historyEl.hidden = false;
+  historyListEl.innerHTML = wins.slice().reverse().map(w =>
+    `<li>${w.emoji} <b>${w.name}</b><span class="h-date">${w.date} · попытка №${w.attempt.toLocaleString('ru-RU')}</span></li>`
+  ).join('');
+}
+
+function genCert() {
+  return 'MG-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 7).toUpperCase();
+}
+
+// ── Single attempt ────────────────────────────────────────────────────────────
+function doAttempt() {
+  attempts++;
+  return Math.random() < CHANCE;
+}
+
+function showLoseMessage() {
+  if (attempts % 1000 === 0) {
+    msgEl.textContent = `🔥 ${attempts.toLocaleString('ru-RU')} попыток позади! Продолжай — шанс не меняется, но удача может улыбнуться на следующей.`;
+    msgEl.classList.add('milestone');
+    initAudio(); SND.milestone();
+  } else {
+    msgEl.textContent = LOSE_MSGS[Math.floor(Math.random() * LOSE_MSGS.length)];
+    msgEl.classList.remove('milestone');
+  }
+}
+
+function triggerWin() {
+  setTurbo(0);
+  const prize = PRIZES[Math.floor(Math.random() * PRIZES.length)];
+  const record = { ...prize, date: new Date().toLocaleString('ru-RU'), attempt: attempts };
+  wins.push(record);
+  saveState();
+  renderHistory();
+  updateStats();
+
+  document.getElementById('prizeEmoji').textContent = prize.emoji;
+  document.getElementById('prizeName').textContent = prize.name;
+  document.getElementById('prizeDesc').textContent = prize.desc;
+  document.getElementById('certNum').textContent = genCert();
+  document.getElementById('winAttempt').textContent = attempts.toLocaleString('ru-RU');
+  document.getElementById('winModal').hidden = false;
+
+  flashEl.classList.remove('go'); void flashEl.offsetWidth; flashEl.classList.add('go');
+  initAudio(); SND.win();
+  startConfetti();
+}
+
+document.getElementById('closeModal').addEventListener('click', () => {
+  document.getElementById('winModal').hidden = true;
+  stopConfetti();
+});
+
+// ── Manual click ──────────────────────────────────────────────────────────────
+btn.addEventListener('click', () => {
+  if (spinning || turboRate > 0) return;
+  spinning = true;
+  initAudio(); SND.click();
+  btn.classList.add('shake');
+  setTimeout(() => {
+    btn.classList.remove('shake');
+    const won = doAttempt();
+    saveState();
+    updateStats();
+    spinning = false;
+    if (won) triggerWin(); else showLoseMessage();
+  }, 200);
+});
+
+// ── Turbo mode ────────────────────────────────────────────────────────────────
+document.querySelectorAll('.speed-btn').forEach(b => {
+  b.addEventListener('click', () => setTurbo(parseInt(b.dataset.speed, 10)));
+});
+
+let turboRAF = null, turboLast = 0;
+function setTurbo(rate) {
+  turboRate = rate;
+  document.querySelectorAll('.speed-btn').forEach(b =>
+    b.classList.toggle('active', parseInt(b.dataset.speed, 10) === rate));
+  btn.classList.toggle('turbo-spin', rate > 0);
+  if (rate > 0) {
+    initAudio();
+    if (!turboRAF) { turboLast = performance.now(); turboLoop(); }
+  } else if (turboRAF) {
+    cancelAnimationFrame(turboRAF);
+    turboRAF = null;
+  }
+}
+
+function turboLoop(now) {
+  if (turboRate <= 0) { turboRAF = null; return; }
+  now = now || performance.now();
+  const dt = Math.min((now - turboLast) / 1000, 0.25);
+  turboLast = now;
+  let toRun = Math.round(turboRate * dt);
+  let won = false;
+  for (let i = 0; i < toRun; i++) {
+    if (doAttempt()) { won = true; break; }
+  }
+  saveState();
+  updateStats();
+  if (won) {
+    triggerWin();
+    return; // setTurbo(0) already called inside triggerWin
+  }
+  turboRAF = requestAnimationFrame(turboLoop);
+}
+
+// ── Reset ─────────────────────────────────────────────────────────────────────
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (!confirm('Сбросить всю статистику и историю призов?')) return;
+  attempts = 0; wins = [];
+  saveState(); updateStats(); renderHistory();
+  msgEl.textContent = ''; msgEl.classList.remove('milestone');
+});
+
+// ── Confetti / fireworks canvas ──────────────────────────────────────────────
+const cCanvas = document.getElementById('confetti');
+const cCtx = cCanvas.getContext('2d');
+let confettiParticles = [];
+let confettiRAF = null;
+let confettiSpawnTimer = null;
+const CONFETTI_COLORS = ['#ffd76a', '#ff8a3d', '#e6432b', '#8fe3ff', '#c58aff', '#7dff9e'];
+
+function resizeConfetti() {
+  cCanvas.width = innerWidth;
+  cCanvas.height = innerHeight;
+}
+window.addEventListener('resize', resizeConfetti);
+resizeConfetti();
+
+function spawnBurst() {
+  const n = 60;
+  for (let i = 0; i < n; i++) {
+    confettiParticles.push({
+      x: Math.random() * cCanvas.width,
+      y: -20 - Math.random() * 100,
+      vx: (Math.random() - 0.5) * 3,
+      vy: 2 + Math.random() * 3,
+      size: 6 + Math.random() * 6,
+      rot: Math.random() * 360,
+      vrot: (Math.random() - 0.5) * 12,
+      color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+      life: 0,
+    });
+  }
+}
+
+function startConfetti() {
+  cCanvas.style.display = 'block';
+  confettiParticles = [];
+  spawnBurst();
+  if (confettiSpawnTimer) clearInterval(confettiSpawnTimer);
+  confettiSpawnTimer = setInterval(spawnBurst, 500);
+  if (!confettiRAF) confettiTick();
+  // auto-stop the burst spawner after 5s, particles keep falling out
+  setTimeout(() => { if (confettiSpawnTimer) { clearInterval(confettiSpawnTimer); confettiSpawnTimer = null; } }, 5000);
+}
+
+function stopConfetti() {
+  if (confettiSpawnTimer) { clearInterval(confettiSpawnTimer); confettiSpawnTimer = null; }
+  confettiParticles = [];
+  cCanvas.style.display = 'none';
+  if (confettiRAF) { cancelAnimationFrame(confettiRAF); confettiRAF = null; }
+  cCtx.clearRect(0, 0, cCanvas.width, cCanvas.height);
+}
+
+function confettiTick() {
+  cCtx.clearRect(0, 0, cCanvas.width, cCanvas.height);
+  confettiParticles.forEach(p => {
+    p.x += p.vx; p.y += p.vy; p.vy += 0.03; p.rot += p.vrot; p.life++;
+    cCtx.save();
+    cCtx.translate(p.x, p.y);
+    cCtx.rotate(p.rot * Math.PI / 180);
+    cCtx.fillStyle = p.color;
+    cCtx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+    cCtx.restore();
+  });
+  confettiParticles = confettiParticles.filter(p => p.y < cCanvas.height + 40);
+  if (confettiParticles.length > 0 || confettiSpawnTimer) {
+    confettiRAF = requestAnimationFrame(confettiTick);
+  } else {
+    confettiRAF = null;
+    cCanvas.style.display = 'none';
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+updateStats();
+renderHistory();
+</script>
+</body>
+</html>
