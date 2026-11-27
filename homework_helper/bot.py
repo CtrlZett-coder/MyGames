@@ -2,12 +2,12 @@
 подробный разбор, как его решать, и можешь задавать уточняющие вопросы.
 
 Работает с двумя нейросетями на выбор (переменная PROVIDER):
-    PROVIDER=deepseek  — DeepSeek (по умолчанию), нужен DEEPSEEK_API_KEY
-    PROVIDER=claude    — Claude, нужен ANTHROPIC_API_KEY
+    PROVIDER=deepseek  — DeepSeek, нужен DEEPSEEK_API_KEY
+    PROVIDER=claude    — Claude (по умолчанию), нужен ANTHROPIC_API_KEY
 
 Запуск:
     export TELEGRAM_BOT_TOKEN=...   # от @BotFather
-    export DEEPSEEK_API_KEY=...     # с platform.deepseek.com
+    export ANTHROPIC_API_KEY=...    # с platform.claude.com
     python bot.py
 """
 
@@ -30,7 +30,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("homework_helper")
 
-PROVIDER = os.environ.get("PROVIDER", "deepseek").lower()
+PROVIDER = os.environ.get("PROVIDER", "claude").lower()
 DEEPSEEK_MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-chat")
 DEEPSEEK_BASE_URL = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 CLAUDE_MODEL = "claude-opus-5-5"
