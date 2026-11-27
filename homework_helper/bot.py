@@ -33,6 +33,20 @@ logging.basicConfig(
 )
 log = logging.getLogger("homework_helper")
 
+def load_env_file(path: Path) -> None:
+    """Читает настройки из файла .env (строки вида КЛЮЧ=значение)."""
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8-sig").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+load_env_file(Path(__file__).with_name(".env"))
+
 PROVIDER = os.environ.get("PROVIDER", "claude").lower()
 DEEPSEEK_MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-chat")
 DEEPSEEK_BASE_URL = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")

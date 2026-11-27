@@ -3,3 +3,5 @@ __pycache__/
 .claude/worktrees/
 space_shooter/build/
 homework_helper/balance.json
+.env
+**/.env
