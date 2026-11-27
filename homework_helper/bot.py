@@ -12,13 +12,16 @@
 """
 
 import base64
+import json
 import logging
 import os
+from pathlib import Path
 
 from telegram import Update
 from telegram.constants import ChatAction
 from telegram.ext import (
     Application,
+    ApplicationHandlerStop,
     CommandHandler,
     ContextTypes,
     MessageHandler,
@@ -37,6 +40,44 @@ CLAUDE_MODEL = "claude-opus-5-5"
 
 MAX_HISTORY = 20          # сообщений в одном разговоре, потом начинаем заново
 TELEGRAM_LIMIT = 4000     # Telegram режет сообщения длиннее 4096 символов
+
+# ---------- Учёт денег ----------
+# Узнать баланс API автоматически нельзя, поэтому бот сам считает,
+# сколько потратил: берёт число токенов из каждого ответа и умножает на цену.
+# Когда пополняешь баланс на сайте — напиши боту /topup 300.
+USD_RUB = float(os.environ.get("USD_RUB", "100"))          # курс доллара
+LOW_BALANCE_RUB = float(os.environ.get("LOW_BALANCE_RUB", "50"))
+# Цена в долларах за 1 миллион токенов (вход / выход).
+PRICES = {
+    "claude": (4.0, 20.0),      # Claude Opus 5.5
+    "deepseek": (0.3, 1.2),     # примерно — проверь на сайте DeepSeek
+}
+PRICE_IN = float(os.environ.get("PRICE_IN", PRICES.get(PROVIDER, (0, 0))[0]))
+PRICE_OUT = float(os.environ.get("PRICE_OUT", PRICES.get(PROVIDER, (0, 0))[1]))
+BALANCE_FILE = Path(__file__).with_name("balance.json")
+
+# Кто может пользоваться ботом (Telegram ID через запятую). Пусто — все.
+# Свой ID можно узнать командой /myid. Без этого чужие люди могут
+# найти бота и тратить твои деньги!
+ALLOWED_USERS = {
+    int(x) for x in os.environ.get("ALLOWED_USERS", "").replace(" ", "").split(",") if x
+}
+
+
+def load_balance() -> float:
+    try:
+        return float(json.loads(BALANCE_FILE.read_text())["rub"])
+    except (FileNotFoundError, KeyError, ValueError):
+        return 0.0
+
+
+def save_balance(rub: float) -> None:
+    BALANCE_FILE.write_text(json.dumps({"rub": round(rub, 2)}))
+
+
+def cost_rub(input_tokens: int, output_tokens: int) -> float:
+    usd = (input_tokens * PRICE_IN + output_tokens * PRICE_OUT) / 1_000_000
+    return usd * USD_RUB
 
 SYSTEM_PROMPT = """Ты — доброжелательный репетитор для школьника. Тебе присылают \
 фото или текст задания. Твоя цель — чтобы ученик ПОНЯЛ, как решать такие задачи, \
@@ -120,7 +161,9 @@ if PROVIDER == "deepseek":
         text = (choice.message.content or "").strip()
         if choice.finish_reason == "length":
             text += "\n\n(Ответ обрезался — напиши «продолжи».)"
-        return text
+        u = response.usage
+        spent = cost_rub(u.prompt_tokens, u.completion_tokens) if u else 0.0
+        return text, spent
 
 
 # ---------- Claude ----------
@@ -163,12 +206,15 @@ elif PROVIDER == "claude":
         except anthropic.APIConnectionError:
             raise ProviderError("Нет связи с сервером, попробуй позже.")
 
+        # output_tokens включает «размышления» модели — они тоже платные.
+        spent = cost_rub(response.usage.input_tokens, response.usage.output_tokens)
         if response.stop_reason == "refusal":
-            return "Не могу помочь с этим запросом. Попробуй прислать другое задание."
+            return ("Не могу помочь с этим запросом. "
+                    "Попробуй прислать другое задание."), spent
         text = "".join(b.text for b in response.content if b.type == "text").strip()
         if response.stop_reason == "max_tokens":
             text += "\n\n(Ответ обрезался — напиши «продолжи».)"
-        return text
+        return text, spent
 
 else:
     raise SystemExit(f"Неизвестный PROVIDER={PROVIDER!r}, нужно deepseek или claude")
@@ -199,7 +245,7 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE,
 
     await update.effective_chat.send_action(ChatAction.TYPING)
     try:
-        answer = await ask(history)
+        answer, spent = await ask(history)
     except ProviderError as e:
         history.pop()
         await update.message.reply_text(str(e))
@@ -210,6 +256,28 @@ async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE,
     for part in split_message(answer):
         await update.message.reply_text(part)
 
+    balance = load_balance() - spent
+    save_balance(balance)
+    status = f"💰 Этот ответ: ~{spent:.2f} ₽ · осталось ~{balance:.0f} ₽"
+    if balance < LOW_BALANCE_RUB:
+        status += (f"\n⚠️ Осталось меньше {LOW_BALANCE_RUB:.0f} ₽! Пополни баланс "
+                   "на сайте и напиши /topup <сумма>.")
+    await update.message.reply_text(status)
+
+
+def allowed(update: Update) -> bool:
+    return not ALLOWED_USERS or update.effective_user.id in ALLOWED_USERS
+
+
+async def guard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Отвечает чужим пользователям и не пускает их дальше."""
+    if update.message and not allowed(update):
+        await update.message.reply_text(
+            "Это личный бот, у тебя нет доступа. "
+            f"Твой ID: {update.effective_user.id}"
+        )
+        raise ApplicationHandlerStop
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
@@ -217,8 +285,45 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "Пришли фото задания (или напиши его текстом) — я объясню, как его "
         "решать, по шагам. Потом можешь спрашивать «а почему так?» или "
         "прислать своё решение похожей задачи на проверку.\n\n"
-        "/new — начать новую тему"
+        "/new — начать новую тему\n"
+        "/balance — сколько осталось денег\n"
+        "/topup 300 — записать пополнение баланса\n"
+        "/myid — узнать свой Telegram ID"
     )
+
+
+async def balance_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    balance = load_balance()
+    text = f"💰 На балансе примерно {balance:.0f} ₽."
+    if balance < LOW_BALANCE_RUB:
+        text += f"\n⚠️ Меньше {LOW_BALANCE_RUB:.0f} ₽ — пора пополнить."
+    text += ("\n\nЭто подсчёт самого бота. Точная сумма — на сайте, "
+             "где ты пополнял ключ.")
+    await update.message.reply_text(text)
+
+
+async def topup_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    arg = "".join(context.args).replace(",", ".")
+    exact = arg.startswith("=")
+    try:
+        amount = float(arg.lstrip("="))
+    except ValueError:
+        await update.message.reply_text(
+            "Напиши сумму, которую положил на сайте, например: /topup 300\n"
+            "Чтобы задать баланс точно (как на сайте): /topup =250"
+        )
+        return
+    if exact:
+        save_balance(amount)
+        msg = f"Баланс установлен: {amount:.0f} ₽."
+    else:
+        save_balance(load_balance() + amount)
+        msg = f"Записал +{amount:.0f} ₽. Теперь на балансе ~{load_balance():.0f} ₽."
+    await update.message.reply_text(msg)
+
+
+async def myid_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text(f"Твой Telegram ID: {update.effective_user.id}")
 
 
 async def new_topic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -245,8 +350,12 @@ def main() -> None:
     if not token:
         raise SystemExit("Задай переменную окружения TELEGRAM_BOT_TOKEN")
     app = Application.builder().token(token).build()
+    app.add_handler(MessageHandler(filters.ALL, guard), group=-1)
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("new", new_topic))
+    app.add_handler(CommandHandler("balance", balance_cmd))
+    app.add_handler(CommandHandler("topup", topup_cmd))
+    app.add_handler(CommandHandler("myid", myid_cmd))
     app.add_handler(MessageHandler(filters.PHOTO, on_photo))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
     log.info("Бот запущен, нейросеть: %s", PROVIDER)
